@@ -1424,6 +1424,55 @@ External Setpoint Generation:
 			</Relations>
 		</DataType>
 		<DataType>
+			<Name GUID="{0994ABA9-6F32-EEB9-4362-7774F7A1F4F4}" AutoDeleteType="true">FSOE_11</Name>
+			<BitSize>88</BitSize>
+			<SubItem>
+				<Name>FSoE CMD</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>0</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>FSoE Data 0</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000033}">BITARR16</Type>
+				<BitSize>16</BitSize>
+				<BitOffs>8</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>FSoE CRC_0</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000005}">UINT</Type>
+				<BitSize>16</BitSize>
+				<BitOffs>24</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>FSoE Data 1</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000033}">BITARR16</Type>
+				<BitSize>16</BitSize>
+				<BitOffs>40</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>FSoE CRC_1</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000005}">UINT</Type>
+				<BitSize>16</BitSize>
+				<BitOffs>56</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>FSoE ConnID</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000005}">UINT</Type>
+				<BitSize>16</BitSize>
+				<BitOffs>72</BitOffs>
+			</SubItem>
+		</DataType>
+		<DataType>
+			<Name GUID="{18071995-0000-0000-0000-002000000005}" IecBaseType="true" AutoDeleteType="true" HideSubItems="true">ARRAY [0..4] OF BIT</Name>
+			<BitSize>5</BitSize>
+			<BaseType GUID="{18071995-0000-0000-0000-000000000010}">BIT</BaseType>
+			<ArrayInfo>
+				<LBound>0</LBound>
+				<Elements>5</Elements>
+			</ArrayInfo>
+		</DataType>
+		<DataType>
 			<Name GUID="{18071995-0000-0000-0000-002000000010}" IecBaseType="true" AutoDeleteType="true" HideSubItems="true">ARRAY [0..1] OF BYTE</Name>
 			<BitSize>16</BitSize>
 			<BaseType GUID="{18071995-0000-0000-0000-000000000001}">BYTE</BaseType>
@@ -1475,15 +1524,6 @@ External Setpoint Generation:
 			<ArrayInfo>
 				<LBound>0</LBound>
 				<Elements>3</Elements>
-			</ArrayInfo>
-		</DataType>
-		<DataType>
-			<Name GUID="{18071995-0000-0000-0000-002000000005}" IecBaseType="true" AutoDeleteType="true" HideSubItems="true">ARRAY [0..4] OF BIT</Name>
-			<BitSize>5</BitSize>
-			<BaseType GUID="{18071995-0000-0000-0000-000000000010}">BIT</BaseType>
-			<ArrayInfo>
-				<LBound>0</LBound>
-				<Elements>5</Elements>
 			</ArrayInfo>
 		</DataType>
 		<DataType>
@@ -1559,7 +1599,7 @@ External Setpoint Generation:
 			</ArrayInfo>
 		</DataType>
 		<DataType>
-			<Name GUID="{18071995-0000-0000-0000-002000000006}" IecBaseType="true" AutoDeleteType="true" HideSubItems="true">ARRAY [0..5] OF BIT</Name>
+			<Name GUID="{18071995-0000-0000-0000-002000000006}" IecBaseType="true" BitType="true" AutoDeleteType="true" HideSubItems="true">ARRAY [0..5] OF BIT</Name>
 			<BitSize>6</BitSize>
 			<BaseType GUID="{18071995-0000-0000-0000-000000000010}">BIT</BaseType>
 			<ArrayInfo>
@@ -1595,7 +1635,7 @@ External Setpoint Generation:
 		<ImageData Id="1005">424dd6020000000000003600000028000000100000000e0000000100180000000000a002000000000000000000000000000000000000ff00ffff00ffff00ffff00ffff00ffff00ff000000ff00ffff00ffa4a0a0a4a0a0a4a0a0a4a0a0a4a0a0a4a0a0a4a0a0000000000000000000000000000000000000000000ff00ffff00ffa4a0a0a4a0a0a4a0a0a4a0a0a4a0a0a4a0a00000000000000000000000000000000000000000000000000909ff0909ffa4a0a0a4a0a0000000000000000000a4a0a000ff00000000000000000000000000000000000000000000ff00ffff00ffa4a0a0a4a0a0000000000000000000a4a0a0000000ff00ffff00ffff00ff000000ff00ffff00ff000000ff00ffff00ffa4a0a0a4a0a0a4a0a0a4a0a0a4a0a0a4a0a0000000000000000000000000000000ff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a0000000000000000000a4a0a000ff00ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a0000000000000000000a4a0a0000000ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a0a4a0a0a4a0a0a4a0a0a4a0a0000000ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a000f2ff00f2ff00f2ffa4a0a000ff00ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a000f2ff00f2ff00f2ffa4a0a0000000ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a000f2ff00f2ff00f2ffa4a0a0000000ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a000f2ff00f2ff00f2ffa4a0a000ff00ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a000f2ff00f2ff00f2ffa4a0a0000000ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffa4a0a0a4a0a0a4a0a0a4a0a0a4a0a0a4a0a0a4a0a0</ImageData>
 		<ImageData Id="1006">424dd6020000000000003600000028000000100000000e0000000100180000000000a0020000c40e0000c40e00000000000000000000ff00ffff00ffff00ffff00ffff00ffff00ff808080808080808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffff00ffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ff007fff007fff007fff007fff007fff007fffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ff007fff007fff007fff007fff007fff007fffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ff007fff007fff007fff007fff007fff007fffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ff007fff007fff007fff007fff007fff007fffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ff007fff007fff007fff007fff007fff007fffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ff007fff007fff007fff007fff007fff007fffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ff007fff007fff007fff007fff007fff007fffc0c0c0c0c0c0808080ff00ffff00ffff00ffff00ffff00ffff00ffff00ff</ImageData>
 	</ImageDatas>
-	<Project ProjectGUID="{DA86CBF5-6BE8-48DE-AE3C-68058BDE7FEA}" TargetNetId="5.146.183.126.1.1" Target64Bit="true" ShowHideConfigurations="#x106">
+	<Project ProjectGUID="{DA86CBF5-6BE8-48DE-AE3C-68058BDE7FEA}" TargetNetId="5.146.183.126.1.1" ShowHideConfigurations="#x106">
 		<System>
 			<Tasks>
 				<Task Id="5" Priority="20" CycleTime="100000" AmsPort="350" AdtTasks="true">
@@ -1621,7 +1661,7 @@ External Setpoint Generation:
 					<Name>NC-Task 1 SVB</Name>
 				</SvbTask>
 				<Axis Id="1" CreateSymbols="true" AxisType="1">
-					<Name>Axis 1</Name>
+					<Name>RA</Name>
 					<AxisPara>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
@@ -1684,7 +1724,7 @@ External Setpoint Generation:
 						</Vars>
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
-						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00000100">
+						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
 							<Analog TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
@@ -1760,7 +1800,7 @@ External Setpoint Generation:
 					</Vars>
 				</Axis>
 				<Axis Id="2" CreateSymbols="true" AxisType="1">
-					<Name>Axis 2</Name>
+					<Name>Dec</Name>
 					<AxisPara>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
@@ -1823,7 +1863,7 @@ External Setpoint Generation:
 						</Vars>
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
-						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00000100">
+						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
 							<Analog TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
@@ -1899,7 +1939,7 @@ External Setpoint Generation:
 					</Vars>
 				</Axis>
 				<Axis Id="3" CreateSymbols="true" AxisType="1">
-					<Name>Axis 3</Name>
+					<Name>Focus</Name>
 					<AxisPara>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
@@ -1962,7 +2002,7 @@ External Setpoint Generation:
 						</Vars>
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
-						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00000100">
+						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
 							<Analog TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
@@ -2041,22 +2081,48 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{FB9130EE-5542-BD35-8A57-458543E497C4}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
+					<Vars VarGrpType="2" AreaNo="1">
+						<Name>PlcTask Outputs</Name>
+						<Var>
+							<Name>GVL_Safety.Run</Name>
+							<Comment><![CDATA[ Run/Stop Safety]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_Safety.Restart</Name>
+							<Comment><![CDATA[ Restart Safety]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_Safety.ErrAck</Name>
+							<Comment><![CDATA[ Error Acknowledgement ]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+					</Vars>
 					<Contexts>
 						<Context>
-							<Id>1</Id>
-							<Name>Default</Name>
+							<Id>0</Id>
+							<Name>PlcTask</Name>
+							<ManualConfig>
+								<OTCID>#x02010050</OTCID>
+							</ManualConfig>
+							<Priority>20</Priority>
+							<CycleTime>10000000</CycleTime>
 						</Context>
 					</Contexts>
+					<TaskPouOids>
+						<TaskPouOid Prio="20" OTCID="#x08502001"/>
+					</TaskPouOids>
 				</Instance>
 			</Project>
 		</Plc>
 		<Safety>
-			<Project GUID="{067EB0AB-4130-4215-B026-9358D6E097CC}" Name="Untitled1" PrjFilePath="Untitled1\Untitled1.splcproj" TmcFilePath="Untitled1\Untitled1.tmc" GeneralArchiveSettings="#x000f" TargetArchiveSettings="#x0007" FileArchiveSettings="#x000e">
+			<Project GUID="{B4C53AAB-62AC-413C-85F9-5EE6744F63DC}" Name="ELM7221" PrjFilePath="ELM7221\ELM7221.splcproj" TmcFilePath="ELM7221\ELM7221.tmc" GeneralArchiveSettings="#x000f" TargetArchiveSettings="#x0007" FileArchiveSettings="#x000e">
 				<Instance Id="#x01010010" KeepUnrestoredLinks="2">
-					<Name>Untitled1 Instance</Name>
+					<Name>ELM7221 Instance</Name>
 					<TmcDesc GUID="{72A6D5B8-E98C-4604-8B90-09D1F8AB38A9}">
 						<Name>Safety</Name>
 						<InitSequence>PO</InitSequence>
@@ -2069,9 +2135,24 @@ External Setpoint Generation:
 					</TmcDesc>
 				</Instance>
 			</Project>
-			<Project GUID="{2270E274-ACEC-402F-AE69-A9E5143DE6E1}" Name="Untitled2" PrjFilePath="Untitled2\Untitled2.splcproj" TmcFilePath="Untitled2\Untitled2.tmc" GeneralArchiveSettings="#x000f" TargetArchiveSettings="#x0007" FileArchiveSettings="#x000e">
+			<Project GUID="{F7542CD4-4859-4AC5-A6DA-11BA51ECB570}" Name="ELM7212" PrjFilePath="ELM7212\ELM7212.splcproj" TmcFilePath="ELM7212\ELM7212.tmc" GeneralArchiveSettings="#x000f" TargetArchiveSettings="#x0007" FileArchiveSettings="#x000e">
 				<Instance Id="#x01010020" KeepUnrestoredLinks="2">
-					<Name>Untitled2 Instance</Name>
+					<Name>ELM7212 Instance</Name>
+					<TmcDesc GUID="{72A6D5B8-E98C-4604-8B90-09D1F8AB38A9}">
+						<Name>Safety</Name>
+						<InitSequence>PO</InitSequence>
+						<Contexts>
+							<Context>
+								<Id>1</Id>
+								<Name>Default</Name>
+							</Context>
+						</Contexts>
+					</TmcDesc>
+				</Instance>
+			</Project>
+			<Project GUID="{166E2B3B-49CA-43BA-A6E6-63D00E8EAEA9}" Name="EL1918" PrjFilePath="EL1918\EL1918.splcproj" TmcFilePath="EL1918\EL1918.tmc" GeneralArchiveSettings="#x000f" TargetArchiveSettings="#x0007" FileArchiveSettings="#x000e">
+				<Instance Id="#x01010030" KeepUnrestoredLinks="2">
+					<Name>EL1918 Instance</Name>
 					<TmcDesc GUID="{72A6D5B8-E98C-4604-8B90-09D1F8AB38A9}">
 						<Name>Safety</Name>
 						<InitSequence>PO</InitSequence>
@@ -2116,6 +2197,9 @@ External Setpoint Generation:
 				<Image Id="1" AddrType="9" ImageType="3">
 					<Name>Image</Name>
 				</Image>
+				<Image Id="4" AddrType="10" ImageType="3">
+					<Name>Image-2</Name>
+				</Image>
 				<Box Id="1" BoxType="9099">
 					<Name>Term 1 (EK1200)</Name>
 					<ImageId>1000</ImageId>
@@ -2126,8 +2210,8 @@ External Setpoint Generation:
 						<EtherCAT SlaveType="2" PdiType="#x0005" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="3" FoeType="1" VendorId="#x00000002" ProductCode="#x077e3052" RevisionNo="#x00100000" InfoDataAddr="true" RepeatSupport="true" TimeoutStateChange1="5000" TimeoutMailbox2="10000" TComSupport="true" PortPhys="51" DebugMemory="8" SafetyLogicSupported="true" MaxSlotCount="2" Type="EL1918, 8Ch. Safety Input 24V, TwinSAFE" Desc="EL1918" PortABoxInfo="#x01000001">
 							<SyncMan>001000012600010001000000000100010001001026010000</SyncMan>
 							<SyncMan>001100012200010002000000000100010001001122010000</SyncMan>
-							<SyncMan>001208002400010003000000000000000800001224010000</SyncMan>
-							<SyncMan>001d09002000010004000000000000000900001d20010000</SyncMan>
+							<SyncMan>001219002400010003000000000000000800001224010000</SyncMan>
+							<SyncMan>001d18002000010004000000000000000900001d20010000</SyncMan>
 							<SyncMan>002e00002400000003000000000000000000002e24000000</SyncMan>
 							<SyncMan>002f00002000000004000000000000000000002f20000000</SyncMan>
 							<Fmmu>0000000000000000001200020100000001000000060000000200000000000000</Fmmu>
@@ -2140,111 +2224,47 @@ External Setpoint Generation:
 							<SuName></SuName>
 							<SuTask>#x00000000</SuTask>
 							<SuTask>#x00000000</SuTask>
-							<MBoxUserCmdData>004003000a00000000000000030010000000000000000000000000000000000020f3100502000000010000</MBoxUserCmdData>
-							<Pdo Name="FSoE Inputs" Index="#x1a00" Flags="#x0091" SyncMan="3">
-								<Entry Name="FSOE__FSoE Command" Index="#x6080" Sub="#x01">
-									<Type>USINT</Type>
+							<MBoxUserCmdData>004003000a00000000000000000000000000000000000000000000000000000020f3100502000000010000</MBoxUserCmdData>
+							<Pdo Name="ConnectionInputs" Index="#x1a00" Flags="#x2011" SyncMan="3">
+								<Entry Name="TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 TxPDO" Index="#x7000" Sub="#x01">
+									<Type GUID="{0994ABA9-6F32-EEB9-4362-7774F7A1F4F4}">FSOE_11</Type>
 								</Entry>
-								<Entry Name="FSOE__FSIN Module 1.Input" Index="#x6001" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 1.Module Fault" Index="#x6002" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 2.Input" Index="#x6011" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 2.Module Fault" Index="#x6012" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 3.Input" Index="#x6021" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 3.Module Fault" Index="#x6022" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 4.Input" Index="#x6031" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 4.Module Fault" Index="#x6032" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 5.Input" Index="#x6041" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 5.Module Fault" Index="#x6042" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 6.Input" Index="#x6051" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 6.Module Fault" Index="#x6052" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 7.Input" Index="#x6061" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 7.Module Fault" Index="#x6062" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 8.Input" Index="#x6071" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 8.Module Fault" Index="#x6072" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSoE CRC 000" Index="#x6080" Sub="#x03">
-									<Type>UINT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSoE Connection ID" Index="#x6080" Sub="#x02">
-									<Type>UINT</Type>
+								<Entry Name="TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 TxPDO" Index="#x7000" Sub="#x02">
+									<Type GUID="{0994ABA9-6F32-EEB9-4362-7774F7A1F4F4}">FSOE_11</Type>
 								</Entry>
 							</Pdo>
-							<Pdo Name="FSoE Outputs" Index="#x1600" InOut="1" Flags="#x0091" SyncMan="2">
-								<Entry Name="FSOE__FSoE Command" Index="#x7080" Sub="#x01">
-									<Type>USINT</Type>
+							<Pdo Name="ConnectionOutputs" Index="#x1600" InOut="1" Flags="#x2011" SyncMan="2">
+								<Entry Name="TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 RxPDO" Index="#x6000" Sub="#x01">
+									<Type GUID="{0994ABA9-6F32-EEB9-4362-7774F7A1F4F4}">FSOE_11</Type>
 								</Entry>
-								<Entry Name="FSOE__FSIN Module 1.ErrAck" Index="#x7002" Sub="#x01">
+								<Entry Name="TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 RxPDO" Index="#x6000" Sub="#x02">
+									<Type GUID="{0994ABA9-6F32-EEB9-4362-7774F7A1F4F4}">FSOE_11</Type>
+								</Entry>
+							</Pdo>
+							<Pdo Name="StandardOutputs" Index="#x17f0" InOut="1" Flags="#x2011" SyncMan="2">
+								<Entry Name="TwinSafeGroup1.Run_1" Index="#x6000" Sub="#x01">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="FSOE__FSIN Module 2.ErrAck" Index="#x7012" Sub="#x01">
+								<Entry Name="TwinSafeGroup1.ErrorAcknowledgement_2" Index="#x6000" Sub="#x02">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="FSOE__FSIN Module 3.ErrAck" Index="#x7022" Sub="#x01">
+								<Entry Name="TwinSafeGroup1.Restart_6" Index="#x6000" Sub="#x03">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="FSOE__FSIN Module 4.ErrAck" Index="#x7032" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 5.ErrAck" Index="#x7042" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 6.ErrAck" Index="#x7052" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 7.ErrAck" Index="#x7062" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSIN Module 8.ErrAck" Index="#x7072" Sub="#x01">
-									<Type>BIT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSoE CRC 000" Index="#x7080" Sub="#x03">
-									<Type>UINT</Type>
-								</Entry>
-								<Entry Name="FSOE__FSoE Connection ID" Index="#x7080" Sub="#x02">
-									<Type>UINT</Type>
+								<Entry>
+									<Type GUID="{18071995-0000-0000-0000-002000000005}">ARRAY [0..4] OF BIT</Type>
 								</Entry>
 							</Pdo>
 							<Pdo Name="FSLOGIC Inputs" Index="#x1bff" Flags="#x0091" SyncMan="3">
-								<Entry Name="Safe Logic State" Index="#xf100" Sub="#x01">
+								<Entry Name="Safe Logic State" BitLen="8" Index="#xf100" Sub="#x01">
 									<Type>USINT</Type>
 								</Entry>
-								<Entry Name="Cycle Counter" Index="#xf100" Sub="#x02">
+								<Entry Name="Cycle Counter" BitLen="8" Index="#xf100" Sub="#x02">
 									<Type>USINT</Type>
 								</Entry>
 							</Pdo>
 							<Pdo Name="FSLOGIC Outputs" Index="#x17ff" InOut="1" Flags="#x0091" SyncMan="2">
-								<Entry>
+								<Entry BitLen="16">
 									<Type GUID="{18071995-0000-0000-0000-002000000010}">ARRAY [0..1] OF BYTE</Type>
 								</Entry>
 							</Pdo>
@@ -2260,14 +2280,6 @@ External Setpoint Generation:
 							<Slot Name="FSOE-Slot">
 								<SlotData>0000000001000400000000000000000000000000000000000000000000000000</SlotData>
 								<ModuleIdent>1050494</ModuleIdent>
-								<Module Id="#x03090001" Type="FSOE" Class="1918">
-									<Name>Module 1 (FSOE)</Name>
-									<ImageId>406</ImageId>
-									<ModuleData>020000007e07100000002c000000000000000000000000000000000000000000</ModuleData>
-									<PdoIndex>6656</PdoIndex>
-									<PdoIndex>5632</PdoIndex>
-									<CoeProfile ProfileNo="#x00bf1389"/>
-								</Module>
 							</Slot>
 							<Slot Name="FSLOGIC">
 								<SlotData>0000010001000400000000000000000000000000000000000000000000000000</SlotData>
@@ -2280,6 +2292,39 @@ External Setpoint Generation:
 									<PdoIndex>6143</PdoIndex>
 								</Module>
 							</Slot>
+						</EtherCAT>
+					</Box>
+					<Box Id="14" Disabled="true" BoxType="9099" BoxFlags="#x00000020">
+						<Name>Term 14 (EL6910)</Name>
+						<ImageId>1001</ImageId>
+						<EtherCAT SlaveType="2" PdiType="#x0005" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="3" FoeType="1" VendorId="#x00000002" ProductCode="#x1afe3052" RevisionNo="#x00150000" InfoDataAddr="true" RepeatSupport="true" TimeoutStateChange1="5000" TimeoutMailbox2="10000" TComSupport="true" PortPhys="51" DebugMemory="8" SafetyLogicSupported="true" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL6910, TwinSAFE PLC" Desc="EL6910" PortABoxInfo="#x01000002">
+							<SyncMan>001000012600010001000000000100010001001026010000</SyncMan>
+							<SyncMan>001100012200010002000000000100010001001122010000</SyncMan>
+							<SyncMan>001202002400010003000000000000000200001224010000</SyncMan>
+							<SyncMan>001d02002000010004000000000000000200001d20010000</SyncMan>
+							<SyncMan>002e00002400000003000000000000000000002e24000000</SyncMan>
+							<SyncMan>002f00002000000004000000000000000000002f20000000</SyncMan>
+							<Fmmu>0000000000000000001200020100000001000000060000000200000000000000</Fmmu>
+							<Fmmu>0000000000000000001d00010100000002000000060000000300000000000000</Fmmu>
+							<Fmmu>00000000000000000d0800010100000003000000000000000000000000000000</Fmmu>
+							<Fmmu>0000000000000000000000020000000001000000060000000400010000000000</Fmmu>
+							<Fmmu>0000000000000000000000010000000002000000060000000500010000000000</Fmmu>
+							<BootStrapData>0010f400f410f400</BootStrapData>
+							<MBoxUserCmdData>004003000a0000001f000000030010000000000000000000000000000000000020f31005020000000100456e61626c6520446961674d65737361676520617320656d657267656e637900</MBoxUserCmdData>
+							<Pdo Name="FSLOGIC Inputs" Index="#x1bff" Flags="#x0011" SyncMan="3">
+								<Entry Name="Safe Logic State" Index="#xf100" Sub="#x01">
+									<Type>USINT</Type>
+								</Entry>
+								<Entry Name="Cycle Counter" Index="#xf100" Sub="#x02">
+									<Type>USINT</Type>
+								</Entry>
+							</Pdo>
+							<Pdo Name="FSLOGIC Outputs" Index="#x17ff" InOut="1" Flags="#x0011" SyncMan="2">
+								<Entry>
+									<Type GUID="{18071995-0000-0000-0000-002000000010}">ARRAY [0..1] OF BYTE</Type>
+								</Entry>
+							</Pdo>
+							<CoeProfile ProfileNo="5001"/>
 						</EtherCAT>
 					</Box>
 					<Box Id="3" BoxType="9099">
@@ -2333,6 +2378,366 @@ External Setpoint Generation:
 					<Box Id="4" BoxType="9099" BoxFlags="#x00000020">
 						<Name>Term 4 (ELM7212-9016)</Name>
 						<ImageId>1002</ImageId>
+						<Xml>
+							<TcDMDrive>
+								<SortId>0</SortId>
+								<DriveModuleType>14</DriveModuleType>
+								<TcLink>
+									<TcPrjPath>..\IAG50cm\IAG50cm.tsproj</TcPrjPath>
+									<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)</IoItemPathName>
+									<ItemId>4</ItemId>
+									<ObjectId>#x03020004</ObjectId>
+								</TcLink>
+								<OrderCode>ELM7212-9016</OrderCode>
+								<Name>Term 4 (ELM7212-9016)</Name>
+								<FirmwareVersion>04</FirmwareVersion>
+								<CatalogNo>ELM7212-9016</CatalogNo>
+								<HardwareVersion>00</HardwareVersion>
+								<SerialNr>0</SerialNr>
+								<BIC>1P235739SBTN0008r1xk1KELM7212-9016                  Q1    2P092404010017</BIC>
+								<ProductRevision>ELM7212-9016-0017</ProductRevision>
+								<SafetyDeviceName>ELM8911(0002-9016)</SafetyDeviceName>
+								<SafetySoftwareVersion>01 (V01.02)</SafetySoftwareVersion>
+								<WatchLog UpdateIntervalInMs="500">
+									<WatchLogItem>
+										<WatchLogParaCoE Index="4120" SubIndex="2"/>
+										<Alias>Type</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="4120" SubIndex="4"/>
+										<Alias>Serial Nr</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="4322" SubIndex="1"/>
+										<Alias>BIC</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="4106" SubIndex="0"/>
+										<Alias>Firmware version</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="63744" SubIndex="18"/>
+										<Alias>DC link voltage</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="63744" SubIndex="17"/>
+										<Alias>Amplifier temperature</Alias>
+									</WatchLogItem>
+								</WatchLog>
+								<Inverter>
+									<Device>
+										<Name>DMInverterTypeDevice</Name>
+										<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+										<Parameter>
+											<PropertyName>MaxAllowedMainVoltage</PropertyName>
+											<Value>48</Value>
+										</Parameter>
+										<Parameter>
+											<PropertyName>MinDcLinkVoltage</PropertyName>
+											<Value>6.8</Value>
+										</Parameter>
+										<Parameter>
+											<PropertyName>MaxDcLinkVoltage</PropertyName>
+											<Value>60</Value>
+										</Parameter>
+									</Device>
+									<Channel ChnId="0">
+										<TcLink>
+											<TcPrjPath>..\IAG50cm\IAG50cm.tsproj</TcPrjPath>
+											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)</IoItemPathName>
+											<NcItemPathName AxisType="1">TINC^NC-Task 1 SAF^Axes^RA</NcItemPathName>
+										</TcLink>
+										<SelectedModifyOptPDOsMode>0</SelectedModifyOptPDOsMode>
+										<Modulo>
+											<Name>ControllerModuloType</Name>
+											<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+											<Parameter>
+												<PropertyName>Modulo_IsOn</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_DataStorage</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_Value</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_MinPositionRange</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_MaxPositionRange</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+										</Modulo>
+										<Block Id="0">
+											<Load MoveStyle="Rotary">
+												<IsMotorRotary>true</IsMotorRotary>
+												<Name>InverterChannelTypeBlockLoad</Name>
+												<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+												<Parameter>
+													<PropertyName>FeedConstantUnit</PropertyName>
+													<Value>°</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>FeedConstant</PropertyName>
+													<Value>360</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearRatioMotorSide</PropertyName>
+													<Value>1</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearRatioLoadSide</PropertyName>
+													<Value>1</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearboxInertia</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>LoadInertiaMassReflectedOnGearbox</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxMoveDistance</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>LoadInertiaMass</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxApplicationTorqueForce</PropertyName>
+													<Value>0.032767</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxApplicationSpeed</PropertyName>
+													<Value>10471.97551</Value>
+												</Parameter>
+											</Load>
+											<Controller>
+												<Filter Id="0">
+													<Name>ControllerFilter</Name>
+													<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+													<Parameter>
+														<PropertyName>Filter_Type</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+												</Filter>
+												<Filter Id="1">
+													<Name>ControllerFilter</Name>
+													<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+													<Parameter>
+														<PropertyName>Filter_Type</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+												</Filter>
+											</Controller>
+										</Block>
+										<WatchLog ChnId="0" UpdateIntervalInMs="500">
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24592" SubIndex="1"/>
+												<Alias>Status word</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="28688" SubIndex="3"/>
+												<Alias>Actual operation mode</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24592" SubIndex="7"/>
+												<Alias>Actual velocity</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24592" SubIndex="8"/>
+												<Alias>Actual torque</Alias>
+											</WatchLogItem>
+										</WatchLog>
+									</Channel>
+									<Channel ChnId="1">
+										<TcLink>
+											<TcPrjPath>..\IAG50cm\IAG50cm.tsproj</TcPrjPath>
+											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)</IoItemPathName>
+											<NcItemPathName AxisType="1">TINC^NC-Task 1 SAF^Axes^Dec</NcItemPathName>
+										</TcLink>
+										<SelectedModifyOptPDOsMode>0</SelectedModifyOptPDOsMode>
+										<Modulo>
+											<Name>ControllerModuloType</Name>
+											<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+											<Parameter>
+												<PropertyName>Modulo_IsOn</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_DataStorage</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_Value</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_MinPositionRange</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_MaxPositionRange</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+										</Modulo>
+										<Block Id="0">
+											<Load MoveStyle="Rotary">
+												<IsMotorRotary>true</IsMotorRotary>
+												<Name>InverterChannelTypeBlockLoad</Name>
+												<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+												<Parameter>
+													<PropertyName>FeedConstantUnit</PropertyName>
+													<Value>°</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>FeedConstant</PropertyName>
+													<Value>360</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearRatioMotorSide</PropertyName>
+													<Value>1</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearRatioLoadSide</PropertyName>
+													<Value>1</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearboxInertia</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>LoadInertiaMassReflectedOnGearbox</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxMoveDistance</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>LoadInertiaMass</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxApplicationTorqueForce</PropertyName>
+													<Value>0.032767</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxApplicationSpeed</PropertyName>
+													<Value>10471.97551</Value>
+												</Parameter>
+											</Load>
+											<Controller>
+												<Filter Id="0">
+													<Name>ControllerFilter</Name>
+													<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+													<Parameter>
+														<PropertyName>Filter_Type</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+												</Filter>
+												<Filter Id="1">
+													<Name>ControllerFilter</Name>
+													<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+													<Parameter>
+														<PropertyName>Filter_Type</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+												</Filter>
+											</Controller>
+										</Block>
+										<WatchLog ChnId="1" UpdateIntervalInMs="500">
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24848" SubIndex="1"/>
+												<Alias>Status word</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="28944" SubIndex="3"/>
+												<Alias>Actual operation mode</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24848" SubIndex="7"/>
+												<Alias>Actual velocity</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24848" SubIndex="8"/>
+												<Alias>Actual torque</Alias>
+											</WatchLogItem>
+										</WatchLog>
+									</Channel>
+								</Inverter>
+							</TcDMDrive>
+						</Xml>
 						<EtherCAT SlaveType="2" PdiType="#x0408" MboxDataLinkLayer="true" StateMBoxPolling="true" CfgModeSafeOp="true" CycleMBoxPollingTime="0" CoeType="47" FoeType="1" VendorId="#x00000002" ProductCode="#x502274c9" RevisionNo="#x00112338" InfoDataAddr="true" InfoDataSoeDS401="true" InfoDataDcTimes="true" TimeoutStateChange3="8000" TimeoutMailbox2="2000" CheckRevisionNoType="3" PortPhys="51" SdoUploadWithMaxLength="true" MaxSlotCount="1" Type="ELM7212-9016 2Ch. Servo Terminal (48 V, 4,5 A RMS, OCT, STO, TwinSAFE Logic)" Desc="ELM7212-9016" PortABoxInfo="#x01000003">
 							<SyncMan>001000012600010001000000800000010001001026010000</SyncMan>
 							<SyncMan>001100012200010002000000800000010001001122010000</SyncMan>
@@ -2358,6 +2763,7 @@ External Setpoint Generation:
 							<DcMode>4443000000000000000000000000000044432d53796e6368726f6e00000000000000000000000000000000000000000024f400000000000000000000ffff00070000000000000000000000000000000000000000000000000000000000000000</DcMode>
 							<MBoxUserCmdData>004003000c0000000000000000000000000000000000000000000000000000002081f001040000003823110000</MBoxUserCmdData>
 							<MBoxUserCmdData>004003000a0000001f000000000000000000000000000000000000000000000020f31005020000000100456e61626c6520446961674d65737361676520617320656d657267656e637900</MBoxUserCmdData>
+							<MBoxUserCmdData>020003000c0000003000000000000000000000000000000000000000000000002000f8100400000080bb000044525620416d706c69666965722053657474696e6773202f204e6f6d696e616c204443206c696e6b20766f6c7461676500</MBoxUserCmdData>
 							<Pdo Name="FB Position Channel 1" Index="#x1a00" Flags="#x0010" SyncMan="3">
 								<Entry Name="Position" BitLen="32" Index="#x6000" Sub="#x11">
 									<Type>UDINT</Type>
@@ -4001,6 +4407,219 @@ Bit 8 - 15 : reserved]]></Comment>
 					<Box Id="12" BoxType="9099" BoxFlags="#x00000020">
 						<Name>Term 12 (ELM7221-9016)</Name>
 						<ImageId>1005</ImageId>
+						<Xml>
+							<TcDMDrive>
+								<SortId>1</SortId>
+								<DriveModuleType>14</DriveModuleType>
+								<TcLink>
+									<TcPrjPath>..\IAG50cm\IAG50cm.tsproj</TcPrjPath>
+									<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)</IoItemPathName>
+									<ItemId>12</ItemId>
+									<ObjectId>#x0302000c</ObjectId>
+								</TcLink>
+								<OrderCode>ELM7221-9016</OrderCode>
+								<Name>Term 12 (ELM7221-9016)</Name>
+								<FirmwareVersion>04</FirmwareVersion>
+								<CatalogNo>ELM7222-9016</CatalogNo>
+								<HardwareVersion>00</HardwareVersion>
+								<SerialNr>0</SerialNr>
+								<BIC>1P235749SBTN0008qug41KELM7221-9016                  Q1    2P072404010017</BIC>
+								<ProductRevision>ELM7221-9016-0017</ProductRevision>
+								<SafetyDeviceName>ELM8911(0001-9016)</SafetyDeviceName>
+								<SafetySoftwareVersion>01 (V01.02)</SafetySoftwareVersion>
+								<WatchLog UpdateIntervalInMs="500">
+									<WatchLogItem>
+										<WatchLogParaCoE Index="4120" SubIndex="2"/>
+										<Alias>Type</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="4120" SubIndex="4"/>
+										<Alias>Serial Nr</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="4322" SubIndex="1"/>
+										<Alias>BIC</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="4106" SubIndex="0"/>
+										<Alias>Firmware version</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="63744" SubIndex="18"/>
+										<Alias>DC link voltage</Alias>
+									</WatchLogItem>
+									<WatchLogItem>
+										<WatchLogParaCoE Index="63744" SubIndex="17"/>
+										<Alias>Amplifier temperature</Alias>
+									</WatchLogItem>
+								</WatchLog>
+								<Inverter>
+									<Device>
+										<Name>DMInverterTypeDevice</Name>
+										<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+										<Parameter>
+											<PropertyName>MaxAllowedMainVoltage</PropertyName>
+											<Value>48</Value>
+										</Parameter>
+										<Parameter>
+											<PropertyName>MinDcLinkVoltage</PropertyName>
+											<Value>6.8</Value>
+										</Parameter>
+										<Parameter>
+											<PropertyName>MaxDcLinkVoltage</PropertyName>
+											<Value>60</Value>
+										</Parameter>
+									</Device>
+									<Channel ChnId="0">
+										<TcLink>
+											<TcPrjPath>..\IAG50cm\IAG50cm.tsproj</TcPrjPath>
+											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)</IoItemPathName>
+											<NcItemPathName AxisType="1">TINC^NC-Task 1 SAF^Axes^Focus</NcItemPathName>
+										</TcLink>
+										<SelectedModifyOptPDOsMode>0</SelectedModifyOptPDOsMode>
+										<Modulo>
+											<Name>ControllerModuloType</Name>
+											<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+											<Parameter>
+												<PropertyName>Modulo_IsOn</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_DataStorage</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_Value</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_MinPositionRange</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+											<Parameter>
+												<PropertyName>Modulo_MaxPositionRange</PropertyName>
+												<Value>0</Value>
+											</Parameter>
+										</Modulo>
+										<Block Id="0">
+											<Load MoveStyle="Rotary">
+												<IsMotorRotary>true</IsMotorRotary>
+												<Name>InverterChannelTypeBlockLoad</Name>
+												<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+												<Parameter>
+													<PropertyName>FeedConstantUnit</PropertyName>
+													<Value>°</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>FeedConstant</PropertyName>
+													<Value>360</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearRatioMotorSide</PropertyName>
+													<Value>1</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearRatioLoadSide</PropertyName>
+													<Value>1</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>GearboxInertia</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>LoadInertiaMassReflectedOnGearbox</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxMoveDistance</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>LoadInertiaMass</PropertyName>
+													<Value>0</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxApplicationTorqueForce</PropertyName>
+													<Value>0.032767</Value>
+												</Parameter>
+												<Parameter>
+													<PropertyName>MaxApplicationSpeed</PropertyName>
+													<Value>10471.97551</Value>
+												</Parameter>
+											</Load>
+											<Controller>
+												<Filter Id="0">
+													<Name>ControllerFilter</Name>
+													<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+													<Parameter>
+														<PropertyName>Filter_Type</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+												</Filter>
+												<Filter Id="1">
+													<Name>ControllerFilter</Name>
+													<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
+													<Parameter>
+														<PropertyName>Filter_Type</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_LowPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassFrequency</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+													<Parameter>
+														<PropertyName>Filter_HighPassDamping</PropertyName>
+														<Value>0</Value>
+													</Parameter>
+												</Filter>
+											</Controller>
+										</Block>
+										<WatchLog ChnId="0" UpdateIntervalInMs="500">
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24592" SubIndex="1"/>
+												<Alias>Status word</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="28688" SubIndex="3"/>
+												<Alias>Actual operation mode</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24592" SubIndex="7"/>
+												<Alias>Actual velocity</Alias>
+											</WatchLogItem>
+											<WatchLogItem>
+												<WatchLogParaCoE Index="24592" SubIndex="8"/>
+												<Alias>Actual torque</Alias>
+											</WatchLogItem>
+										</WatchLog>
+									</Channel>
+								</Inverter>
+							</TcDMDrive>
+						</Xml>
 						<EtherCAT SlaveType="2" PdiType="#x0408" MboxDataLinkLayer="true" StateMBoxPolling="true" CfgModeSafeOp="true" CycleMBoxPollingTime="0" CoeType="47" FoeType="1" VendorId="#x00000002" ProductCode="#x50227559" RevisionNo="#x00112338" InfoDataAddr="true" InfoDataSoeDS401="true" InfoDataDcTimes="true" TimeoutStateChange3="8000" TimeoutMailbox2="2000" CheckRevisionNoType="3" PortPhys="51" SdoUploadWithMaxLength="true" MaxSlotCount="1" Type="ELM7221-9016 1Ch. Servo Terminal (48 V, 8 A RMS, OCT, STO, TwinSAFE Logic)" Desc="ELM7221-9016" PortABoxInfo="#x0100000b">
 							<SyncMan>001000012600010001000000800000010001001026010000</SyncMan>
 							<SyncMan>001100012200010002000000800000010001001122010000</SyncMan>
@@ -4026,6 +4645,7 @@ Bit 8 - 15 : reserved]]></Comment>
 							<DcMode>4443000000000000000000000000000044432d53796e6368726f6e00000000000000000000000000000000000000000024f400000000000000000000ffff00070000000000000000000000000000000000000000000000000000000000000000</DcMode>
 							<MBoxUserCmdData>004003000c0000000000000000000000000000000000000000000000000000002081f001040000003823110000</MBoxUserCmdData>
 							<MBoxUserCmdData>004003000a0000001f000000000000000000000000000000000000000000000020f31005020000000100456e61626c6520446961674d65737361676520617320656d657267656e637900</MBoxUserCmdData>
+							<MBoxUserCmdData>020003000c0000003000000000000000000000000000000000000000000000002000f8100400000080bb000044525620416d706c69666965722053657474696e6773202f204e6f6d696e616c204443206c696e6b20766f6c7461676500</MBoxUserCmdData>
 							<Pdo Name="FB Position" Index="#x1a00" Flags="#x0010" SyncMan="3">
 								<Entry Name="Position" BitLen="32" Index="#x6000" Sub="#x11">
 									<Type>UDINT</Type>
@@ -4832,43 +5452,10 @@ Bit 8 - 15 : reserved]]></Comment>
 							</Slot>
 						</EtherCAT>
 					</Box>
-					<Box Id="14" BoxType="9099" BoxFlags="#x00000020">
-						<Name>Term 14 (EL6910)</Name>
-						<ImageId>1001</ImageId>
-						<EtherCAT SlaveType="2" PdiType="#x0005" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="3" FoeType="1" VendorId="#x00000002" ProductCode="#x1afe3052" RevisionNo="#x00150000" InfoDataAddr="true" RepeatSupport="true" TimeoutStateChange1="5000" TimeoutMailbox2="10000" TComSupport="true" PortPhys="51" DebugMemory="8" SafetyLogicSupported="true" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL6910, TwinSAFE PLC" Desc="EL6910" PortABoxInfo="#x0100000c">
-							<SyncMan>001000012600010001000000000100010001001026010000</SyncMan>
-							<SyncMan>001100012200010002000000000100010001001122010000</SyncMan>
-							<SyncMan>001202002400010003000000000000000200001224010000</SyncMan>
-							<SyncMan>001d02002000010004000000000000000200001d20010000</SyncMan>
-							<SyncMan>002e00002400000003000000000000000000002e24000000</SyncMan>
-							<SyncMan>002f00002000000004000000000000000000002f20000000</SyncMan>
-							<Fmmu>0000000000000000001200020100000001000000060000000200000000000000</Fmmu>
-							<Fmmu>0000000000000000001d00010100000002000000060000000300000000000000</Fmmu>
-							<Fmmu>00000000000000000d0800010100000003000000000000000000000000000000</Fmmu>
-							<Fmmu>0000000000000000000000020000000001000000060000000400010000000000</Fmmu>
-							<Fmmu>0000000000000000000000010000000002000000060000000500010000000000</Fmmu>
-							<BootStrapData>0010f400f410f400</BootStrapData>
-							<MBoxUserCmdData>004003000a0000001f000000030010000000000000000000000000000000000020f31005020000000100456e61626c6520446961674d65737361676520617320656d657267656e637900</MBoxUserCmdData>
-							<Pdo Name="FSLOGIC Inputs" Index="#x1bff" Flags="#x0011" SyncMan="3">
-								<Entry Name="Safe Logic State" Index="#xf100" Sub="#x01">
-									<Type>USINT</Type>
-								</Entry>
-								<Entry Name="Cycle Counter" Index="#xf100" Sub="#x02">
-									<Type>USINT</Type>
-								</Entry>
-							</Pdo>
-							<Pdo Name="FSLOGIC Outputs" Index="#x17ff" InOut="1" Flags="#x0011" SyncMan="2">
-								<Entry>
-									<Type GUID="{18071995-0000-0000-0000-002000000010}">ARRAY [0..1] OF BYTE</Type>
-								</Entry>
-							</Pdo>
-							<CoeProfile ProfileNo="5001"/>
-						</EtherCAT>
-					</Box>
 					<Box Id="13" BoxType="9099">
 						<Name>Term 13 (EL9011)</Name>
 						<ImageId>1006</ImageId>
-						<EtherCAT CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x23333050" InfoDataState="false" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL9011 End Terminal" Desc="EL9011" PortABoxInfo="#x0100000e"/>
+						<EtherCAT CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x23333050" InfoDataState="false" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL9011 End Terminal" Desc="EL9011" PortABoxInfo="#x0100000c"/>
 					</Box>
 				</Box>
 				<EtherCAT DcSyncMode="3"/>
@@ -4876,26 +5463,23 @@ Bit 8 - 15 : reserved]]></Comment>
 		</Io>
 	</Project>
 	<Mappings>
+		<MappingInfo Identifier="{00000000-2001-0850-0020-500841000403}" Id="#x02030030"/>
 		<MappingInfo Identifier="{00000000-0010-0304-3000-040310000403}" Id="#x02030010"/>
-		<MappingInfo Identifier="{00000000-0020-0304-3000-040321000403}" Id="#x02030020"/>
-		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Axis 1">
+		<MappingInfo Identifier="{00000000-0020-0304-3000-040322000403}" Id="#x02030040"/>
+		<MappingInfo Identifier="{03040040-0040-0304-4000-040340000403}" Id="#x02030020" Watchdog="04000000040000000400000004000000"/>
+		<OwnerA Name="TIID^Device 1 (EtherCAT)">
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)">
+				<Link VarA="Term 1 (EK1200)^Term 2 (EL1918)^ConnectionInputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 TxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1"/>
+				<Link VarA="Term 1 (EK1200)^Term 2 (EL1918)^ConnectionOutputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 RxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 2 (EL1918)">
+				<Link VarA="Term 1 (EK1200)^Term 4 (ELM7212-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1" VarB="ConnectionOutputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 RxPDO"/>
+			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)">
-				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value Channel 1^Following error actual value"/>
-				<Link VarA="Drive^Inputs^In^nDcOutputTime" VarB="InfoData^DcOutputShift"/>
-				<Link VarA="Drive^Inputs^In^nState1" VarB="DRV Statusword Channel 1^Statusword"/>
-				<Link VarA="Drive^Inputs^In^nState2" VarB="DRV Statusword Channel 1^Statusword" Size="8" OffsB="8"/>
-				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
-				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^WcState0"/>
-				<Link VarA="Drive^Outputs^Out^nCtrl1" VarB="DRV Controlword Channel 1^Controlword"/>
-				<Link VarA="Drive^Outputs^Out^nCtrl2" VarB="DRV Controlword Channel 1^Controlword" Size="8" OffsB="8"/>
-				<Link VarA="Drive^Outputs^Out^nDataOut1" VarB="DRV Target position Channel 1^Target position"/>
-				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="FB Position Channel 1^Position"/>
-				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
-				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
-				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState0"/>
+				<Link VarA="Term 1 (EK1200)^Term 2 (EL1918)^ConnectionInputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 TxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1"/>
 			</OwnerB>
 		</OwnerA>
-		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Axis 2">
+		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Dec">
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)">
 				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value Channel 2^Following error actual value"/>
 				<Link VarA="Drive^Inputs^In^nDcOutputTime" VarB="InfoData^DcOutputShift"/>
@@ -4912,7 +5496,7 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState0"/>
 			</OwnerB>
 		</OwnerA>
-		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Axis 3">
+		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Focus">
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)">
 				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value^Following error actual value"/>
 				<Link VarA="Drive^Inputs^In^nDcOutputTime" VarB="InfoData^DcOutputShift"/>
@@ -4927,6 +5511,38 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
 				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
 				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState0"/>
+			</OwnerB>
+		</OwnerA>
+		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^RA">
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)">
+				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value Channel 1^Following error actual value"/>
+				<Link VarA="Drive^Inputs^In^nDcOutputTime" VarB="InfoData^DcOutputShift"/>
+				<Link VarA="Drive^Inputs^In^nState1" VarB="DRV Statusword Channel 1^Statusword"/>
+				<Link VarA="Drive^Inputs^In^nState2" VarB="DRV Statusword Channel 1^Statusword" Size="8" OffsB="8"/>
+				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
+				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^WcState0"/>
+				<Link VarA="Drive^Outputs^Out^nCtrl1" VarB="DRV Controlword Channel 1^Controlword"/>
+				<Link VarA="Drive^Outputs^Out^nCtrl2" VarB="DRV Controlword Channel 1^Controlword" Size="8" OffsB="8"/>
+				<Link VarA="Drive^Outputs^Out^nDataOut1" VarB="DRV Target position Channel 1^Target position"/>
+				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="FB Position Channel 1^Position"/>
+				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
+				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
+				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState0"/>
+			</OwnerB>
+		</OwnerA>
+		<OwnerA Name="TIPC^IAG50cm^IAG50cm Instance">
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)">
+				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 3"/>
+				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 2"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 2 (EL1918)">
+				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="StandardOutputs^TwinSafeGroup1.ErrorAcknowledgement_2"/>
+				<Link VarA="PlcTask Outputs^GVL_Safety.Restart" VarB="StandardOutputs^TwinSafeGroup1.Restart_6"/>
+				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="StandardOutputs^TwinSafeGroup1.Run_1"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)">
+				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 3"/>
+				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 2"/>
 			</OwnerB>
 		</OwnerA>
 	</Mappings>

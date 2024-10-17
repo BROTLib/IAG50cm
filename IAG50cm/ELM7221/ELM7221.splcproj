@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Crc="277762850" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{b4c53aab-62ac-413c-85f9-5ee6744f63dc}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <OldToolsVersion>2.0</OldToolsVersion>
+    <TargetSystem>ELM891x</TargetSystem>
+    <ProgrammingLanguage>Graphical Editor</ProgrammingLanguage>
+    <Worker />
+    <IntProjName />
+    <NextSdsId>6</NextSdsId>
+    <SPlcProjVersion>1.8.0.0</SPlcProjVersion>
+    <SortMode>2</SortMode>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugSymbols>false</DebugSymbols>
+    <OutputPath>bin\Release\</OutputPath>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="ChA_Connection_Input\Alias Devices\ERR_ACK FSoE Connection.sds" />
+    <None Include="ChA_Connection_Input\Alias Devices\RUN FSoE Connection.sds" />
+    <None Include="ChA_Connection_Input\Alias Devices\SAFEMOTION FSoE Connection.sds" />
+    <None Include="ChA_Connection_Input\Alias Devices\Target System.sds" />
+    <None Include="ChA_Connection_Input\ChA_Connection_Input.sal" />
+    <None Include="ChA_Connection_Input\ChA_Connection_Input.sal.diagram">
+      <Visible>false</Visible>
+      <DependentUpon>ChA_Connection_Input\ChA_Connection_Input.sal</DependentUpon>
+    </None>
+    <None Include="ChA_Connection_Output\Alias Devices\SS1_To_NC_ChA.sds" />
+    <None Include="ChA_Connection_Output\ChA_Connection_Output.sal" />
+    <None Include="ChA_Connection_Output\ChA_Connection_Output.sal.diagram">
+      <Visible>false</Visible>
+      <DependentUpon>ChA_Connection_Output\ChA_Connection_Output.sal</DependentUpon>
+    </None>
+    <None Include="ChA_STO_SS1_ErrorHandling\ChA_STO_SS1_ErrorHandling.sal" />
+    <None Include="ChA_STO_SS1_ErrorHandling\ChA_STO_SS1_ErrorHandling.sal.diagram">
+      <Visible>false</Visible>
+      <DependentUpon>ChA_STO_SS1_ErrorHandling\ChA_STO_SS1_ErrorHandling.sal</DependentUpon>
+    </None>
+    <None Include="GVLs\ChA.sgvl" />
+    <None Include="TargetSystemConfig.xml">
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="ChA_Connection_Input" />
+    <Folder Include="ChA_Connection_Input\Alias Devices" />
+    <Folder Include="ChA_Connection_Output" />
+    <Folder Include="ChA_Connection_Output\Alias Devices" />
+    <Folder Include="ChA_STO_SS1_ErrorHandling" />
+    <Folder Include="ChA_STO_SS1_ErrorHandling\Alias Devices" />
+    <Folder Include="GVLs" />
+    <Folder Include="User FBs" />
+  </ItemGroup>
+</Project>

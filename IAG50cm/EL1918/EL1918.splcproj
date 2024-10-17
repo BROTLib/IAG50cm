@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Crc="3054816856" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{166e2b3b-49ca-43ba-a6e6-63d00e8eaea9}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <OldToolsVersion>2.0</OldToolsVersion>
+    <TargetSystem>EL6910</TargetSystem>
+    <ProgrammingLanguage>Graphical Editor</ProgrammingLanguage>
+    <Worker />
+    <IntProjName />
+    <NextSdsId>7</NextSdsId>
+    <SPlcProjVersion>1.8.0.0</SPlcProjVersion>
+    <SortMode>2</SortMode>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugSymbols>false</DebugSymbols>
+    <OutputPath>bin\Release\</OutputPath>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="TargetSystemConfig.xml">
+      <Visible>false</Visible>
+    </None>
+    <None Include="TwinSafeGroup1\Alias Devices\Connection to Term 12 %28ELM7221-9016%29.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\Connection to Term 4 %28ELM7212-9016%29.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\EL1918, 8 digital inputs_1.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\ErrorAcknowledgement.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\Restart.sds" />
+    <None Include="TwinSafeGroup1\Alias Devices\Run.sds" />
+    <None Include="TwinSafeGroup1\TwinSafeGroup1.sal" />
+    <None Include="TwinSafeGroup1\TwinSafeGroup1.sal.diagram">
+      <Visible>false</Visible>
+      <DependentUpon>TwinSafeGroup1\TwinSafeGroup1.sal</DependentUpon>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="GVLs" />
+    <Folder Include="TwinSafeGroup1" />
+    <Folder Include="TwinSafeGroup1\Alias Devices" />
+    <Folder Include="User FBs" />
+  </ItemGroup>
+</Project>
