@@ -10,8 +10,8 @@ VAR_INPUT
 	stopAxis			: BOOL;				// stop the Axis
 	position			: LREAL;			// focus position in millimeters
 	velocity			: LREAL := 100.0;	// focus velocity
-	minPosition			: LREAL := 1000.0;		// minimum position
-	maxPosition			: LREAL := 1500.0;		// maximum position
+	minPosition			: LREAL := 1000.0;	// minimum position
+	maxPosition			: LREAL := 1500.0;	// maximum position
 	
 	bSoEReset			: BOOL;				// diagnostic error code reset
 END_VAR
@@ -27,8 +27,7 @@ VAR
 	comm				: I_Comm;	
 	axis				: FB_Axis2;				// axis function block
 	axisEvent			: FB_EventLog;
-	calibrationEvent	: FB_EventLog;			// torque calibration event
-	torque				: REAL;					// percentage of the derotator torque
+	calibrationEvent	: FB_EventLog;			// calibration event
 	readParameter		: MC_ReadParameter;		// read slewtime
 	fbSoEReset			: FB_SoEReset;
 	mqttTimer 			: TON := (PT:=T#5S);
@@ -154,7 +153,7 @@ END_VAR]]></Declaration>
 	OffLevel 		:= ADSLOG_MSGTYPE_HINT,
 	comm 			:= comm);
 
-CalibrationEvent(
+calibrationEvent(
 	Trigger 		:=	calibrated,
 	Level 			:=	ADSLOG_MSGTYPE_HINT,
 	OnMessage 		:= 'Focus Axis is calibrated.',
