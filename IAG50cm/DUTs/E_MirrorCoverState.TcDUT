@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
+  <DUT Name="E_MirrorCoverState" Id="{912d241f-d2a8-419d-8f08-9f22cedc1d83}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+TYPE E_MirrorCoverState :
+(
+	closing := 0,
+	opening := 1,
+	stopped := 2,
+	closed	:= 3,
+	open	:= 4,
+	error := 5
+);
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

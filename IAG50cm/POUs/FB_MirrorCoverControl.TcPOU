@@ -1,0 +1,347 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
+  <POU Name="FB_MirrorCoverControl" Id="{0e8290b7-d995-422f-a963-5aa8fa3bd4c0}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK PUBLIC FB_MirrorCoverControl IMPLEMENTS I_MirrorCover
+VAR_INPUT
+	delta_t		: TIME := T#5s;	// Time difference between both covers opening (and closing)
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	emergency				: BOOL := FALSE; // TRUE when Safty is triggered
+	// commands for automatic MirrorCover controls
+	openCover				: BOOL;
+	closeCover				: BOOL;
+	stopCover				: BOOL;
+	resetCover				: BOOL;
+	//state handeling
+	coverState				: E_MirrorCoverState := E_MirrorCoverState.stopped;	// State of the Cover, initialize it with closed (Assumption)
+	newState				: E_MirrorCoverState;								// State which gets compared to the state one cyle ago to detect change
+	endStateTimer			: TON := (PT:=T#15S+delta_t);						// Timer for 'closed' and 'open' state (due to no limit switches) one motor needs 15s
+	// CoverMotors
+	coverMotors				: ARRAY[1..2] OF FB_MirrorCoverMotor(comm:=comm);	// Function  blocks for both motors
+	// Comm
+	comm					: I_Comm;
+	commTimer 				: TON := (PT:=T#5S);
+	// Delta_t timer
+	deltaTimer				: Ton := (PT:=delta_t);
+	// Bool whether a move command just got started or if the movement is ungoing 
+	initialCommand			: BOOL := TRUE;
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// update cover motors
+coverMotors[1]();
+coverMotors[2]();
+// update timers
+deltaTimer();
+endStateTimer();
+// safty triggered? -> STOP
+IF emergency THEN
+	stopCover := TRUE;
+END_IF
+
+IF resetCover AND NOT emergency THEN
+	// if reset (and safty is not triggered still): remove stop commands and close covers
+	coverMotors[1].Reset();
+	coverMotors[2].Reset();
+	// close the cover in the next cycle
+	stopCover := FALSE;
+	resetCover := FALSE;
+	closeCover := TRUE;
+	openCover := FALSE;
+
+ELSIF stopCover THEN
+	// if stop: stop
+	coverMotors[1].Stop();
+	coverMotors[2].Stop();
+	closeCover := FALSE;
+	openCover := FALSE;
+
+ELSIF closeCover THEN
+	// close the covers
+	// close has precedence over open -> Eg. for bad weather
+	openCover := FALSE;
+	// First: initiate close of motor 2
+	coverMotors[2].Close();
+	// Then: Soft stop motor 1 which has to wait so its not moving
+	IF initialCommand THEN
+		coverMotors[1].SoftStop();
+		// reset (if opening is interuped) and start delay timer in next cycle
+		IF deltaTimer.IN THEN
+			deltaTimer.IN := FALSE;
+		ELSE
+			deltaTimer.IN := TRUE;
+			// remove initial command tag
+			initialCommand := FALSE;
+		END_IF
+		
+	ELSE
+		// when the timer finishes -> set second Motor to closing
+		IF deltaTimer.Q THEN
+			deltaTimer.IN := FALSE;
+			coverMotors[1].Close();
+			// remove tags:
+			closeCover := FALSE;
+			initialCommand := TRUE;
+		END_IF
+	END_IF
+	
+ELSIF openCover THEN
+	// open the covers
+	// First:  initiate close of motor 1
+	coverMotors[1].Open();
+	// Then: Soft stop motor 2 which has to wait so its not moving
+	IF initialCommand THEN
+		coverMotors[2].SoftStop();
+		// reset then start delay timer
+		IF deltaTimer.IN THEN
+			deltaTimer.IN := FALSE;
+		ELSE
+			deltaTimer.IN := TRUE;
+			// remove initial command tag
+			initialCommand := FALSE;
+		END_IF
+	ELSE
+		// when the timer finishes -> set second Motor to opening
+		IF deltaTimer.Q THEN
+			deltaTimer.IN := FALSE;
+			coverMotors[2].Open();
+			// remove tags
+			openCover := FALSE;
+			initialCommand := TRUE;
+		END_IF
+	END_IF
+END_IF
+
+
+
+// check states and set states
+// if both have the same state -> state
+// if only one is moving and the other not -> the moving state is the state (this is the time where only one starts moving)
+
+IF coverMotors[1].motor_state = coverMotors[2].motor_state THEN
+	newState := coverMotors[1].motor_state;
+ELSIF coverMotors[1].motor_state = E_MirrorCoverState.closing OR coverMotors[1].motor_state = E_MirrorCoverState.opening THEN
+	newState := coverMotors[1].motor_state;
+ELSIF coverMotors[2].motor_state = E_MirrorCoverState.closing OR coverMotors[2].motor_state = E_MirrorCoverState.opening THEN
+	newState := coverMotors[2].motor_state;
+END_IF
+
+// check the new state against the old state
+// if closing/opening goes on for long enough -> closed/open position is assumed to be reached
+IF coverState <> newState THEN
+	// opening and closing on open and closed doesn't change a thing
+	IF coverState = E_MirrorCoverState.closed AND newState = E_MirrorCoverState.closing THEN
+		coverState := E_MirrorCoverState.closed;
+	ELSIF coverState = E_MirrorCoverState.open AND newState = E_MirrorCoverState.opening THEN
+		coverState := E_MirrorCoverState.open;
+	// stopped motors
+	ELSIF newState = E_MirrorCoverState.stopped THEN
+		coverState := newState;
+		//reset timer
+		endStateTimer.IN := FALSE;
+	// initialize Timer till open/closed
+	ELSE
+		// allready running? -> reset it
+		IF endStateTimer.IN THEN
+			// reset for next cycle
+			endStateTimer.IN := FALSE;
+		// start it and set new state
+		ELSE
+			endStateTimer.IN := TRUE;
+			// 
+			coverState := newState;
+		END_IF
+	END_IF
+ELSE
+	IF endStateTimer.Q THEN
+		// reset timer
+		endStateTimer.IN := FALSE;
+		IF coverState = E_MirrorCoverState.closing THEN
+			coverState := E_MirrorCoverState.closed;
+		ELSE
+			coverState := E_MirrorCoverState.open;
+		END_IF
+	END_IF
+END_IF
+
+]]></ST>
+    </Implementation>
+    <Method Name="CloseCover" Id="{b50cbd73-4616-4660-bdf7-e64554deaa74}">
+      <Declaration><![CDATA[METHOD CloseCover : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[closeCover := True;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Init" Id="{340c7945-d394-455f-9061-0330b21fd120}">
+      <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
+//The return value is not evaluated. For a specific influence, you can also declare the
+//methods explicitly and provide additional code there with the standard initialization
+//code. You can evaluate the return value.
+METHOD FB_Init: BOOL
+VAR_INPUT
+    bInitRetains	: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
+    bInCopyCode		: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)
+	comm			: I_Comm;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.comm := comm;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OpenCover" Id="{0fe80793-0710-437e-81f7-4ad62db0ec24}">
+      <Declaration><![CDATA[METHOD OpenCover : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[openCover := True;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ResetCover" Id="{370a496f-18d5-4d7d-8d76-c088c8d5b24c}">
+      <Declaration><![CDATA[METHOD ResetCover : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[resetCover := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="State" Id="{eaf521f2-4fca-4327-9b77-4041ea684643}">
+      <Declaration><![CDATA[PROPERTY State : E_MirrorCoverState]]></Declaration>
+      <Get Name="Get" Id="{b797b061-d5ff-4228-884f-50950761aec2}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[State := coverState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="StopCover" Id="{69a6cd3b-e699-468e-986e-e43f61a4875e}">
+      <Declaration><![CDATA[METHOD StopCover : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[stopCover := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_MirrorCoverControl">
+      <LineId Id="289" Count="1" />
+      <LineId Id="288" Count="0" />
+      <LineId Id="320" Count="0" />
+      <LineId Id="293" Count="0" />
+      <LineId Id="468" Count="0" />
+      <LineId Id="271" Count="0" />
+      <LineId Id="55" Count="1" />
+      <LineId Id="305" Count="0" />
+      <LineId Id="296" Count="0" />
+      <LineId Id="306" Count="4" />
+      <LineId Id="312" Count="1" />
+      <LineId Id="311" Count="0" />
+      <LineId Id="295" Count="0" />
+      <LineId Id="319" Count="0" />
+      <LineId Id="299" Count="0" />
+      <LineId Id="317" Count="0" />
+      <LineId Id="314" Count="2" />
+      <LineId Id="300" Count="0" />
+      <LineId Id="318" Count="0" />
+      <LineId Id="120" Count="0" />
+      <LineId Id="191" Count="0" />
+      <LineId Id="268" Count="0" />
+      <LineId Id="355" Count="0" />
+      <LineId Id="148" Count="0" />
+      <LineId Id="232" Count="0" />
+      <LineId Id="352" Count="0" />
+      <LineId Id="219" Count="1" />
+      <LineId Id="247" Count="0" />
+      <LineId Id="244" Count="1" />
+      <LineId Id="248" Count="1" />
+      <LineId Id="356" Count="0" />
+      <LineId Id="351" Count="0" />
+      <LineId Id="246" Count="0" />
+      <LineId Id="350" Count="0" />
+      <LineId Id="126" Count="0" />
+      <LineId Id="128" Count="3" />
+      <LineId Id="386" Count="2" />
+      <LineId Id="133" Count="0" />
+      <LineId Id="234" Count="0" />
+      <LineId Id="176" Count="0" />
+      <LineId Id="164" Count="0" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="226" Count="0" />
+      <LineId Id="237" Count="0" />
+      <LineId Id="382" Count="0" />
+      <LineId Id="227" Count="1" />
+      <LineId Id="250" Count="0" />
+      <LineId Id="389" Count="5" />
+      <LineId Id="238" Count="0" />
+      <LineId Id="225" Count="0" />
+      <LineId Id="169" Count="3" />
+      <LineId Id="384" Count="0" />
+      <LineId Id="395" Count="0" />
+      <LineId Id="385" Count="0" />
+      <LineId Id="162" Count="0" />
+      <LineId Id="255" Count="0" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="278" Count="0" />
+      <LineId Id="281" Count="0" />
+      <LineId Id="269" Count="1" />
+      <LineId Id="346" Count="1" />
+      <LineId Id="370" Count="0" />
+      <LineId Id="372" Count="6" />
+      <LineId Id="432" Count="0" />
+      <LineId Id="424" Count="0" />
+      <LineId Id="465" Count="0" />
+      <LineId Id="423" Count="0" />
+      <LineId Id="435" Count="0" />
+      <LineId Id="429" Count="1" />
+      <LineId Id="433" Count="1" />
+      <LineId Id="441" Count="0" />
+      <LineId Id="436" Count="1" />
+      <LineId Id="467" Count="0" />
+      <LineId Id="466" Count="0" />
+      <LineId Id="442" Count="0" />
+      <LineId Id="438" Count="0" />
+      <LineId Id="451" Count="0" />
+      <LineId Id="445" Count="0" />
+      <LineId Id="453" Count="0" />
+      <LineId Id="446" Count="0" />
+      <LineId Id="452" Count="0" />
+      <LineId Id="447" Count="3" />
+      <LineId Id="444" Count="0" />
+      <LineId Id="431" Count="0" />
+      <LineId Id="425" Count="0" />
+      <LineId Id="456" Count="1" />
+      <LineId Id="459" Count="2" />
+      <LineId Id="463" Count="1" />
+      <LineId Id="462" Count="0" />
+      <LineId Id="458" Count="0" />
+      <LineId Id="426" Count="0" />
+      <LineId Id="362" Count="0" />
+      <LineId Id="71" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverControl.CloseCover">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverControl.FB_Init">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverControl.OpenCover">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverControl.ResetCover">
+      <LineId Id="17" Count="0" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverControl.State.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverControl.StopCover">
+      <LineId Id="10" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

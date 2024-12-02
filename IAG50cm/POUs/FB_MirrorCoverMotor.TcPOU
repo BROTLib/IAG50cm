@@ -1,0 +1,172 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
+  <POU Name="FB_MirrorCoverMotor" Id="{ad6a0aff-220c-488b-a97b-ed536bb59202}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_MirrorCoverMotor
+VAR_INPUT
+	//comm	: I_Comm;
+END_VAR
+VAR_OUTPUT
+	// state of the Motor
+	motor_state : E_MirrorCoverState := E_MirrorCoverState.stopped;
+END_VAR
+VAR
+	// Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP
+	Relais_Out_A	AT%Q*	: BOOL := TRUE;
+	Relais_Out_B	AT%Q*	: BOOL := FALSE;
+	// stop movement untill reset command
+	stop_command			: BOOL;
+	// reset
+	reset_command			: BOOL;
+	// Move commands
+	close_command			: BOOL;
+	open_command			: BOOL;
+	// stop the movement but only till next move command follows
+	softstop_command		: BOOL;
+	// comm
+	comm	: I_Comm;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF stop_command OR softstop_command OR reset_command THEN
+	// no movement is happening
+	motor_state := E_MirrorCoverState.stopped;
+	// stop movement commands and reset soft stop
+	close_command := FALSE;
+	open_command := FALSE;
+	softstop_command := FALSE;
+	IF reset_command THEN
+		// RESET
+		// remove all tags
+		stop_command := FALSE;
+		softstop_command := FALSE;
+		reset_command := FALSE;
+	END_IF
+	// STOP -> put both Relais on same Voltage so motor stops
+	Relais_OUT_A := TRUE;
+	Relais_OUT_B := FALSE;
+
+ELSIF close_command THEN
+	// set Relais to CLOSED
+	Relais_Out_A := FALSE;
+	Relais_Out_B := FALSE;
+	// Motor is closing or closed
+	motor_state := E_MirrorCoverState.closing;
+	close_command := FALSE;
+	
+ELSIF open_command THEN
+	// set Relais to OPEN
+	Relais_Out_A := TRUE;
+	Relais_Out_B := TRUE;
+	// Motor is opening or open
+	motor_state := E_MirrorCoverState.opening;
+	open_command := FALSE;
+END_IF
+
+]]></ST>
+    </Implementation>
+    <Method Name="Close" Id="{c386672b-a433-45b1-a524-afe636ecf3df}">
+      <Declaration><![CDATA[METHOD Close : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[close_command := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_Init" Id="{14a3b685-b6a9-4c98-bf37-d32782135287}">
+      <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
+//The return value is not evaluated. For a specific influence, you can also declare the
+//methods explicitly and provide additional code there with the standard initialization
+//code. You can evaluate the return value.
+METHOD FB_Init: BOOL
+VAR_INPUT
+    bInitRetains	: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
+    bInCopyCode		: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)
+	comm			: I_Comm;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.comm := comm;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Open" Id="{2da6e197-438b-4839-b895-9a11327edb2d}">
+      <Declaration><![CDATA[METHOD Open : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[open_command := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset" Id="{e06d1684-953a-488b-8105-334aac9cb976}">
+      <Declaration><![CDATA[METHOD Reset : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[reset_command := True;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SoftStop" Id="{c3546edc-0138-443f-8833-427b38310bcd}">
+      <Declaration><![CDATA[METHOD SoftStop : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[softstop_command := True;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop" Id="{78fbdab0-4ab6-4aab-8344-5916f672987b}">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[stop_command := True;]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_MirrorCoverMotor">
+      <LineId Id="114" Count="0" />
+      <LineId Id="161" Count="1" />
+      <LineId Id="165" Count="2" />
+      <LineId Id="197" Count="0" />
+      <LineId Id="169" Count="4" />
+      <LineId Id="168" Count="0" />
+      <LineId Id="174" Count="0" />
+      <LineId Id="117" Count="1" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="94" Count="1" />
+      <LineId Id="99" Count="2" />
+      <LineId Id="151" Count="0" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="163" Count="0" />
+      <LineId Id="108" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="34" Count="1" />
+      <LineId Id="152" Count="0" />
+      <LineId Id="154" Count="0" />
+      <LineId Id="164" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="68" Count="0" />
+      <LineId Id="49" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverMotor.Close">
+      <LineId Id="13" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverMotor.FB_Init">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverMotor.Open">
+      <LineId Id="6" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverMotor.Reset">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverMotor.SoftStop">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_MirrorCoverMotor.Stop">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

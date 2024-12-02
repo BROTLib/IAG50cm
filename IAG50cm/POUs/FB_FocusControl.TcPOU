@@ -1,0 +1,232 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
+  <POU Name="FB_FocusControl" Id="{758e08ff-7d69-4056-9327-dc96b024961b}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_FocusControl
+VAR_INPUT
+	enable				: BOOL;				// enable the axis
+	reset				: BOOL;				// reset the axis(-error)
+	moveAxis			: BOOL;				// move the axis to new position
+	homeAxis			: BOOL;				// calibrate the focus axis
+	stopAxis			: BOOL;				// stop the Axis
+	position			: LREAL;			// focus position in millimeters
+	velocity			: LREAL := 100.0;	// focus velocity
+	minPosition			: LREAL := 1000.0;		// minimum position
+	maxPosition			: LREAL := 1500.0;		// maximum position
+	
+	bSoEReset			: BOOL;				// diagnostic error code reset
+END_VAR
+VAR_OUTPUT
+	error			: BOOL;		// error flag
+	errorID			: UDINT;	// nc error id
+	actualPosition	: LREAL;	// actual position of the focus
+	calibrated		: BOOL;		// calibrated flag
+	ready			: BOOL;		// axis ready flag
+	slewTime		: LREAL;	// position to move the axis to
+END_VAR
+VAR
+	comm				: I_Comm;	
+	axis				: FB_Axis2;				// axis function block
+	axisEvent			: FB_EventLog;
+	calibrationEvent	: FB_EventLog;			// torque calibration event
+	torque				: REAL;					// percentage of the derotator torque
+	readParameter		: MC_ReadParameter;		// read slewtime
+	fbSoEReset			: FB_SoEReset;
+	mqttTimer 			: TON := (PT:=T#5S);
+	diagnosticError		: BOOL;
+	inward				: BOOL;					// Move M2 closer to M1
+	outward				: BOOL;					// Move M2 away from M1
+	calibPosition		: LREAL;
+	
+	// Axis
+	axisRef						: AXIS_REF;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// limit to sane positions
+position := LIMIT(minPosition, position, maxPosition);
+
+
+IF enable AND NOT axis.Calibrated THEN
+	homeAxis := TRUE;
+END_IF
+
+IF axis.Calibrated THEN
+	homeAxis := FALSE;
+	calibrated := axis.Calibrated;
+END_IF
+
+IF homeAxis THEN
+	position := position;//calibPosition;
+END_IF
+
+axis(
+	enable 			:= enable,
+	Reset 			:= reset,
+	MoveAxis 		:= moveAxis,
+	HomeAxis 		:= homeAxis,
+	StopAxis 		:= stopAxis,
+	HomingMode 		:= MC_ForceCalibration,
+	Position 		:= position, 
+	Velocity 		:= velocity,
+	Enable_Positive := NOT axisRef.Status.SoftLimitMaxExceeded,
+	Enable_Negative := NOT axisRef.Status.SoftLimitMinExceeded,
+	Jog_Forward 	:= outward,
+	Jog_Backwards 	:= inward,
+	isModuloAxis 	:= FALSE,
+	ActualPosition 	=> actualPosition,
+	Error 			=> error,
+	ErrorID 		=> errorID,
+	AxisRef 		:= axisRef);
+	
+IF axis.MoveDone OR reset OR error THEN
+	moveAxis := FALSE;
+END_IF
+
+IF axis.HomeDone OR reset OR error THEN
+	homeAxis := FALSE;
+END_IF
+	
+IF axis.ResetDone THEN
+	reset := FALSE;
+END_IF
+
+IF axis.StopDone THEN
+	stopAxis := FALSE;
+END_IF
+
+
+ready := axis.Ready;
+
+readParameter(	
+	Axis 			:= axisRef, 
+	Enable 			:= axis.InMotion, 
+	ParameterNumber := MC_AxisParameter.AxisRemainingTimeToGo, 
+	ReadMode 		:= E_ReadMode.READMODE_CYCLIC);
+				
+IF readParameter.Valid THEN
+	slewtime := readParameter.Value;
+END_IF
+
+IF bSoEReset THEN
+	fbSoEReset(
+		Axis 	:= axisRef,
+		Execute := TRUE,
+		Timeout := DEFAULT_ADS_TIMEOUT);
+ 	IF NOT fbSoEReset.Busy THEN
+		fbSoEReset(Axis := axisRef, Execute := FALSE);
+		bSoEReset := FALSE;
+		reset := TRUE;
+	END_IF
+END_IF
+
+(*
+SendTelemetry();
+HandleEvents();
+	
+*)]]></ST>
+    </Implementation>
+    <Method Name="FB_Init" Id="{17d81d64-5647-49eb-8f39-4de9c4a6dd83}">
+      <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
+//The return value is not evaluated. For a specific influence, you can also declare the
+//methods explicitly and provide additional code there with the standard initialization
+//code. You can evaluate the return value.
+METHOD FB_Init: BOOL
+VAR_INPUT
+    bInitRetains	: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
+    bInCopyCode		: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)
+	comm			: I_Comm;   
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.comm := comm;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HandleEvents" Id="{375f50c9-e6ea-4fcd-9fab-a26147b70ce8}">
+      <Declaration><![CDATA[METHOD PRIVATE HandleEvents : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[axisEvent(	
+	Trigger 		:= axis.Error, 
+	Level 			:= ADSLOG_MSGTYPE_ERROR,
+	FormatString	:= 'Focus Axis Error: %S',
+	OnMessage 		:= NCError_TO_STRING(ErrorID),
+	OffMEssage 		:= 'OK',
+	OffLevel 		:= ADSLOG_MSGTYPE_HINT,
+	comm 			:= comm);
+
+CalibrationEvent(
+	Trigger 		:=	calibrated,
+	Level 			:=	ADSLOG_MSGTYPE_HINT,
+	OnMessage 		:= 'Focus Axis is calibrated.',
+	comm 			:= comm);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MoveIn" Id="{457ec480-c410-4034-8eef-3a888cb86380}">
+      <Declaration><![CDATA[METHOD PUBLIC MoveIn : BOOL
+VAR_INPUT
+	enable	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[inward := enable;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MoveOut" Id="{dde23261-8560-4e1b-95b2-82960b603ca9}">
+      <Declaration><![CDATA[METHOD PUBLIC MoveOut : BOOL
+VAR_INPUT
+	enable	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[outward := enable;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SendTelemetry" Id="{9492de4d-6d2e-401c-bc97-10786d283636}">
+      <Declaration><![CDATA[METHOD PRIVATE SendTelemetry : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[mqttTimer(IN:=TRUE);
+IF mqttTimer.Q THEN // publish new payload every second
+	mqttTimer(IN:=FALSE);
+	comm.Publish('telescope', 'dome', 'FocusPosition', LREAL_TO_FMTSTR(actualPosition, 5, TRUE));
+	comm.Publish('telescope', 'dome', 'Focuscalibrated', BOOL_TO_STRING(calibrated));	
+	comm.Publish('telescope', 'dome', 'FocusReady', BOOL_TO_STRING(ready));	
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_FocusControl">
+      <LineId Id="58" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="220" Count="0" />
+      <LineId Id="234" Count="0" />
+      <LineId Id="61" Count="25" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="90" Count="19" />
+      <LineId Id="116" Count="24" />
+      <LineId Id="144" Count="1" />
+      <LineId Id="180" Count="0" />
+      <LineId Id="173" Count="0" />
+      <LineId Id="59" Count="0" />
+      <LineId Id="179" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_FocusControl.FB_Init">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_FocusControl.HandleEvents">
+      <LineId Id="1" Count="14" />
+    </LineIds>
+    <LineIds Name="FB_FocusControl.MoveIn">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_FocusControl.MoveOut">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_FocusControl.SendTelemetry">
+      <LineId Id="1" Count="7" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
