@@ -2085,7 +2085,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{9B66DF39-C362-E62B-B198-2A9D84A91BC1}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{4AB53B14-18B1-3CBE-4651-50A3A46DAE0A}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">

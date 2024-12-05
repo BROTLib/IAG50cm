@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<TcLicenseInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.beckhoff.com/schemas/2011/11/TcLicenseInfo">
+	<LicenseInfo>
+		<SystemId>{D1E86615-0B09-1A2D-2C4F-AE775A9E0C0B}</SystemId>
+		<IssueTime>2024-11-26T13:34:00</IssueTime>
+		<ExpireTime>2024-12-04T00:00:00</ExpireTime>
+		<LicenseKey>c24460cf21106d58b93fa494496f981f5542b4f1a6b235cb549c4f7ae9243ccefe4aaa6e27457681fb8952cd37d2c91b2a27b988998f8edfce2235ae5ff5d25c0ed9a4f4923b82020e32d3c1fd30a12aba9741832680df719723b8a766f70f543aac592efb0b34cfd6e8bf8158f8856ab746a0fba47e020f5f096584c0a089996e1a1feeb793f16bca6e146478c559431d5b51ba7abe44af01dd9114cff7e6c71c2fec270a552cd8ab20646f07147f8ec68c2ebd8743347b56efe4479a5f0a98f89b367d5b1d29930befa1d4b3d3ca46162597e425177efd0acd84b63101499521afb55fd1075ebf2ae4e5024864dd15f36db30133be8d17b2da7200036df183</LicenseKey>
+		<License>
+			<LicenseId>{973BA0B1-AADD-41C1-B518-302802473922}</LicenseId>
+			<Name>TC3 IoT MQTT Protocol</Name>
+		</License>
+		<License>
+			<LicenseId>{0ABFD2B0-EAE1-4DC7-AABE-03093B0786B7}</LicenseId>
+			<Name>TC3 IoT Communication (MQTT)</Name>
+			<OrderNo>TF6701</OrderNo>
+		</License>
+	</LicenseInfo>
+</TcLicenseInfo>
