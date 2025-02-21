@@ -1,0 +1,121 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="FB_HourAngleControl" Id="{69217813-d219-4ca2-9cea-b7c641aa5dcd}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_HourAngleControl EXTENDS FB_AxisControl
+VAR_INPUT
+	fMinPosition : LREAL := 0.0;
+	fMaxPosition : LREAL := 360.0;
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// limit to sane positions
+fPosition := LIMIT(fMinPosition, fPosition, fMaxPosition);
+
+
+IF bEnable AND NOT fbAxis.Calibrated THEN
+	bHomeAxis := TRUE;
+END_IF
+
+IF fbAxis.Calibrated THEN
+	bHomeAxis := FALSE;
+	bCalibrated := fbAxis.Calibrated;
+END_IF
+
+IF bHomeAxis THEN
+	fPosition := fPosition;
+END_IF
+
+fbAxis(
+	enable 			:= bEnable,
+	Reset 			:= bReset,
+	MoveAxis 		:= bMoveAxis,
+	HomeAxis 		:= bHomeAxis,
+	StopAxis 		:= bStopAxis,
+	HomingMode 		:= MC_ForceCalibration,
+	Position 		:= fPosition, 
+	Velocity 		:= fVelocity,
+	Enable_Positive := NOT axisRef.Status.SoftLimitMaxExceeded,
+	Enable_Negative := NOT axisRef.Status.SoftLimitMinExceeded,
+	Jog_Forward 	:= bMovePos,
+	Jog_Backwards 	:= bMoveNeg,
+	isModuloAxis 	:= FALSE,
+	ActualPosition 	=> fActualPosition,
+	Error 			=> bError,
+	ErrorID 		=> nErrorID,
+	AxisRef 		:= axisRef);
+	
+IF fbAxis.MoveDone OR bReset OR bError THEN
+	bMoveAxis := FALSE;
+END_IF
+
+IF fbAxis.HomeDone OR bReset OR bError THEN
+	bHomeAxis := FALSE;
+END_IF
+	
+IF fbAxis.ResetDone THEN
+	bReset := FALSE;
+END_IF
+
+IF fbAxis.StopDone THEN
+	bStopAxis := FALSE;
+END_IF
+
+
+bReady := fbAxis.Ready;
+
+fbReadParameter(	
+	Axis 			:= axisRef, 
+	Enable 			:= fbAxis.InMotion, 
+	ParameterNumber := MC_AxisParameter.AxisRemainingTimeToGo, 
+	ReadMode 		:= E_ReadMode.READMODE_CYCLIC);
+				
+IF fbReadParameter.Valid THEN
+	fSlewtime := fbReadParameter.Value;
+END_IF
+
+IF bSoEReset THEN
+	fbSoEReset(
+		Axis 	:= axisRef,
+		Execute := TRUE,
+		Timeout := DEFAULT_ADS_TIMEOUT);
+ 	IF NOT fbSoEReset.Busy THEN
+		fbSoEReset(Axis := axisRef, Execute := FALSE);
+		bSoEReset := FALSE;
+		bReset := TRUE;
+	END_IF
+END_IF
+
+
+axisEvent(	
+	Trigger 		:= bError, 
+	Level 			:= ADSLOG_MSGTYPE_ERROR,
+	FormatString	:= 'Right Ascension Axis Error: %s',
+	OnMessage 		:= NCError_TO_STRING(nErrorID),
+	OffMEssage 		:= 'OK',
+	OffLevel 		:= ADSLOG_MSGTYPE_HINT,
+	Comm			:= fbComm);
+	
+
+CalibrationEvent(	
+	Trigger 		:= bCalibrated, 
+	Level 			:= ADSLOG_MSGTYPE_HINT,
+	OnMessage 		:= 'Right Ascension Axis is calibrated.',
+	Comm			:= fbComm);
+	
+]]></ST>
+    </Implementation>
+    <LineIds Name="FB_HourAngleControl">
+      <LineId Id="10" Count="27" />
+      <LineId Id="97" Count="1" />
+      <LineId Id="38" Count="47" />
+      <LineId Id="99" Count="8" />
+      <LineId Id="121" Count="5" />
+      <LineId Id="87" Count="0" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

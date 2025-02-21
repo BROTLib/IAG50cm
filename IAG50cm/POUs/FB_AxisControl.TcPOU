@@ -1,0 +1,159 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="FB_AxisControl" Id="{6fdef2a3-176a-42ec-90be-24250bb425eb}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK ABSTRACT FB_AxisControl EXTENDS FB_BaseAxis IMPLEMENTS I_Axis
+VAR_INPUT
+	bMoveAxis				: BOOL;		// Move axis to given position
+	bTracking				: BOOL;		// enable tracking
+	bStopAxis				: BOOL;		// stop the Axis
+	bSoEReset				: BOOL;		// diagnostic reset
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	fActualPosition			: LREAL;	// actual_position of the axis
+	fSlewTime				: LREAL;	// time to reach target position
+	
+	axisRef					:	AXIS_REF;	
+	
+	fbAxisCalibration		:	MC_SetPosition;
+
+	fbSoEReset			  	:	FB_SoEReset;
+	axisEvent				:	FB_EventLog;
+	diagnosticEvent			:	FB_EventLog;
+	
+	bDiagnosticError		: BOOL;
+	
+	fbReadParameter		: MC_ReadParameter;
+	bGetLastPosition		: BOOL := TRUE;
+	
+	calibrationEvent		: FB_Eventlog;
+END_VAR
+VAR PERSISTENT
+	fLastPosition			: LREAL := -1.0;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="isTracking" Id="{d14d4ed7-aa44-40b8-a06b-dbd9bb4bc398}">
+      <Declaration><![CDATA[PROPERTY isTracking : BOOL]]></Declaration>
+      <Get Name="Get" Id="{d8cce5f4-c21e-4d9a-87e8-69b1f87cb648}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[isTracking := fbAxis.isTracking;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="MoveAxis" Id="{62370465-c9c4-4b3d-9522-670fc80fcf7d}">
+      <Declaration><![CDATA[PROPERTY MoveAxis : BOOL]]></Declaration>
+      <Get Name="Get" Id="{b6a037c9-1a5a-4ccc-a67e-cd8fbf875616}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MoveAxis := bMoveAxis;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{d5ee563e-2fbb-4a6b-ae57-cdb88f0e5477}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bMoveAxis := MoveAxis;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="MoveDone" Id="{ffed8cc8-8f25-4253-859b-58a4e017102a}">
+      <Declaration><![CDATA[PROPERTY MoveDone : BOOL]]></Declaration>
+      <Get Name="Get" Id="{9b084521-bbd8-4f17-b07f-9acdda778b7d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MoveDone := fbAxis.MoveDone;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="SlewTime" Id="{a36dc70d-226a-4ef7-9e23-e0fd5a5024cb}">
+      <Declaration><![CDATA[PROPERTY SlewTime : LREAL]]></Declaration>
+      <Get Name="Get" Id="{87871d10-1142-4737-afba-11d3d9c70605}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SlewTime := fSlewTime;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="StopAxis" Id="{895eb35b-1f81-42b7-8416-fc32b401fd0f}">
+      <Declaration><![CDATA[PROPERTY StopAxis : BOOL]]></Declaration>
+      <Get Name="Get" Id="{d8fe8d4f-84fc-4959-900d-984362d0d694}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StopAxis := bStopAxis;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{7b322eb7-7271-44c8-a7b2-c7ee70ff43dc}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bStopAxis := StopAxis;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Tracking" Id="{4bf1bf93-5980-423d-96c9-58edc9fdb938}">
+      <Declaration><![CDATA[PROPERTY Tracking : BOOL]]></Declaration>
+      <Get Name="Get" Id="{e9371fc2-0020-4b0a-85b6-17721f14dcf3}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Tracking := bTracking;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{4ff2f8a4-67a6-4244-b8ba-f5f82d04fc0f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bTracking := Tracking;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <LineIds Name="FB_AxisControl">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.isTracking.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.MoveAxis.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.MoveAxis.Set">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.MoveDone.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.SlewTime.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.StopAxis.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.StopAxis.Set">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.Tracking.Get">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.Tracking.Set">
+      <LineId Id="1" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

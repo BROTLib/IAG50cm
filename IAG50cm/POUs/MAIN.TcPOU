@@ -1,24 +1,56 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.13">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
   <POU Name="MAIN" Id="{d994e49b-b7f8-4497-8346-561ddfb9c2db}" SpecialFunc="None">
     <Declaration><![CDATA[PROGRAM MAIN
 VAR
-	comm		: FB_Comm_MQTT_Influx;
-	mirrorCover : FB_MirrorCoverControl(comm:=comm);
-	focusControl: FB_FocusControl(comm:=comm);
+	comm			: FB_Comm_MQTT_Influx;
+	coverControl 	: FB_MirrorCoverControl(comm:=comm);
+	focusControl	: FB_FocusControl(comm:=comm);
+	haControl		: FB_HourAngleControl(comm:=comm);
+	decControl		: FB_DeclinationControl(comm:=comm);
+	telescopeControl: FB_TelescopeControl(comm := comm);
 END_VAR
-]]></Declaration>
+VAR CONSTANT
+	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
+													houranglePark := 0.0, declinationPark := 0.0, focusPark:= 1000.0,
+													hourangleHome := 30.0, declinationHome := 30.0);
+END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[GVL_Safety.Run := TRUE;
 
-mirrorCover();
-focusControl();]]></ST>
+coverControl(delta_t:= T#5s);
+focusControl();
+haControl();
+decControl();
+telescopeControl(
+	fbHourAngle		:= haControl,
+	fbDeclination	:= decControl,
+	fbFocus			:= focusControl,
+	fbCovers		:= coverControl,
+	telescopeConfig	:= telescopeConfig,
+);
+
+
+comm(	
+	sHostName			:= '169.254.149.100',
+    nHostPort  			:= 1883,
+    nKeepAlive  		:= 60,
+	sTopicSub  		 	:= '50cm/Telescope/SET',
+	sTopicPublish		:= '50cm/Telemetry',
+	sTopicLog			:= '50cm/Log',
+);]]></ST>
     </Implementation>
     <LineIds Name="MAIN">
       <LineId Id="2" Count="0" />
-      <LineId Id="7" Count="0" />
-      <LineId Id="6" Count="0" />
-      <LineId Id="13" Count="0" />
+      <LineId Id="53" Count="3" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="70" Count="0" />
+      <LineId Id="43" Count="3" />
+      <LineId Id="50" Count="0" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="38" Count="1" />
+      <LineId Id="22" Count="6" />
+      <LineId Id="20" Count="0" />
     </LineIds>
   </POU>
 </TcPlcObject>
