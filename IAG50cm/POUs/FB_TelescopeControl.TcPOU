@@ -352,15 +352,21 @@ IF MQTTTimer.Q THEN // publish new payload every second
 	comm.Publish('telescope', 'dome', 'declination_offset', LREAL_TO_STRING(fDeclinationOffset));
 	comm.Publish('telescope', 'dome', 'hourangle_offset', LREAL_TO_STRING(fHourAngleOffset));
 	
-	comm.Publish('telescope', 'dome', 'errorid',		UDINT_TO_STRING(errorid));
+	comm.Publish('telescope', 'dome', 'errorid',	UDINT_TO_STRING(errorid));
 	comm.Publish('telescope', 'dome', 'error',		BOOL_TO_STRING(bError));
 	comm.Publish('telescope', 'dome', 'ready',		BOOL_TO_STRING(bReady));
-	comm.Publish('telescope', 'dome', 'busy',		BOOL_TO_STRING(bBusy));
-	comm.Publish('telescope', 'dome', 'sliding',		BOOL_TO_STRING(bSliding));
+	comm.Publish('telescope', 'dome', 'sliding',	BOOL_TO_STRING(bSliding));
 	comm.Publish('telescope', 'dome', 'tracking', 	BOOL_TO_STRING(bTracking));
-	comm.Publish('telescope', 'dome', 'stopped',		BOOL_TO_STRING(bStopped));
+	comm.Publish('telescope', 'dome', 'stopped',	BOOL_TO_STRING(bStopped));
 	comm.Publish('telescope', 'dome', 'homed',		BOOL_TO_STRING(bHomed));
-	comm.Publish('telescope', 'dome', 'parked',		BOOL_TO_STRING(isparked));
+	comm.Publish('telescope', 'dome', 'power',		BOOL_TO_STRING(bPower));
+	comm.Publish('telescope', 'dome', 'park',		BOOL_TO_STRING(bPark));
+	comm.Publish('telescope', 'dome', 'gohome',		BOOL_TO_STRING(bGoHome));
+	comm.Publish('telescope', 'dome', 'track',		BOOL_TO_STRING(bTrack));
+	comm.Publish('telescope', 'dome', 'goto',		BOOL_TO_STRING(bGoto));
+	comm.Publish('telescope', 'dome', 'slew',		BOOL_TO_STRING(bSlew));
+	comm.Publish('telescope', 'dome', 'stop',		BOOL_TO_STRING(bStop));
+	comm.Publish('telescope', 'dome', 'busy',		BOOL_TO_STRING(bBusy));
 END_IF
 
 StatusWord.0 := bError;
@@ -436,13 +442,13 @@ TCSstopEvent(	Trigger := bStop,
 				OffMEssage := 'completed',
 				OffLevel := ADSLOG_MSGTYPE_HINT, 
 				Comm := comm);
-AltitudeEvent(	Trigger := bPower AND elevation_calc<0.0, 
+AltitudeEvent(	Trigger := bReady AND elevation_calc<0.0, 
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'Target below horizon',
 				OffMEssage := '', 
 				Comm := comm);
-TCSreadyEvent(	Trigger := bPower AND bReady, 
+TCSreadyEvent(	Trigger := bReady, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := '%s',
 				OnMessage := 'IAG50cm startup finished', 
@@ -1052,7 +1058,9 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="5646" Count="15" />
       <LineId Id="5663" Count="13" />
       <LineId Id="5678" Count="4" />
-      <LineId Id="5686" Count="99" />
+      <LineId Id="5686" Count="1" />
+      <LineId Id="6147" Count="12" />
+      <LineId Id="5695" Count="90" />
       <LineId Id="354" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._GotoTelescope">
