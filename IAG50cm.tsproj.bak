@@ -1665,12 +1665,12 @@ External Setpoint Generation:
 					<Name>HourAngle</Name>
 					<AxisPara>
 						<General UnitName="°"/>
-						<Dynamic Acceleration="15000" Deceleration="15000" Jerk="145784.961"/>
-						<Velo RefSearch="323.96658" RefSync="323.96658" SlowManual="1619.8329" FastManual="9718.9974" Fast="32396.658" Maximum="32396.658"/>
+						<Dynamic Acceleration="6074.373" Deceleration="6074.373" Jerk="18223.119"/>
+						<Velo RefSearch="40.49582" RefSync="40.49582" SlowManual="202.4791" FastManual="1214.8746" Fast="4049.582" Maximum="4049.582"/>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
 					<Encoder Name="Enc" EncType="19">
-						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="1048576" MaxCount="#xffffffff"/>
+						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="8388608" MaxCount="#xffffffff"/>
 						<Vars VarGrpType="1">
 							<Name>Inputs</Name>
 							<Var>
@@ -1729,7 +1729,7 @@ External Setpoint Generation:
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
 						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
-							<Analog VeloReferenz="35636.3238" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
+							<Analog VeloReferenz="4454.5402" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
 						<Vars VarGrpType="1">
@@ -1807,12 +1807,12 @@ External Setpoint Generation:
 					<Name>Declination</Name>
 					<AxisPara>
 						<General UnitName="°"/>
-						<Dynamic Acceleration="15000" Deceleration="15000" Jerk="145784.961"/>
-						<Velo RefSearch="323.96658" RefSync="323.96658" SlowManual="1619.8329" FastManual="9718.9974" Fast="32396.658" Maximum="32396.658"/>
+						<Dynamic Acceleration="6074.37" Deceleration="6074.37" Jerk="18223.1"/>
+						<Velo RefSearch="40.49582" RefSync="40.49582" SlowManual="202.4791" FastManual="1214.8746" Fast="4049.582" Maximum="4049.58"/>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
 					<Encoder Name="Enc" EncType="19">
-						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="1048576" MaxCount="#xffffffff"/>
+						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="8388608" MaxCount="#xffffffff"/>
 						<Vars VarGrpType="1">
 							<Name>Inputs</Name>
 							<Var>
@@ -1871,7 +1871,7 @@ External Setpoint Generation:
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
 						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
-							<Analog VeloReferenz="35636.3238" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
+							<Analog VeloReferenz="4454.5402" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
 						<Vars VarGrpType="1">
@@ -2094,7 +2094,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{0F4A74CB-0CAA-D686-5DEE-66D02A7205BF}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{FD54D9A2-B9A0-BB34-7D4A-568BB1354A82}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -2114,24 +2114,6 @@ External Setpoint Generation:
 					</Vars>
 					<Vars VarGrpType="2" AreaNo="1">
 						<Name>PlcTask Outputs</Name>
-						<Var>
-							<Name>MAIN.coverControl.coverMotors[1].Relais_Out_A</Name>
-							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.coverControl.coverMotors[1].Relais_Out_B</Name>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_A</Name>
-							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
-							<Type>BOOL</Type>
-						</Var>
 						<Var>
 							<Name>GVL_Safety.Run</Name>
 							<Comment><![CDATA[ Run/Stop Safety]]></Comment>
@@ -2158,6 +2140,24 @@ External Setpoint Generation:
 						<Var>
 							<Name>MAIN.decControl.axisRef.PlcToNc</Name>
 							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.coverControl.coverMotors[1].Relais_Out_A</Name>
+							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.coverControl.coverMotors[1].Relais_Out_B</Name>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_A</Name>
+							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
+							<Type>BOOL</Type>
 						</Var>
 					</Vars>
 					<UnrestoredVarLinks ImportTime="2024-12-02T10:58:38">
@@ -2974,7 +2974,7 @@ External Setpoint Generation:
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioMotorSide</PropertyName>
-													<Value>1</Value>
+													<Value>8</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioLoadSide</PropertyName>
@@ -3095,7 +3095,7 @@ External Setpoint Generation:
 											</Parameter>
 											<Parameter>
 												<PropertyName>Modulo_Value</PropertyName>
-												<Value>0</Value>
+												<Value>4294967296</Value>
 											</Parameter>
 											<Parameter>
 												<PropertyName>Modulo_MinPositionRange</PropertyName>
@@ -3103,7 +3103,7 @@ External Setpoint Generation:
 											</Parameter>
 											<Parameter>
 												<PropertyName>Modulo_MaxPositionRange</PropertyName>
-												<Value>0</Value>
+												<Value>4294967295</Value>
 											</Parameter>
 										</Modulo>
 										<Block Id="0">
@@ -3518,7 +3518,7 @@ External Setpoint Generation:
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioMotorSide</PropertyName>
-													<Value>1</Value>
+													<Value>8</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioLoadSide</PropertyName>
@@ -3542,11 +3542,11 @@ External Setpoint Generation:
 												</Parameter>
 												<Parameter>
 													<PropertyName>MaxApplicationTorqueForce</PropertyName>
-													<Value>0.40014</Value>
+													<Value>0.6299937</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>MaxApplicationSpeed</PropertyName>
-													<Value>1047.1975511966</Value>
+													<Value>1047.19755</Value>
 												</Parameter>
 											</Load>
 											<Controller>

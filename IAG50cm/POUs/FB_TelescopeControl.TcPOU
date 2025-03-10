@@ -7,7 +7,7 @@ VAR_INPUT
 TCS interface section
 see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 *)
-	bPower				: BOOL;		// true: Power on, false: power off
+	bPowerOn			: BOOL;		// true: Power on
 	bGoHome				: BOOL;		// true: go to home position, unset track/goto if active
 	bPark				: BOOL;		// boolean, true: go into park position, ready to stow telescope, unset track/goto
 	bTrack				: BOOL;		// boolean, TRUE: MOVE telescope TO last ra/de AND start tracking. Set 'goto' TO FALSE, IF TRUE. FALSE: Stop tracking as soon as possible
@@ -80,7 +80,8 @@ VAR
 	StatusWord, LastStatus:	UDINT;
 END_VAR
 VAR_OUTPUT
-	bReady				: BOOL;		//		TRUE, IF telescope can be operated 
+	bPower				: BOOL;		// TRUE: Telescope is powered on
+	bReady				: BOOL;		// TRUE, IF telescope can be operated 
 	bError				: BOOL;		// indicates an error on one of the components	
 	errorid				: UDINT;	//error id of axis	
 	bSliding			: BOOL;		//TRUE, IF telescope is in fast-MOVE phase (includes pole-swap)	
@@ -200,7 +201,7 @@ eq2hor(
 	az => azimuth_current);
 	
 	
-poweronwarning(IN := bPower OR (NOT fbHourAngle.bEnable), PT := T#250MS);
+poweronwarning(IN := bPowerOn OR (NOT fbHourAngle.bEnable), PT := T#250MS);
 
 power_timeout(IN := TCS_command = E_TCSCommand.no_command AND NOT isparked, PT := T#12H);
 command_timeout();
@@ -209,7 +210,7 @@ IF power_timeout.Q AND NOT isparked THEN
 END_IF
 		
 // set TCS_command according to state variables ordered by precedence
-IF bPower THEN
+IF bPowerOn THEN
 	TCS_command := E_TCSCommand.poweron;
 ELSIF bStop THEN
 	TCS_command := E_TCSCommand.stop;
@@ -597,7 +598,7 @@ VAR
 END_VAR
 VAR_STAT
 	Stage		: USINT := 0;
-	LastStage	: USINT := 101;
+	LastStage	: USINT := 0;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_ParkTelescope := Stage;
@@ -687,6 +688,7 @@ END_VAR
 	powerfailure := TRUE;
 	TCSpowerEvent.OnMessage := 'Generic error during power on occured.';
 	bPower := FALSE;
+	bPowerOn := FALSE;
 ELSE
 	powerfailure := FALSE;		
 END_IF
@@ -723,7 +725,9 @@ IF fbCovers.Opened AND
 	fbHourAngle.Calibrated AND
 	fbDeclination.Calibrated THEN
 	//FocusControl.Calibrated THEN
-	bPower := FALSE;
+	//PowerOn is done, set bPower to True
+	bPowerOn := FALSE;
+	bPower := TRUE;
 	_PowerOn := TRUE;
 	isparked := FALSE;
 	// slew the telescope to the home position
@@ -1096,14 +1100,20 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="73" Count="12" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._PowerOn">
-      <LineId Id="5" Count="7" />
+      <LineId Id="5" Count="3" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="9" Count="3" />
       <LineId Id="69" Count="0" />
       <LineId Id="63" Count="0" />
       <LineId Id="65" Count="0" />
       <LineId Id="13" Count="5" />
       <LineId Id="20" Count="9" />
       <LineId Id="33" Count="11" />
-      <LineId Id="46" Count="9" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="76" Count="0" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="48" Count="7" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._SlewTelescope">
       <LineId Id="1" Count="7" />
