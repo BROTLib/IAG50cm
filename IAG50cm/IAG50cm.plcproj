@@ -43,6 +43,9 @@
     <Compile Include="POUs\FB_FocusControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FB_HA2RA.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\FB_MirrorCoverControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>

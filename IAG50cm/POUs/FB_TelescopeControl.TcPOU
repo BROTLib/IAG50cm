@@ -7,7 +7,7 @@ VAR_INPUT
 TCS interface section
 see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 *)
-	bPowerOn			: BOOL;		// true: Power on
+	bPower				: BOOL;		// true: Power on
 	bGoHome				: BOOL;		// true: go to home position, unset track/goto if active
 	bPark				: BOOL;		// boolean, true: go into park position, ready to stow telescope, unset track/goto
 	bTrack				: BOOL;		// boolean, TRUE: MOVE telescope TO last ra/de AND start tracking. Set 'goto' TO FALSE, IF TRUE. FALSE: Stop tracking as soon as possible
@@ -43,7 +43,7 @@ VAR
 	
 	TCS_command			: E_TCSCommand;	// actual command from the TCS
 	jd					: LREAL;	// current Julian Date calculated from system time
-	lst					: LREAL;	// local siderial time calculated from Julian date
+	lst					: LREAL;	// local siderial time calculated from Julian date in hours
 	elevation_calc		: LREAL;	// elevation calulated when ra and dec are set by TCS 
 	azimuth_calc		: LREAL;	// azimuth calulated when ra and dec are set by TCS
 	fHourAngle			: LREAL;	// hourangle when ra and dec are set by TCS
@@ -54,6 +54,7 @@ VAR
 	fbTime				: FB_AstroClock;	// precise astronomical	time
 	eq2hor				: FB_EQ2HOR;
 	hor2eq				: FB_HOR2EQ;
+	ha2ra				: FB_HA2RA;
 	
 	reset_trigger		: R_TRIG;
 	
@@ -80,7 +81,6 @@ VAR
 	StatusWord, LastStatus:	UDINT;
 END_VAR
 VAR_OUTPUT
-	bPower				: BOOL;		// TRUE: Telescope is powered on
 	bReady				: BOOL;		// TRUE, IF telescope can be operated 
 	bError				: BOOL;		// indicates an error on one of the components	
 	errorid				: UDINT;	//error id of axis	
@@ -177,7 +177,7 @@ eq2hor(
 // calculate equatorial coordinates (used by Slew command, takes Alt/Az -> moves telescope)
 hor2eq(alt := fElevation, 
 		az := fAzimuth,
-		jd := jd,
+		jd := jd+fTimeOffset,
 		lat := telescopeConfig.latitude,
 		lon := telescopeConfig.longitude,
 		altitude := telescopeConfig.altitude,
@@ -190,10 +190,16 @@ hor2eq(alt := fElevation,
 declination_current := fbDeclination.fActualPosition;
 hourangle_current := fbHourAngle.fActualPosition;
 // transform into needed coordinates
-rightascension_current := MODABS(lst*15.0 - hourangle_current, 360.0);
+ha2ra(
+	ha := hourangle_current,
+	dec := declination_current,
+	jd := jd+fTimeOffset,
+	lon := telescopeConfig.longitude,
+	ra => rightascension_current);
+
 eq2hor(
-	ra := declination_current,
-	dec := rightascension_current,
+	ra := rightascension_current,
+	dec := declination_current,
 	lon := telescopeConfig.longitude,
 	lat := telescopeConfig.latitude,
 	JD := jd + fTimeOffset,
@@ -201,7 +207,7 @@ eq2hor(
 	az => azimuth_current);
 	
 	
-poweronwarning(IN := bPowerOn OR (NOT fbHourAngle.bEnable), PT := T#250MS);
+poweronwarning(IN := bPower OR (NOT fbHourAngle.bEnable), PT := T#250MS);
 
 power_timeout(IN := TCS_command = E_TCSCommand.no_command AND NOT isparked, PT := T#12H);
 command_timeout();
@@ -210,7 +216,7 @@ IF power_timeout.Q AND NOT isparked THEN
 END_IF
 		
 // set TCS_command according to state variables ordered by precedence
-IF bPowerOn THEN
+IF bPower THEN
 	TCS_command := E_TCSCommand.poweron;
 ELSIF bStop THEN
 	TCS_command := E_TCSCommand.stop;
@@ -688,7 +694,6 @@ END_VAR
 	powerfailure := TRUE;
 	TCSpowerEvent.OnMessage := 'Generic error during power on occured.';
 	bPower := FALSE;
-	bPowerOn := FALSE;
 ELSE
 	powerfailure := FALSE;		
 END_IF
@@ -726,7 +731,6 @@ IF fbCovers.Opened AND
 	fbDeclination.Calibrated THEN
 	//FocusControl.Calibrated THEN
 	//PowerOn is done, set bPower to True
-	bPowerOn := FALSE;
 	bPower := TRUE;
 	_PowerOn := TRUE;
 	isparked := FALSE;
@@ -1049,6 +1053,8 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="5485" Count="0" />
       <LineId Id="5506" Count="3" />
       <LineId Id="6033" Count="0" />
+      <LineId Id="6274" Count="0" />
+      <LineId Id="6276" Count="4" />
       <LineId Id="5896" Count="0" />
       <LineId Id="6025" Count="7" />
       <LineId Id="5520" Count="55" />
@@ -1100,9 +1106,7 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="73" Count="12" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._PowerOn">
-      <LineId Id="5" Count="3" />
-      <LineId Id="73" Count="0" />
-      <LineId Id="9" Count="3" />
+      <LineId Id="5" Count="7" />
       <LineId Id="69" Count="0" />
       <LineId Id="63" Count="0" />
       <LineId Id="65" Count="0" />
@@ -1111,7 +1115,6 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="33" Count="11" />
       <LineId Id="46" Count="0" />
       <LineId Id="76" Count="0" />
-      <LineId Id="47" Count="0" />
       <LineId Id="74" Count="0" />
       <LineId Id="48" Count="7" />
     </LineIds>
