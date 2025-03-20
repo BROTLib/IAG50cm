@@ -38,6 +38,8 @@ comm(
 	sTopicSub  		 	:= '50cm/Telescope/SET',
 	sTopicPublish		:= '50cm/Telemetry',
 	sTopicLog			:= '50cm/Log',
+	Telescope			:= telescopeControl,
+	Focus				:= focusControl
 );]]></ST>
     </Implementation>
     <LineIds Name="MAIN">
@@ -50,6 +52,7 @@ comm(
       <LineId Id="42" Count="0" />
       <LineId Id="38" Count="1" />
       <LineId Id="22" Count="6" />
+      <LineId Id="84" Count="1" />
       <LineId Id="20" Count="0" />
     </LineIds>
   </POU>

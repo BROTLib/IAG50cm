@@ -730,8 +730,8 @@ IF fbCovers.Opened AND
 	fbHourAngle.Calibrated AND
 	fbDeclination.Calibrated THEN
 	//FocusControl.Calibrated THEN
-	//PowerOn is done, set bPower to True
-	bPower := TRUE;
+	//PowerOn is done, set bPower to False
+	bPower := FALSE;
 	_PowerOn := TRUE;
 	isparked := FALSE;
 	// slew the telescope to the home position
