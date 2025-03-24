@@ -9,9 +9,9 @@ VAR_INPUT
 	bSoEReset				: BOOL;		// diagnostic reset
 END_VAR
 VAR_OUTPUT
+	fActualPosition			: LREAL;	// actual_position of the axis
 END_VAR
 VAR
-	fActualPosition			: LREAL;	// actual_position of the axis
 	fSlewTime				: LREAL;	// time to reach target position
 	
 	axisRef					:	AXIS_REF;	

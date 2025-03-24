@@ -19,7 +19,7 @@ END_VAR]]></Declaration>
       <ST><![CDATA[GVL_Safety.Run := TRUE;
 
 coverControl(delta_t:= T#5s);
-focusControl();
+focusControl(fVelocity:=10);
 haControl();
 decControl();
 telescopeControl(

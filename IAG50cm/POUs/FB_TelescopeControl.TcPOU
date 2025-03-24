@@ -241,6 +241,8 @@ ELSIF bGoHome THEN
 	END_IF
 ELSIF bGoto THEN
 	bTrack := FALSE;
+	fbHourAngle.Tracking := FALSE;
+	fbDeclination.Tracking := FALSE;
 	bSlew := FALSE;
 	IF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.goto;
@@ -366,13 +368,7 @@ IF MQTTTimer.Q THEN // publish new payload every second
 	comm.Publish('telescope', 'dome', 'tracking', 	BOOL_TO_STRING(bTracking));
 	comm.Publish('telescope', 'dome', 'stopped',	BOOL_TO_STRING(bStopped));
 	comm.Publish('telescope', 'dome', 'homed',		BOOL_TO_STRING(bHomed));
-	comm.Publish('telescope', 'dome', 'power',		BOOL_TO_STRING(bPower));
-	comm.Publish('telescope', 'dome', 'park',		BOOL_TO_STRING(bPark));
-	comm.Publish('telescope', 'dome', 'gohome',		BOOL_TO_STRING(bGoHome));
-	comm.Publish('telescope', 'dome', 'track',		BOOL_TO_STRING(bTrack));
-	comm.Publish('telescope', 'dome', 'goto',		BOOL_TO_STRING(bGoto));
-	comm.Publish('telescope', 'dome', 'slew',		BOOL_TO_STRING(bSlew));
-	comm.Publish('telescope', 'dome', 'stop',		BOOL_TO_STRING(bStop));
+	comm.Publish('telescope', 'dome', 'parked',		BOOL_TO_STRING(isparked));
 	comm.Publish('telescope', 'dome', 'busy',		BOOL_TO_STRING(bBusy));
 END_IF
 
@@ -506,6 +502,13 @@ END_IF
 CASE Stage OF
 	0:	
 		IF bReady AND NOT bBusy THEN
+			Stage := 10;
+		END_IF
+	10:
+		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
+			fbHourAngle.Tracking := FALSE;
+			fbDeclination.Tracking := FALSE;
+		ELSE
 			Stage := 25;
 		END_IF
 	25:	
@@ -629,7 +632,14 @@ CASE Stage OF
 			fbCovers.Close();	
 			Stage := 80;
 		END_IF
-		Stage := 20;
+		Stage := 10;
+	10:
+		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
+			fbHourAngle.Tracking := FALSE;
+			fbDeclination.Tracking := FALSE;
+		ELSE
+			Stage := 20;
+		END_IF
 	20:
 		fbHourAngle.Position := telescopeConfig.houranglePark;
 		fbHourAngle.Velocity := 10.0;
@@ -776,6 +786,13 @@ END_IF
 CASE Stage OF
 	0:	
 		IF bReady AND bStopped AND NOT bBusy AND NOT bTracking THEN
+			Stage := 10;
+		END_IF
+	10:
+		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
+			fbHourAngle.Tracking := FALSE;
+			fbDeclination.Tracking := FALSE;
+		ELSE
 			Stage := 25;
 		END_IF
 	25:
@@ -820,13 +837,20 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[fbHourAngle.StopAxis := TRUE;
-fbDeclination.StopAxis := TRUE;
-IF bStopped THEN
-	fbHourAngle.StopAxis := FALSE;
-	fbDeclination.StopAxis := FALSE;
-	_StopTelescope := FALSE;
+        <ST><![CDATA[IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
+	fbHourAngle.Tracking := FALSE;
+	fbDeclination.Tracking := FALSE;
+ELSE
+	fbHourAngle.StopAxis := TRUE;
+	fbDeclination.StopAxis := TRUE;
+	IF bStopped THEN
+		fbHourAngle.StopAxis := FALSE;
+		fbDeclination.StopAxis := FALSE;
+		_StopTelescope := FALSE;
+	END_IF
 END_IF
+
+
 ]]></ST>
       </Implementation>
     </Method>
@@ -844,15 +868,15 @@ IF NOT fbHourAngle.Tracking THEN
 	IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 		fbHourAngle.MoveAxis := FALSE;
 		IF fbHourAngle.isTracking THEN
-			fbHourAngle.Velocity := siderial_velocity;
+			fbHourAngle.Velocity := 1.0;//siderial_velocity;
 		ELSE
-			fbHourAngle.Velocity := 3.0*siderial_velocity;
+			fbHourAngle.Velocity := 3.0;//*siderial_velocity;
 		END_IF
-		fbHourAngle.Velocity := siderial_velocity;
+		//fbHourAngle.Velocity := 1.0;//siderial_velocity;
 		fbHourAngle.Tracking := TRUE;
 	END_IF
 ELSE
-	fbHourAngle.Velocity := siderial_velocity;
+	fbHourAngle.Velocity := 1.0;//siderial_velocity;
 END_IF
 
 // Declination (should not move while tracking)
@@ -863,15 +887,15 @@ IF NOT fbDeclination.Tracking THEN
 	IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 		fbDeclination.MoveAxis := FALSE;
 		IF fbDeclination.isTracking THEN
-			fbDeclination.Velocity := 0.0;
+			fbDeclination.Velocity := 1.0;
 		ELSE
-			fbDeclination.Velocity := 10.0;
+			fbDeclination.Velocity := 3.0;
 		END_IF
-		fbDeclination.Velocity := 0.0;
+		//fbDeclination.Velocity := 1.0;
 		fbDeclination.Tracking := TRUE;
 	END_IF
 ELSE
-	fbDeclination.Velocity := 0.0;
+	fbDeclination.Velocity := 1.0;
 END_IF
 ]]></ST>
       </Implementation>
@@ -947,7 +971,13 @@ bGoto			:= TRUE;]]></ST>
       <Declaration><![CDATA[METHOD Park : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[bPark := TRUE;]]></ST>
+        <ST><![CDATA[IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
+	bTrack := FALSE;
+	fbHourAngle.Tracking := FALSE;
+	fbDeclination.Tracking := FALSE;
+ELSE
+	bPark := TRUE;
+END_IF]]></ST>
       </Implementation>
     </Method>
     <Property Name="RaDec" Id="{03d00136-4b42-4017-a768-650b9915ac54}">
@@ -1035,8 +1065,9 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[fRightAscension	:= RaDec.RightAscension;
-fDeclination		:= RaDec.Declination;
-bTrack			:= TRUE;]]></ST>
+fDeclination	:= RaDec.Declination;
+bTrack			:= TRUE;
+]]></ST>
       </Implementation>
     </Method>
     <LineIds Name="FB_TelescopeControl">
@@ -1057,7 +1088,9 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="6276" Count="4" />
       <LineId Id="5896" Count="0" />
       <LineId Id="6025" Count="7" />
-      <LineId Id="5520" Count="55" />
+      <LineId Id="5520" Count="35" />
+      <LineId Id="6395" Count="1" />
+      <LineId Id="5556" Count="19" />
       <LineId Id="5577" Count="1" />
       <LineId Id="5580" Count="37" />
       <LineId Id="5619" Count="3" />
@@ -1069,14 +1102,19 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="5663" Count="13" />
       <LineId Id="5678" Count="4" />
       <LineId Id="5686" Count="1" />
-      <LineId Id="6147" Count="12" />
+      <LineId Id="6147" Count="6" />
       <LineId Id="5695" Count="90" />
       <LineId Id="354" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._GotoTelescope">
       <LineId Id="1" Count="17" />
       <LineId Id="89" Count="0" />
-      <LineId Id="19" Count="13" />
+      <LineId Id="19" Count="9" />
+      <LineId Id="100" Count="0" />
+      <LineId Id="102" Count="2" />
+      <LineId Id="101" Count="0" />
+      <LineId Id="105" Count="1" />
+      <LineId Id="29" Count="3" />
       <LineId Id="34" Count="4" />
       <LineId Id="40" Count="1" />
       <LineId Id="43" Count="8" />
@@ -1095,7 +1133,13 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="87" Count="0" />
       <LineId Id="15" Count="0" />
       <LineId Id="17" Count="1" />
-      <LineId Id="20" Count="10" />
+      <LineId Id="20" Count="3" />
+      <LineId Id="114" Count="0" />
+      <LineId Id="117" Count="0" />
+      <LineId Id="115" Count="1" />
+      <LineId Id="113" Count="0" />
+      <LineId Id="118" Count="1" />
+      <LineId Id="24" Count="6" />
       <LineId Id="34" Count="1" />
       <LineId Id="37" Count="8" />
       <LineId Id="49" Count="10" />
@@ -1122,19 +1166,33 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="1" Count="7" />
       <LineId Id="71" Count="5" />
       <LineId Id="70" Count="0" />
-      <LineId Id="9" Count="14" />
+      <LineId Id="9" Count="7" />
+      <LineId Id="91" Count="0" />
+      <LineId Id="88" Count="2" />
+      <LineId Id="87" Count="0" />
+      <LineId Id="92" Count="1" />
+      <LineId Id="17" Count="6" />
       <LineId Id="27" Count="1" />
       <LineId Id="30" Count="9" />
       <LineId Id="43" Count="6" />
       <LineId Id="51" Count="7" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._StopTelescope">
-      <LineId Id="1" Count="1" />
-      <LineId Id="4" Count="2" />
-      <LineId Id="8" Count="2" />
+      <LineId Id="16" Count="1" />
+      <LineId Id="19" Count="1" />
+      <LineId Id="22" Count="5" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="18" Count="0" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="9" Count="1" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._TrackTelescope">
-      <LineId Id="34" Count="37" />
+      <LineId Id="34" Count="7" />
+      <LineId Id="76" Count="1" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="75" Count="0" />
+      <LineId Id="47" Count="24" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.AltAz.Get">
       <LineId Id="1" Count="1" />
@@ -1155,13 +1213,18 @@ bTrack			:= TRUE;]]></ST>
       <LineId Id="1" Count="2" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Park">
+      <LineId Id="5" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="6" Count="1" />
+      <LineId Id="4" Count="0" />
       <LineId Id="1" Count="0" />
+      <LineId Id="9" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.RaDec.Get">
       <LineId Id="1" Count="1" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Reset">
-      <LineId Id="1" Count="0" />
+      <LineId Id="9" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.SetAltitudeOffset">
       <LineId Id="1" Count="0" />
@@ -1183,6 +1246,7 @@ bTrack			:= TRUE;]]></ST>
     </LineIds>
     <LineIds Name="FB_TelescopeControl.TrackRaDec">
       <LineId Id="1" Count="2" />
+      <LineId Id="13" Count="0" />
     </LineIds>
   </POU>
 </TcPlcObject>
