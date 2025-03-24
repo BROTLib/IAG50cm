@@ -971,13 +971,8 @@ bGoto			:= TRUE;]]></ST>
       <Declaration><![CDATA[METHOD Park : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
-	bTrack := FALSE;
-	fbHourAngle.Tracking := FALSE;
-	fbDeclination.Tracking := FALSE;
-ELSE
-	bPark := TRUE;
-END_IF]]></ST>
+        <ST><![CDATA[bPark := TRUE;
+]]></ST>
       </Implementation>
     </Method>
     <Property Name="RaDec" Id="{03d00136-4b42-4017-a768-650b9915ac54}">
@@ -1213,10 +1208,6 @@ bTrack			:= TRUE;
       <LineId Id="1" Count="2" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Park">
-      <LineId Id="5" Count="0" />
-      <LineId Id="8" Count="0" />
-      <LineId Id="6" Count="1" />
-      <LineId Id="4" Count="0" />
       <LineId Id="1" Count="0" />
       <LineId Id="9" Count="0" />
     </LineIds>

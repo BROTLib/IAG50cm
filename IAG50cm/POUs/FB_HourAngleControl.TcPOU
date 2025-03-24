@@ -14,7 +14,9 @@ END_VAR
     <Implementation>
       <ST><![CDATA[// limit to sane positions
 fPosition := LIMIT(fMinPosition, fPosition, fMaxPosition);
-
+IF fPosition > 180 THEN
+	fPosition := fPosition-360.0;
+END_IF
 
 IF bEnable AND NOT fbAxis.Calibrated THEN
 	bHomeAxis := TRUE;
@@ -43,7 +45,6 @@ fbAxis(
 	Enable_Negative := NOT axisRef.Status.SoftLimitMinExceeded,
 	Jog_Forward 	:= bMovePos,
 	Jog_Backwards 	:= bMoveNeg,
-	//isModuloAxis 	:= FALSE,
 	ActualPosition 	=> fActualPosition,
 	Error 			=> bError,
 	ErrorID 		=> nErrorID,
@@ -110,11 +111,13 @@ CalibrationEvent(
 ]]></ST>
     </Implementation>
     <LineIds Name="FB_HourAngleControl">
-      <LineId Id="10" Count="22" />
+      <LineId Id="10" Count="2" />
+      <LineId Id="137" Count="1" />
+      <LineId Id="13" Count="19" />
       <LineId Id="136" Count="0" />
       <LineId Id="33" Count="4" />
       <LineId Id="97" Count="1" />
-      <LineId Id="38" Count="47" />
+      <LineId Id="39" Count="46" />
       <LineId Id="99" Count="8" />
       <LineId Id="121" Count="5" />
       <LineId Id="87" Count="0" />
