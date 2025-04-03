@@ -143,9 +143,10 @@ ELSIF fbFocus <> 0 AND_THEN fbFocus.Error THEN
 	END_IF
 END_IF
 
-bError := fbHourAngle.Error OR 
-		 fbDeclination.bError OR
-		 (fbFocus <> 0 AND_THEN fbFocus.Error);
+IF fbHourAngle.Error OR fbDeclination.bError OR(fbFocus <> 0 AND_THEN fbFocus.Error) THEN
+	bError := TRUE;
+END_IF
+
 
 slewtime := MAX(fbHourAngle.fSlewTime, fbDeclination.fSlewTime);
 			
@@ -509,39 +510,83 @@ CASE Stage OF
 			fbHourAngle.Tracking := FALSE;
 			fbDeclination.Tracking := FALSE;
 		ELSE
-			Stage := 25;
+			Stage := 20;
 		END_IF
-	25:	
-		fbHourAngle.Position := fHourAngle;
+	20:	
+		// channge to -180 to 180 degree in HA
+		IF fHourAngle > 180 THEN
+			fbHourAngle.Position := fHourAngle-360.0;
+		ELSE
+			fbHourAngle.Position := fHourAngle;
+		END_IF
 		fbDeclination.Position := fDeclination;
-		
 		fbHourAngle.Velocity := 10.0;
 		fbDeclination.Velocity := 10.0;
 		
-		fbHourAngle.MoveAxis := TRUE;
-		fbDeclination.MoveAxis := TRUE;
-		IF fbDeclination.Busy AND
-			fbHourAngle.Busy THEN
-				Stage := 50;
+		// make sure to never drive under Horizon
+		IF ABS(fbHourAngle.Position) < ABS(hourangle_current) THEN
+			// move Ha then Dec
+			Stage := 30;
+		ELSE
+			// move Dec then HA
+			Stage := 40;
 		END_IF
-	50:
+	// Stage 30: move Ha and then Dec
+	30:
+		fbHourAngle.MoveAxis := TRUE;
+		IF fbHourAngle.Busy THEN
+			Stage := 31;
+		END_IF
+	31:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
+		IF NOT fbHourAngle.MoveAxis THEN
+		   Stage := 32;
+		END_IF
+	32:
+		fbDeclination.MoveAxis := TRUE;
+		IF fbDeclination.Busy THEN
+			Stage := 33;
+		END_IF
+	33:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
-		IF NOT fbHourAngle.MoveAxis AND 
-           NOT fbDeclination.MoveAxis THEN
+		IF NOT fbDeclination.MoveAxis THEN
 		   Stage := 75;
 		END_IF
+	// Stage 40: move Dec and then Ha
+	40:
+		fbDeclination.MoveAxis := TRUE;
+		IF fbDeclination.Busy THEN
+			Stage := 41;
+		END_IF
+	41:
+		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
+			fbDeclination.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbDeclination.MoveAxis THEN
+		   Stage := 42;
+		END_IF
+	42:
+		fbHourAngle.MoveAxis := TRUE;
+		IF fbHourAngle.Busy THEN
+			Stage := 43;
+		END_IF
+	43:
+		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
+			fbHourAngle.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbHourAngle.MoveAxis THEN
+		   Stage := 75;
+		END_IF
+
 	75:
 		IF NOT bSliding AND bStopped THEN // all axis standstill
 			Stage := 100;
 		END_IF
 	100:
-		fbHourAngle.MoveAxis := FALSE;
-		fbDeclination.MoveAxis := FALSE;
 
 		fRightAscension := rightascension_current;
 		fDeclination := declination_current;
@@ -550,52 +595,121 @@ CASE Stage OF
 		bTrack := bAutoTrack;
 		Stage := 0;
 END_CASE
-GoToEvent(Trigger := Stage > LastStage, FormatString := 'GoTo progress: %s', OnMessage := USINT_TO_STRING(Stage), comm := comm);
+GoToEvent(Trigger := Stage > LastStage, FormatString := 'GOTO progress: %s', OnMessage := USINT_TO_STRING(Stage), comm := comm);
 LastStage := Stage;
 ]]></ST>
       </Implementation>
     </Method>
     <Method Name="_HomeTelescope" Id="{b2d9dfb4-bf7c-4f17-8ac5-7f074d6808c9}">
-      <Declaration><![CDATA[METHOD PRIVATE _HomeTelescope : BOOL
+      <Declaration><![CDATA[METHOD PRIVATE _HomeTelescope : USINT
 VAR_INPUT
 END_VAR
 VAR
-	HomeEvent		: FB_Eventlog;
-	commandTimeout	: TON;
+	HomeEvent:	FB_Eventlog;
+	commandTimeout: TON;
+END_VAR
+VAR_STAT
+	Stage:		USINT := 0;
+	LastStage:	USINT := 101;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[commandTimeout(IN := NOT _HomeTelescope, PT := T#600S);
+        <ST><![CDATA[_HomeTelescope := Stage;
+commandTimeout(IN := Stage < 100, PT := T#600S);
 IF commandTimeout.Q THEN
 	bError := TRUE;
 	errorid := 16#30;
-	_HomeTelescope :=TRUE;
+	Stage := 0;
 END_IF
 
-IF bReady AND bStopped AND NOT bBusy AND NOT bTracking THEN
-	fbHourAngle.Velocity := 10.0;
-	fbHourAngle.Position := telescopeConfig.hourangleHome;
-	fbHourAngle.MoveAxis := TRUE;
-	fbDeclination.Velocity := 10.0;
-	fbDeclination.Position := telescopeConfig.declinationHome;
-	fbDeclination.MoveAxis := TRUE;
+IF bReset OR bError THEN
+	Stage := 0;
+	RETURN;
+END_IF
+CASE Stage OF
+	0:	
+		IF bReady AND bStopped AND NOT bBusy THEN
+			Stage := 10;
+		END_IF
+	10:
+		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
+			fbHourAngle.Tracking := FALSE;
+			fbDeclination.Tracking := FALSE;
+		ELSE
+			Stage := 20;
+		END_IF
+	20:
+		fbHourAngle.Position := telescopeConfig.hourangleHome;
+		fbHourAngle.Velocity := 10.0;
+		fbDeclination.Position := telescopeConfig.declinationHome;
+		fbDeclination.Velocity := 10;
 		
-END_IF
+		// make sure to never drive under Horizon
+		IF ABS(telescopeConfig.hourangleHome) < ABS(hourangle_current) THEN
+			// move Ha then Dec
+			Stage := 30;
+		ELSE
+			// move Dec then HA
+			Stage := 40;
+		END_IF
+	// Stage 30: move Ha and then Dec
+	30:
+		fbHourAngle.MoveAxis := TRUE;
+		IF fbHourAngle.Busy THEN
+			Stage := 31;
+		END_IF
+	31:
+		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
+			fbHourAngle.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbHourAngle.MoveAxis THEN
+		   Stage := 32;
+		END_IF
+	32:
+		fbDeclination.MoveAxis := TRUE;
+		IF fbDeclination.Busy THEN
+			Stage := 33;
+		END_IF
+	33:
+		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
+			fbDeclination.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbDeclination.MoveAxis THEN
+		   Stage := 100;
+		END_IF
+	// Stage 40: move Dec and then Ha
+	40:
+		fbDeclination.MoveAxis := TRUE;
+		IF fbDeclination.Busy THEN
+			Stage := 41;
+		END_IF
+	41:
+		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
+			fbDeclination.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbDeclination.MoveAxis THEN
+		   Stage := 42;
+		END_IF
+	42:
+		fbHourAngle.MoveAxis := TRUE;
+		IF fbHourAngle.Busy THEN
+			Stage := 43;
+		END_IF
+	43:
+		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
+			fbHourAngle.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbHourAngle.MoveAxis THEN
+		   Stage := 100;
+		END_IF
+	100:
+		fRightAscension := rightascension_current;
+		fDeclination := declination_current;
+		bGoHome := FALSE;
+		Stage := 0;
+END_CASE
 
-IF fbHourAngle.MoveDone AND 
-	fbDeclination.MoveDone THEN
-	bGoHome := FALSE;
-	fRightAscension := rightascension_current;
-	fDeclination := declination_current;
-	_HomeTelescope := TRUE;
-ELSE
-	_HomeTelescope := FALSE;
-END_IF
-
-HomeEvent(Trigger := _HomeTelescope, 
-			Level := ADSLOG_MSGTYPE_HINT,
-			FormatString := '%s',
-			OnMessage := 'Telescope is homed.', comm := comm);
-]]></ST>
+HomeEvent(Trigger := Stage > LastStage, FormatString := 'GOHOME progress: %s', OnMessage := USINT_TO_STRING(Stage), comm := comm);
+LastStage := Stage;]]></ST>
       </Implementation>
     </Method>
     <Method Name="_ParkTelescope" Id="{94a12771-4c75-4743-9ad3-850f66878f1f}">
@@ -643,23 +757,66 @@ CASE Stage OF
 	20:
 		fbHourAngle.Position := telescopeConfig.houranglePark;
 		fbHourAngle.Velocity := 10.0;
-		fbHourAngle.MoveAxis := TRUE;
 		fbDeclination.Position := telescopeConfig.declinationPark;
 		fbDeclination.Velocity := 10;
-		fbDeclination.MoveAxis := TRUE;
-		IF fbHourAngle.Busy AND
-			fbDeclination.Busy THEN
-				Stage := 40;
+		
+		// make sure to never drive under Horizon
+		IF ABS(telescopeConfig.houranglePark) < ABS(hourangle_current) THEN
+			// move Ha then Dec
+			Stage := 30;
+		ELSE
+			// move Dec then HA
+			Stage := 40;
 		END_IF
-	40:
-		IF fbHourAngle.MoveDone THEN
+	// Stage 30: move Ha and then Dec
+	30:
+		fbHourAngle.MoveAxis := TRUE;
+		IF fbHourAngle.Busy THEN
+			Stage := 31;
+		END_IF
+	31:
+		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
-		IF fbDeclination.MoveDone THEN
+		IF NOT fbHourAngle.MoveAxis THEN
+		   Stage := 32;
+		END_IF
+	32:
+		fbDeclination.MoveAxis := TRUE;
+		IF fbDeclination.Busy THEN
+			Stage := 33;
+		END_IF
+	33:
+		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
-		IF NOT bSliding THEN // all axis standstill
-			Stage := 60;
+		IF NOT fbDeclination.MoveAxis THEN
+		   Stage := 60;
+		END_IF
+	// Stage 40: move Dec and then Ha
+	40:
+		fbDeclination.MoveAxis := TRUE;
+		IF fbDeclination.Busy THEN
+			Stage := 41;
+		END_IF
+	41:
+		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
+			fbDeclination.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbDeclination.MoveAxis THEN
+		   Stage := 42;
+		END_IF
+	42:
+		fbHourAngle.MoveAxis := TRUE;
+		IF fbHourAngle.Busy THEN
+			Stage := 43;
+		END_IF
+	43:
+		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
+			fbHourAngle.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbHourAngle.MoveAxis THEN
+		   Stage := 60;
 		END_IF
 	60:
 		IF NOT fbHourAngle.Enable AND NOT fbDeclination.Enable THEN
@@ -796,25 +953,74 @@ CASE Stage OF
 			Stage := 25;
 		END_IF
 	25:
-		fbHourAngle.Position := hourangle_calc;
+		// change to -180 to 180 degree in HA
+		IF hourangle_calc > 180 THEN
+			fbHourAngle.Position := hourangle_calc-360.0;
+		ELSE
+			fbHourAngle.Position := hourangle_calc;
+		END_IF
 		fbHourAngle.Velocity := 10.0;
-		fbHourAngle.MoveAxis := TRUE;
 		fbDeclination.Position := declination_calc;
 		fbDeclination.Velocity := 10.0;
+		// make sure to never drive under Horizon
+		IF ABS(fbHourAngle.Position) < ABS(hourangle_current) THEN
+			// move Ha then Dec
+			Stage := 30;
+		ELSE
+			// move Dec then HA
+			Stage := 40;
+		END_IF
+	// Stage 30: move Ha and then Dec
+	30:
+		fbHourAngle.MoveAxis := TRUE;
+		IF fbHourAngle.Busy THEN
+			Stage := 31;
+		END_IF
+	31:
+		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
+			fbHourAngle.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbHourAngle.MoveAxis THEN
+		   Stage := 32;
+		END_IF
+	32:
 		fbDeclination.MoveAxis := TRUE;
-		IF fbHourAngle.Busy AND
-			fbDeclination.Busy THEN
-				Stage := 50;
+		IF fbDeclination.Busy THEN
+			Stage := 33;
 		END_IF
-	50:
-		IF fbHourAngle.MoveDone THEN
-			fbHourAngle.bMoveAxis := FALSE;
-		END_IF
-		
-		IF fbDeclination.MoveDone THEN
+	33:
+		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
-
+		IF NOT fbDeclination.MoveAxis THEN
+		   Stage := 75;
+		END_IF
+	// Stage 40: move Dec and then Ha
+	40:
+		fbDeclination.MoveAxis := TRUE;
+		IF fbDeclination.Busy THEN
+			Stage := 41;
+		END_IF
+	41:
+		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
+			fbDeclination.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbDeclination.MoveAxis THEN
+		   Stage := 42;
+		END_IF
+	42:
+		fbHourAngle.MoveAxis := TRUE;
+		IF fbHourAngle.Busy THEN
+			Stage := 43;
+		END_IF
+	43:
+		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
+			fbHourAngle.MoveAxis := FALSE;
+		END_IF
+		IF NOT fbHourAngle.MoveAxis THEN
+		   Stage := 75;
+		END_IF
+	75:
 		IF NOT bSliding AND bStopped THEN // all axis standstill
 			Stage := 100;
 		END_IF
@@ -861,7 +1067,12 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[// HourAngle
-fbHourAngle.Position := fHourAngle;
+// channge to -180 to 180 degree in HA
+IF fHourAngle > 180 THEN
+	fbHourAngle.Position := fHourAngle-360.0;
+ELSE
+	fbHourAngle.Position := fHourAngle;
+END_IF
 IF NOT fbHourAngle.Tracking THEN
 	fbHourAngle.Velocity := 10.0;
 	fbHourAngle.MoveAxis := TRUE;
@@ -1067,7 +1278,10 @@ bTrack			:= TRUE;
     </Method>
     <LineIds Name="FB_TelescopeControl">
       <LineId Id="5425" Count="23" />
-      <LineId Id="5452" Count="4" />
+      <LineId Id="5452" Count="0" />
+      <LineId Id="6511" Count="1" />
+      <LineId Id="6514" Count="1" />
+      <LineId Id="5456" Count="0" />
       <LineId Id="5458" Count="14" />
       <LineId Id="5474" Count="0" />
       <LineId Id="5910" Count="0" />
@@ -1109,17 +1323,53 @@ bTrack			:= TRUE;
       <LineId Id="102" Count="2" />
       <LineId Id="101" Count="0" />
       <LineId Id="105" Count="1" />
-      <LineId Id="29" Count="3" />
-      <LineId Id="34" Count="4" />
-      <LineId Id="40" Count="1" />
-      <LineId Id="43" Count="8" />
-      <LineId Id="55" Count="1" />
-      <LineId Id="58" Count="19" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="122" Count="0" />
+      <LineId Id="118" Count="3" />
+      <LineId Id="117" Count="0" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="34" Count="2" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="186" Count="0" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="187" Count="0" />
+      <LineId Id="190" Count="2" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="133" Count="2" />
+      <LineId Id="137" Count="0" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="142" Count="1" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="145" Count="0" />
+      <LineId Id="147" Count="0" />
+      <LineId Id="144" Count="0" />
+      <LineId Id="149" Count="10" />
+      <LineId Id="148" Count="0" />
+      <LineId Id="185" Count="0" />
+      <LineId Id="162" Count="22" />
+      <LineId Id="161" Count="0" />
+      <LineId Id="59" Count="5" />
+      <LineId Id="67" Count="10" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._HomeTelescope">
-      <LineId Id="1" Count="13" />
-      <LineId Id="17" Count="4" />
-      <LineId Id="23" Count="12" />
+      <LineId Id="52" Count="0" />
+      <LineId Id="1" Count="5" />
+      <LineId Id="54" Count="3" />
+      <LineId Id="53" Count="0" />
+      <LineId Id="58" Count="0" />
+      <LineId Id="61" Count="10" />
+      <LineId Id="73" Count="62" />
+      <LineId Id="72" Count="0" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="138" Count="1" />
+      <LineId Id="137" Count="0" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="60" Count="0" />
+      <LineId Id="7" Count="0" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="30" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._ParkTelescope">
       <LineId Id="1" Count="12" />
@@ -1134,10 +1384,11 @@ bTrack			:= TRUE;
       <LineId Id="115" Count="1" />
       <LineId Id="113" Count="0" />
       <LineId Id="118" Count="1" />
-      <LineId Id="24" Count="6" />
-      <LineId Id="34" Count="1" />
-      <LineId Id="37" Count="8" />
-      <LineId Id="49" Count="10" />
+      <LineId Id="24" Count="2" />
+      <LineId Id="28" Count="1" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="129" Count="56" />
+      <LineId Id="51" Count="8" />
       <LineId Id="61" Count="3" />
       <LineId Id="66" Count="3" />
       <LineId Id="103" Count="0" />
@@ -1166,9 +1417,13 @@ bTrack			:= TRUE;
       <LineId Id="88" Count="2" />
       <LineId Id="87" Count="0" />
       <LineId Id="92" Count="1" />
-      <LineId Id="17" Count="6" />
-      <LineId Id="27" Count="1" />
-      <LineId Id="30" Count="9" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="173" Count="4" />
+      <LineId Id="172" Count="0" />
+      <LineId Id="19" Count="0" />
+      <LineId Id="21" Count="1" />
+      <LineId Id="115" Count="56" />
+      <LineId Id="39" Count="0" />
       <LineId Id="43" Count="6" />
       <LineId Id="51" Count="7" />
     </LineIds>
@@ -1182,7 +1437,9 @@ bTrack			:= TRUE;
       <LineId Id="9" Count="1" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._TrackTelescope">
-      <LineId Id="34" Count="7" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="81" Count="4" />
+      <LineId Id="35" Count="6" />
       <LineId Id="76" Count="1" />
       <LineId Id="42" Count="0" />
       <LineId Id="45" Count="0" />

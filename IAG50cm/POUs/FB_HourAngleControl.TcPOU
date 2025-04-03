@@ -3,8 +3,8 @@
   <POU Name="FB_HourAngleControl" Id="{69217813-d219-4ca2-9cea-b7c641aa5dcd}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_HourAngleControl EXTENDS FB_AxisControl
 VAR_INPUT
-	fMinPosition : LREAL := 0.0;
-	fMaxPosition : LREAL := 360.0;
+	fMinPosition : LREAL := -180.0;
+	fMaxPosition : LREAL := 180.0;
 END_VAR
 VAR_OUTPUT
 END_VAR
@@ -14,9 +14,7 @@ END_VAR
     <Implementation>
       <ST><![CDATA[// limit to sane positions
 fPosition := LIMIT(fMinPosition, fPosition, fMaxPosition);
-IF fPosition > 180 THEN
-	fPosition := fPosition-360.0;
-END_IF
+
 
 IF bEnable AND NOT fbAxis.Calibrated THEN
 	bHomeAxis := TRUE;
@@ -111,8 +109,8 @@ CalibrationEvent(
 ]]></ST>
     </Implementation>
     <LineIds Name="FB_HourAngleControl">
-      <LineId Id="10" Count="2" />
-      <LineId Id="137" Count="1" />
+      <LineId Id="10" Count="1" />
+      <LineId Id="138" Count="0" />
       <LineId Id="13" Count="19" />
       <LineId Id="136" Count="0" />
       <LineId Id="33" Count="4" />
