@@ -1,29 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
   <POU Name="FB_FocusControl" Id="{758e08ff-7d69-4056-9327-dc96b024961b}" SpecialFunc="None">
-    <Declaration><![CDATA[FUNCTION_BLOCK FB_FocusControl EXTENDS FB_BaseAxis IMPLEMENTS I_Focus
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_FocusControl EXTENDS FB_AxisControl IMPLEMENTS I_Focus
 VAR_INPUT
-	bMoveAxis			: BOOL;				// move the axis to new fPosition
-	bStopAxis			: BOOL;				// stop the Axis
 	fMinPosition		: LREAL := 1000.0;		// minimum Position
 	fMaxPosition		: LREAL := 1500.0;		// maximum Position
-	
-	bSoEReset			: BOOL;				// diagnostic error code reset
-END_VAR
-VAR_OUTPUT
-	fActualPosition	: LREAL;	// actual Position of the focus
-	fSlewTime		: LREAL;	// fPosition to move the axis to
 END_VAR
 VAR
-	axisEvent			: FB_EventLog;
-	calibrationEvent	: FB_EventLog;			// torque calibration event
-	readParameter		: MC_ReadParameter;		// read slewtime
-	fbSoEReset			: FB_SoEReset;
 	mqttTimer 			: TON := (PT:=T#5S);
-	diagnosticError		: BOOL;
-	
-	// Axis
-	axisRef						: AXIS_REF;
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -82,14 +66,14 @@ END_IF
 
 bReady := fbAxis.Ready;
 
-readParameter(	
+fbreadParameter(	
 	Axis 			:= axisRef, 
 	Enable 			:= fbAxis.InMotion, 
 	ParameterNumber := MC_AxisParameter.AxisRemainingTimeToGo, 
 	ReadMode 		:= E_ReadMode.READMODE_CYCLIC);
 				
-IF readParameter.Valid THEN
-	fSlewtime := readParameter.Value;
+IF fbreadParameter.Valid THEN
+	fSlewtime := fbreadParameter.Value;
 END_IF
 
 IF bSoEReset THEN

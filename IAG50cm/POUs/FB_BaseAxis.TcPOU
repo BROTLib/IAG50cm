@@ -1,10 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4026.11">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
   <POU Name="FB_BaseAxis" Id="{bae85b54-65c9-4d1f-98f7-530b10d558b7}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK ABSTRACT FB_BaseAxis IMPLEMENTS I_BaseAxis
 VAR_INPUT
 	bEnable				: BOOL;		// enable the axis and its position control loop
 	bReset				: BOOL;		// reset the axis
+	bSoEReset			: BOOL;		// diagnostic reset
 	bHomeAxis			: BOOL;		// Home the axis
 	fPosition			: LREAL;	// position to move the axis to
 	fVelocity			: LREAL;	// set the Velocity of the axis
@@ -20,6 +21,8 @@ END_VAR
 VAR
 	fbComm				: I_Comm;	
 	fbAxis				: FB_Axis2;
+	fbSoEReset			: FB_SoEReset;
+	axisRef				: AXIS_REF;	
 END_VAR
 ]]></Declaration>
     <Implementation>

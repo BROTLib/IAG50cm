@@ -23,22 +23,20 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	fHourAngleOffset	: LREAL := 0.0;		// absolute offset for elevation
 	fDeclinationOffset 	: LREAL := 0.0;		// absolute offset for azimuth
 	fTimeOffset			: LREAL := 0.0;		// absolute offset for time
+	fHorizon			: LREAL := 10.0;	// ELEVATION below which value the telescope will not go
 	
 	bEstopTriggered		: BOOL	:= FALSE;	// TODO: CHANGE
 	bMainReady			: BOOL	:= TRUE;
 	
 	fbFocus				: I_Focus;
 	fbCovers			: I_MirrorCovers;
-	//fbBrake				: I_Brake;	
-	//fbHydraulics   		: I_Hydraulics;
+
 	fbHourAngle			: REFERENCE TO FB_HourAngleControl;
 	fbDeclination		: REFERENCE TO FB_DeclinationControl;
 
 	telescopeConfig		: ST_TelescopeConfig;
 END_VAR
 VAR
-	//TelescopeAuxiliary	: FB_TelescopeAuxiliary;
-
 	comm 				: I_Comm;
 	
 	TCS_command			: E_TCSCommand;	// actual command from the TCS
@@ -57,6 +55,7 @@ VAR
 	ha2ra				: FB_HA2RA;
 	
 	reset_trigger		: R_TRIG;
+	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	
 	powerfailure		: BOOL;		// triggers power-failure event
 	poweronwarning		: TP;		// triggers power warning
@@ -70,6 +69,7 @@ VAR
 	TCSgotoEvent,
 	TCStrackEvent,
 	TCSstopEvent,
+	TargetHorizonEvent,
 	AltitudeEvent,
 	TCSreadyEvent,
 	TCSCTOEvent			: FB_Eventlog;
@@ -82,7 +82,8 @@ VAR
 END_VAR
 VAR_OUTPUT
 	bReady				: BOOL;		// TRUE, IF telescope can be operated 
-	bError				: BOOL;		// indicates an error on one of the components	
+	bError				: BOOL;		// indicates an error on one of the components
+	bHorizonError		: BOOL;		// if TRUE, the set Coordinate is below the Horizon threshold fHorizon
 	errorid				: UDINT;	//error id of axis	
 	bSliding			: BOOL;		//TRUE, IF telescope is in fast-MOVE phase (includes pole-swap)	
 	bTracking			: BOOL;		//TRUE, IF telescope is on tracking position AND currently tracking.	
@@ -117,35 +118,39 @@ VAR PERSISTENT
 	NPAE:	LREAL;
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[//TelescopeAuxiliary(comm := comm);
-
-// get the system time
+      <ST><![CDATA[// get the system time
 fbTime();
 jd := DateTime2JD(fbTime.time_RTCEX2);
 lst := CT2LST(telescopeConfig.longitude, jd);
 // set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
-//IF GVL_Main.reset_switch THEN
-	//reset := TRUE;
-//END_IF
+
 
 reset_trigger(CLK := bReset);
+// if reset, the bHorizonError can be switched off
+IF bReset THEN
+	bHorizonError := FALSE;
+END_IF
 
+// get error ID, reset if bReset command is set
 IF fbHourAngle.Error THEN
 	errorid := fbHourAngle.nErrorID;
-	fbHourAngle.bReset := bReset;
+	IF bReset THEN
+		fbHourAngle.Reset();
+	END_IF
 ELSIF fbDeclination.bError THEN
 	errorid := fbDeclination.nErrorID;
-	fbDeclination.bReset := bReset;
+	IF bReset THEN
+		fbDeclination.Reset();
+	END_IF
 ELSIF fbFocus <> 0 AND_THEN fbFocus.Error THEN
 	errorid := fbFocus.ErrorID;
-	IF reset_trigger.Q THEN
+	IF bReset THEN
 		fbFocus.Reset();
 	END_IF
 END_IF
 
-IF fbHourAngle.Error OR fbDeclination.bError OR(fbFocus <> 0 AND_THEN fbFocus.Error) THEN
-	bError := TRUE;
-END_IF
+bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR bHorizonError;
+
 
 
 slewtime := MAX(fbHourAngle.fSlewTime, fbDeclination.fSlewTime);
@@ -206,7 +211,15 @@ eq2hor(
 	JD := jd + fTimeOffset,
 	alt => elevation_current,
 	az => azimuth_current);
-	
+
+// If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
+IF elevation_current < (fHorizon+0.2) THEN
+	IF NOT bStopped THEN
+		bStop := TRUE;
+	ELSE
+		bGoHome := TRUE;
+	END_IF
+END_IF
 	
 poweronwarning(IN := bPower OR (NOT fbHourAngle.bEnable), PT := T#250MS);
 
@@ -219,44 +232,85 @@ END_IF
 // set TCS_command according to state variables ordered by precedence
 IF bPower THEN
 	TCS_command := E_TCSCommand.poweron;
+	
 ELSIF bStop THEN
+	bTrack := FALSE;
+	// If the stop is during a movement, reset the stage of the movement first
+	IF bPark THEN
+		bPark := FALSE;
+		_ParkTelescope();
+	ELSIF bGoto THEN
+		bGoto := FALSE;
+		_GotoTelescope();
+	ELSIF bSlew THEN
+		bSlew := FALSE;
+		_SlewTelescope();
+	ELSIF bGoHome THEN
+		bGoHome := FALSE;
+		_HomeTelescope();
+	END_IF
 	TCS_command := E_TCSCommand.stop;
-	bGoto := FALSE;
-	bTrack := FALSE;
-	bSlew := FALSE;
-	bGoHome := FALSE;
-	bPark := FALSE;
+	
 ELSIF bPark THEN
-	bGoto := FALSE;
 	bTrack := FALSE;
-	bSlew := FALSE;
-	IF bReady AND bStopped THEN
-		TCS_command := E_TCSCommand.park;
+	// If lower presedence commands are ongoing, let them know they are interupted
+	IF bGoto OR bSlew OR bGoHome THEN
+		bGoHome := FALSE;
+		bGoto := FALSE;
+		bSlew := FALSE;
+		bInterupted := TRUE;
+		_HomeTelescope();
+		_GotoTelescope();
+		_SlewTelescope();
+		
+	ELSE
+		IF bReady AND bStopped THEN
+			bInterupted := FALSE;
+			TCS_command := E_TCSCommand.park;
+		END_IF
 	END_IF
+	
+	
+	
 ELSIF bGoHome THEN
-	bGoto := FALSE;
 	bTrack := FALSE;
-	bSlew := FALSE;
-	IF bReady AND NOT bBusy AND bStopped THEN
-		TCS_command := E_TCSCommand.gohome;
+	// If lower presedence commands are ongoing, let them know they are interupted
+	IF bGoto OR bSlew THEN
+		bGoto := FALSE;
+		bSlew := FALSE;
+		bInterupted := TRUE;
+		_GotoTelescope();
+		_SlewTelescope();
+		
+	ELSE
+		IF bReady AND NOT bBusy AND bStopped THEN
+			bInterupted := FALSE;
+			TCS_command := E_TCSCommand.gohome;
+		END_IF
 	END_IF
+	
+	
 ELSIF bGoto THEN
 	bTrack := FALSE;
-	fbHourAngle.Tracking := FALSE;
-	fbDeclination.Tracking := FALSE;
-	bSlew := FALSE;
-	IF bReady AND NOT bBusy THEN
-		TCS_command := E_TCSCommand.goto;
+	// If lower presedence commands are ongoing, let them know they are interupted
+	IF bSlew THEN
+		bSlew := FALSE;
+		bInterupted := TRUE;
+		_SlewTelescope();
+	ELSE
+		IF bReady AND NOT bBusy THEN
+			bInterupted := FALSE;
+			TCS_command := E_TCSCommand.goto;
+		END_IF
 	END_IF
+	
+	
 ELSIF bSlew THEN
-	bGoto := FALSE;
 	bTrack := FALSE;
 	IF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.slew;
 	END_IF
 ELSIF bTrack THEN
-	bGoto := FALSE;
-	bSlew := FALSE;
 	IF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.track;
 	END_IF
@@ -308,7 +362,7 @@ bSliding := NOT bTracking AND (fbHourAngle.fbAxis.InMotion OR fbHourAngle.fbAxis
 // signal must be stable for 5500MS
 tracking_delay(in := fbHourAngle.fbAxis.isTracking AND 
 			fbDeclination.fbAxis.isTracking ,PT :=T#5500MS, Q => bTracking);
-			
+
 bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
 			(NOT fbDeclination.bEnable OR fbDeclination.fbAxis.StandStill);
 			
@@ -319,7 +373,7 @@ IF fbFocus <> 0 THEN
 END_IF
 			
 bReady := bHomed AND 
-	fbCovers.Opened AND 
+	//fbCovers.Opened AND 
 	fbHourAngle.bEnable AND
 	fbDeclination.bEnable AND
     NOT bError;
@@ -334,7 +388,8 @@ END_IF
 IF bStopped THEN
 	bStop := FALSE;
 END_IF
-	
+
+// unset the RESET command when no Error is present
 IF NOT bError THEN
 	bReset := FALSE;
 END_IF
@@ -446,12 +501,18 @@ TCSstopEvent(	Trigger := bStop,
 				OffMEssage := 'completed',
 				OffLevel := ADSLOG_MSGTYPE_HINT, 
 				Comm := comm);
-AltitudeEvent(	Trigger := bReady AND elevation_calc<0.0, 
+TargetHorizonEvent(	Trigger := bReady AND elevation_calc<fHorizon, 
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
-				OnMessage := 'Target below horizon',
+				OnMessage := 'Target below safe horizon',
 				OffMEssage := '', 
 				Comm := comm);
+AltitudeEvent(	Trigger := elevation_current<(fHorizon+2.0), 
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				OnMessage := 'Telescope below safe horizon',
+				OffMEssage := '', 
+				Comm := comm);				
 TCSreadyEvent(	Trigger := bReady, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := '%s',
@@ -477,7 +538,7 @@ VAR_STAT
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_GotoTelescope := Stage;
-commandTimeout(IN := Stage < 100, PT := T#600S);
+commandTimeout(IN := Stage < 100 AND Stage > 0, PT := T#600S);
 IF commandTimeout.Q THEN
 	bError := TRUE;
 	errorid := 16#10;
@@ -486,8 +547,8 @@ IF commandTimeout.Q THEN
 	RETURN;
 END_IF
 
-IF elevation_calc<10.0 THEN
-	bError := TRUE;
+IF elevation_calc < fHorizon THEN
+	bHorizonError := TRUE;
 	errorid := 16#15;
 	bGoto := FALSE;
 	Stage := 0;
@@ -495,7 +556,7 @@ IF elevation_calc<10.0 THEN
 END_IF
 
 
-IF bReset OR bError THEN
+IF bReset OR bError OR bStop OR bInterupted THEN
 	Stage := 0;
 	RETURN;
 END_IF
@@ -587,9 +648,6 @@ CASE Stage OF
 			Stage := 100;
 		END_IF
 	100:
-
-		fRightAscension := rightascension_current;
-		fDeclination := declination_current;
 		bGoto := FALSE;
 		// enable automatic tracking
 		bTrack := bAutoTrack;
@@ -614,14 +672,14 @@ VAR_STAT
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_HomeTelescope := Stage;
-commandTimeout(IN := Stage < 100, PT := T#600S);
+commandTimeout(IN := Stage < 100 AND Stage > 0, PT := T#600S);
 IF commandTimeout.Q THEN
 	bError := TRUE;
 	errorid := 16#30;
 	Stage := 0;
 END_IF
 
-IF bReset OR bError THEN
+IF bReset OR bError OR bStop OR bInterupted THEN
 	Stage := 0;
 	RETURN;
 END_IF
@@ -725,25 +783,22 @@ VAR_STAT
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_ParkTelescope := Stage;
-IF bReset OR bError THEN
+IF bReset OR bError OR bStop OR bInterupted THEN
 	Stage := 0;
+	RETURN;
 END_IF
 IF isparked THEN
 	Stage := 100;
 END_IF
 CASE Stage OF
 	0: 
-		bGoHome := 	FALSE;
-		bTrack := 	FALSE;
-		bGoto := 	FALSE;
-		bSlew := 	FALSE;
 		IF fbFocus <> 0 THEN
 			fbFocus.Position := telescopeConfig.focusPark;
 		END_IF
 		IF bError THEN // emergency park
 			fbHourAngle.Enable := FALSE;
 			fbDeclination.Enable := FALSE;	
-			fbCovers.Close();	
+			//fbCovers.Close();	
 			Stage := 80;
 		END_IF
 		Stage := 10;
@@ -834,8 +889,8 @@ CASE Stage OF
 		IF fbHourAngle.Enable OR fbDeclination.Enable THEN
 			stage := 60;
 		END_IF
-		fbCovers.Close();
-		Stage := 90;	
+		//fbCovers.Close();
+		Stage := 100;	
 	90:
 		IF fbCovers.Closed THEN
 			Stage := 100;
@@ -866,12 +921,12 @@ ELSE
 END_IF
 // COVER MUST BE OPENED FOR A SUCCESSFUL WAKE & SHAKE COMMAND!
 
-fbCovers.Open();
+//fbCovers.Open();
 
 
 
 // enable elevation, enable azimuth
-IF bMainReady AND fbCovers.Opened THEN
+IF bMainReady THEN // AND fbCovers.Opened
 	fbHourAngle.Enable := TRUE;
 	fbDeclination.Enable := TRUE;
 END_IF
@@ -893,9 +948,9 @@ IF fbHourAngle.Calibrated AND (fbFocus <> 0 AND_THEN NOT fbFocus.Calibrated) THE
 	fbFocus.HomeAxis := TRUE;
 END_IF
 
-IF fbCovers.Opened AND 
-	fbHourAngle.Calibrated AND
+IF fbHourAngle.Calibrated AND
 	fbDeclination.Calibrated THEN
+	//fbCovers.Opened AND 
 	//FocusControl.Calibrated THEN
 	//PowerOn is done, set bPower to False
 	bPower := FALSE;
@@ -923,22 +978,23 @@ VAR_STAT
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_SlewTelescope := Stage;
-command_timeout(IN := Stage < 100, PT := T#600S);
+command_timeout(IN := Stage < 100 AND Stage > 0, PT := T#600S);
 IF command_timeout.Q THEN
 	bError := TRUE;
 	errorid := 16#40;
 	bSlew := FALSE;
 	Stage := 0;
 END_IF
-IF fElevation<10.0 THEN
-	bError := TRUE;
+IF fElevation < fHorizon THEN
+	bHorizonError := TRUE;
 	errorid := 16#15;
 	bSlew := FALSE;
 	Stage := 0;
 	RETURN;
 END_IF
-IF bReset OR bError THEN
+IF bReset OR bError OR bStop OR bInterupted THEN
 	Stage := 0;
+	RETURN;
 END_IF
 CASE Stage OF
 	0:	
@@ -1046,9 +1102,23 @@ END_VAR
         <ST><![CDATA[IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
 	fbHourAngle.Tracking := FALSE;
 	fbDeclination.Tracking := FALSE;
+ELSIF fbHourAngle.MoveAxis = TRUE OR  fbDeclination.MoveAxis = TRUE THEN
+	fbHourAngle.MoveAxis := FALSE;
+	fbDeclination.MoveAxis := FALSE;
 ELSE
-	fbHourAngle.StopAxis := TRUE;
-	fbDeclination.StopAxis := TRUE;
+	// Only issue Axis stop commands if they are moving
+	IF NOT fbHourAngle.fbAxis.StandStill THEN
+		fbHourAngle.StopAxis := TRUE;
+	ELSE
+		fbHourAngle.StopAxis := FALSE;
+	END_IF
+	
+	IF NOT fbDeclination.fbAxis.StandStill THEN
+		fbDeclination.StopAxis := TRUE;
+	ELSE
+		fbDeclination.StopAxis := FALSE;
+	END_IF
+
 	IF bStopped THEN
 		fbHourAngle.StopAxis := FALSE;
 		fbDeclination.StopAxis := FALSE;
@@ -1074,39 +1144,39 @@ ELSE
 	fbHourAngle.Position := fHourAngle;
 END_IF
 IF NOT fbHourAngle.Tracking THEN
-	fbHourAngle.Velocity := 10.0;
+	fbHourAngle.Velocity := 1.0;
 	fbHourAngle.MoveAxis := TRUE;
 	IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 		fbHourAngle.MoveAxis := FALSE;
 		IF fbHourAngle.isTracking THEN
-			fbHourAngle.Velocity := 1.0;//siderial_velocity;
+			fbHourAngle.Velocity := 0.5;//siderial_velocity;
 		ELSE
-			fbHourAngle.Velocity := 3.0;//*siderial_velocity;
+			fbHourAngle.Velocity := 1.0;//siderial_velocity;
 		END_IF
 		//fbHourAngle.Velocity := 1.0;//siderial_velocity;
 		fbHourAngle.Tracking := TRUE;
 	END_IF
 ELSE
-	fbHourAngle.Velocity := 1.0;//siderial_velocity;
+	fbHourAngle.Velocity := 0.5;//siderial_velocity;
 END_IF
 
 // Declination (should not move while tracking)
 fbDeclination.Position := fDeclination;
 IF NOT fbDeclination.Tracking THEN
-	fbDeclination.Velocity := 10.0;
+	fbDeclination.Velocity := 1.0;
 	fbDeclination.MoveAxis := TRUE;
 	IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 		fbDeclination.MoveAxis := FALSE;
 		IF fbDeclination.isTracking THEN
-			fbDeclination.Velocity := 1.0;
+			fbDeclination.Velocity := 0.5;
 		ELSE
-			fbDeclination.Velocity := 3.0;
+			fbDeclination.Velocity := 1.0;
 		END_IF
 		//fbDeclination.Velocity := 1.0;
 		fbDeclination.Tracking := TRUE;
 	END_IF
 ELSE
-	fbDeclination.Velocity := 1.0;
+	fbDeclination.Velocity := 0.5;
 END_IF
 ]]></ST>
       </Implementation>
@@ -1277,10 +1347,22 @@ bTrack			:= TRUE;
       </Implementation>
     </Method>
     <LineIds Name="FB_TelescopeControl">
-      <LineId Id="5425" Count="23" />
+      <LineId Id="5427" Count="4" />
+      <LineId Id="5434" Count="2" />
+      <LineId Id="6752" Count="0" />
+      <LineId Id="6637" Count="0" />
+      <LineId Id="6750" Count="1" />
+      <LineId Id="6753" Count="0" />
+      <LineId Id="5437" Count="2" />
+      <LineId Id="6630" Count="2" />
+      <LineId Id="5441" Count="1" />
+      <LineId Id="6633" Count="1" />
+      <LineId Id="5443" Count="2" />
+      <LineId Id="6635" Count="1" />
+      <LineId Id="5447" Count="0" />
       <LineId Id="5452" Count="0" />
       <LineId Id="6511" Count="1" />
-      <LineId Id="6514" Count="1" />
+      <LineId Id="6515" Count="0" />
       <LineId Id="5456" Count="0" />
       <LineId Id="5458" Count="14" />
       <LineId Id="5474" Count="0" />
@@ -1297,9 +1379,78 @@ bTrack			:= TRUE;
       <LineId Id="6276" Count="4" />
       <LineId Id="5896" Count="0" />
       <LineId Id="6025" Count="7" />
-      <LineId Id="5520" Count="35" />
-      <LineId Id="6395" Count="1" />
-      <LineId Id="5556" Count="19" />
+      <LineId Id="6774" Count="0" />
+      <LineId Id="6754" Count="0" />
+      <LineId Id="5520" Count="0" />
+      <LineId Id="6759" Count="0" />
+      <LineId Id="6768" Count="0" />
+      <LineId Id="6772" Count="1" />
+      <LineId Id="6769" Count="0" />
+      <LineId Id="6756" Count="0" />
+      <LineId Id="5521" Count="11" />
+      <LineId Id="6991" Count="0" />
+      <LineId Id="5533" Count="0" />
+      <LineId Id="6850" Count="0" />
+      <LineId Id="6793" Count="0" />
+      <LineId Id="6779" Count="0" />
+      <LineId Id="6984" Count="0" />
+      <LineId Id="6782" Count="0" />
+      <LineId Id="6784" Count="0" />
+      <LineId Id="6985" Count="0" />
+      <LineId Id="6785" Count="0" />
+      <LineId Id="6788" Count="0" />
+      <LineId Id="6986" Count="0" />
+      <LineId Id="6789" Count="1" />
+      <LineId Id="6987" Count="0" />
+      <LineId Id="6791" Count="0" />
+      <LineId Id="6781" Count="0" />
+      <LineId Id="6992" Count="0" />
+      <LineId Id="5539" Count="1" />
+      <LineId Id="6849" Count="0" />
+      <LineId Id="6815" Count="0" />
+      <LineId Id="6801" Count="0" />
+      <LineId Id="6973" Count="1" />
+      <LineId Id="6972" Count="0" />
+      <LineId Id="6802" Count="0" />
+      <LineId Id="6804" Count="2" />
+      <LineId Id="6844" Count="0" />
+      <LineId Id="6808" Count="0" />
+      <LineId Id="6810" Count="0" />
+      <LineId Id="6978" Count="0" />
+      <LineId Id="6811" Count="0" />
+      <LineId Id="6809" Count="0" />
+      <LineId Id="6803" Count="0" />
+      <LineId Id="6848" Count="0" />
+      <LineId Id="5543" Count="0" />
+      <LineId Id="5546" Count="1" />
+      <LineId Id="6854" Count="0" />
+      <LineId Id="6817" Count="1" />
+      <LineId Id="6979" Count="1" />
+      <LineId Id="6819" Count="0" />
+      <LineId Id="6821" Count="1" />
+      <LineId Id="6852" Count="0" />
+      <LineId Id="6823" Count="0" />
+      <LineId Id="6828" Count="0" />
+      <LineId Id="6981" Count="0" />
+      <LineId Id="6829" Count="0" />
+      <LineId Id="6827" Count="0" />
+      <LineId Id="6816" Count="0" />
+      <LineId Id="5550" Count="0" />
+      <LineId Id="5553" Count="1" />
+      <LineId Id="6856" Count="0" />
+      <LineId Id="6831" Count="1" />
+      <LineId Id="6982" Count="0" />
+      <LineId Id="6833" Count="0" />
+      <LineId Id="6835" Count="1" />
+      <LineId Id="6841" Count="0" />
+      <LineId Id="6983" Count="0" />
+      <LineId Id="6842" Count="0" />
+      <LineId Id="6840" Count="0" />
+      <LineId Id="6830" Count="0" />
+      <LineId Id="5556" Count="0" />
+      <LineId Id="5559" Count="1" />
+      <LineId Id="5562" Count="4" />
+      <LineId Id="5569" Count="6" />
       <LineId Id="5577" Count="1" />
       <LineId Id="5580" Count="37" />
       <LineId Id="5619" Count="3" />
@@ -1307,12 +1458,17 @@ bTrack			:= TRUE;
       <LineId Id="5628" Count="2" />
       <LineId Id="5632" Count="7" />
       <LineId Id="5641" Count="3" />
-      <LineId Id="5646" Count="15" />
+      <LineId Id="5646" Count="7" />
+      <LineId Id="6990" Count="0" />
+      <LineId Id="5654" Count="7" />
       <LineId Id="5663" Count="13" />
       <LineId Id="5678" Count="4" />
       <LineId Id="5686" Count="1" />
       <LineId Id="6147" Count="6" />
-      <LineId Id="5695" Count="90" />
+      <LineId Id="5695" Count="81" />
+      <LineId Id="6762" Count="4" />
+      <LineId Id="6761" Count="0" />
+      <LineId Id="5777" Count="8" />
       <LineId Id="354" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._GotoTelescope">
@@ -1351,7 +1507,7 @@ bTrack			:= TRUE;
       <LineId Id="162" Count="22" />
       <LineId Id="161" Count="0" />
       <LineId Id="59" Count="5" />
-      <LineId Id="67" Count="10" />
+      <LineId Id="70" Count="7" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._HomeTelescope">
       <LineId Id="52" Count="0" />
@@ -1372,7 +1528,9 @@ bTrack			:= TRUE;
       <LineId Id="30" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._ParkTelescope">
-      <LineId Id="1" Count="12" />
+      <LineId Id="1" Count="2" />
+      <LineId Id="195" Count="0" />
+      <LineId Id="4" Count="5" />
       <LineId Id="86" Count="0" />
       <LineId Id="14" Count="0" />
       <LineId Id="87" Count="0" />
@@ -1402,7 +1560,9 @@ bTrack			:= TRUE;
       <LineId Id="65" Count="0" />
       <LineId Id="13" Count="5" />
       <LineId Id="20" Count="9" />
-      <LineId Id="33" Count="11" />
+      <LineId Id="33" Count="9" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="80" Count="0" />
       <LineId Id="46" Count="0" />
       <LineId Id="76" Count="0" />
       <LineId Id="74" Count="0" />
@@ -1412,7 +1572,9 @@ bTrack			:= TRUE;
       <LineId Id="1" Count="7" />
       <LineId Id="71" Count="5" />
       <LineId Id="70" Count="0" />
-      <LineId Id="9" Count="7" />
+      <LineId Id="9" Count="1" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="11" Count="5" />
       <LineId Id="91" Count="0" />
       <LineId Id="88" Count="2" />
       <LineId Id="87" Count="0" />
@@ -1430,7 +1592,16 @@ bTrack			:= TRUE;
     <LineIds Name="FB_TelescopeControl._StopTelescope">
       <LineId Id="16" Count="1" />
       <LineId Id="19" Count="1" />
-      <LineId Id="22" Count="5" />
+      <LineId Id="31" Count="2" />
+      <LineId Id="48" Count="0" />
+      <LineId Id="41" Count="1" />
+      <LineId Id="49" Count="1" />
+      <LineId Id="43" Count="1" />
+      <LineId Id="46" Count="1" />
+      <LineId Id="51" Count="1" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="24" Count="3" />
       <LineId Id="21" Count="0" />
       <LineId Id="18" Count="0" />
       <LineId Id="14" Count="0" />
