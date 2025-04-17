@@ -214,7 +214,7 @@ eq2hor(
 
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
 IF elevation_current < (fHorizon+0.2) THEN
-	IF NOT bStopped THEN
+	IF NOT bStopped AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSE
 		bGoHome := TRUE;
