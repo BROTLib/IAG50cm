@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_TelescopeControl" Id="{10c2c294-efcf-424f-afd3-75ac57a5e8bc}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_TelescopeControl IMPLEMENTS I_Telescope
 VAR_INPUT
@@ -20,7 +20,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	fDeclination		: LREAL := 16.0 + 30.0/60.0 + 25.4/3600.0;	// apparent declination, degrees, double
 	fElevation			: LREAL := 45.0;	// desired elevation of the telescope pointing
 	fAzimuth			: LREAL := 320.0;	// desired azimut of the telescope pointing
-	fHourAngleOffset	: LREAL := 0.0;		// absolute offset for elevation
+	fRightAscensionOffset	: LREAL := 0.0;		// absolute offset for elevation
 	fDeclinationOffset 	: LREAL := 0.0;		// absolute offset for azimuth
 	fTimeOffset			: LREAL := 0.0;		// absolute offset for time
 	fHorizon			: LREAL := 10.0;	// ELEVATION below which value the telescope will not go
@@ -153,7 +153,7 @@ bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFo
 
 
 
-slewtime := MAX(fbHourAngle.fSlewTime, fbDeclination.fSlewTime);
+slewtime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
 			
 IF bError THEN
 	bGoHome := 	FALSE;
@@ -171,8 +171,8 @@ END_IF
 
 // calculate fHourAngle (and also horizontal coord. -> used for checking if target is on sky or in ground)
 eq2hor(
-	ra := fRightAscension,
-	dec := fDeclination,
+	ra := fRightAscension + fRightAscensionOffset,
+	dec := fDeclination + fDeclinationOffset,
 	lon := telescopeConfig.longitude,
 	lat := telescopeConfig.latitude,
 	JD := jd + fTimeOffset,
@@ -415,7 +415,7 @@ IF MQTTTimer.Q THEN // publish new payload every second
 	comm.Publish('telescope', 'dome', 'RightAscension', LREAL_TO_STRING(rightascension_current));
 	comm.Publish('telescope', 'dome', 'Declination', LREAL_TO_STRING(declination_current));
 	comm.Publish('telescope', 'dome', 'declination_offset', LREAL_TO_STRING(fDeclinationOffset));
-	comm.Publish('telescope', 'dome', 'hourangle_offset', LREAL_TO_STRING(fHourAngleOffset));
+	comm.Publish('telescope', 'dome', 'rightascension_offset', LREAL_TO_STRING(fRightAscensionOffset));
 	
 	comm.Publish('telescope', 'dome', 'errorid',	UDINT_TO_STRING(errorid));
 	comm.Publish('telescope', 'dome', 'error',		BOOL_TO_STRING(bError));
@@ -1316,14 +1316,14 @@ END_VAR
         <ST><![CDATA[]]></ST>
       </Implementation>
     </Method>
-    <Method Name="SetHourAngleOffset" Id="{10a7c758-0667-41d2-90bb-38e90ad006bf}">
-      <Declaration><![CDATA[METHOD SetHourAngleOffset : BOOL
+    <Method Name="SetRightAscensionOffset" Id="{10a7c758-0667-41d2-90bb-38e90ad006bf}">
+      <Declaration><![CDATA[METHOD SetRightAscensionOffset : BOOL
 VAR_INPUT
 	Offset	: LREAL;
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[fHourAngleOffset := Offset;]]></ST>
+        <ST><![CDATA[fRightAscensionOffset := Offset;]]></ST>
       </Implementation>
     </Method>
     <Method Name="Stop" Id="{e66d844d-991d-4af1-8b55-fe6740342385}">
@@ -1657,7 +1657,7 @@ bTrack			:= TRUE;
     <LineIds Name="FB_TelescopeControl.SetDerotatorOffset">
       <LineId Id="1" Count="0" />
     </LineIds>
-    <LineIds Name="FB_TelescopeControl.SetHourAngleOffset">
+    <LineIds Name="FB_TelescopeControl.SetRightAscensionOffset">
       <LineId Id="1" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Stop">

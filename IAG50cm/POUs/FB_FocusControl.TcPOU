@@ -1,10 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_FocusControl" Id="{758e08ff-7d69-4056-9327-dc96b024961b}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_FocusControl EXTENDS FB_AxisControl IMPLEMENTS I_Focus
 VAR_INPUT
 	fMinPosition		: LREAL := 1000.0;		// minimum Position
 	fMaxPosition		: LREAL := 1500.0;		// maximum Position
+	fTolerance			: LREAL := 0.5;
 END_VAR
 VAR
 	mqttTimer 			: TON := (PT:=T#5S);
@@ -22,6 +23,11 @@ END_IF
 IF fbAxis.Calibrated THEN
 	bHomeAxis := FALSE;
 	bCalibrated := fbAxis.Calibrated;
+	IF ABS(fPosition - fActualPosition) > fTolerance THEN
+			IF fbAxis.Ready THEN
+				bMoveAxis := TRUE;
+			END_IF;
+	END_IF;
 END_IF
 
 IF bHomeAxis THEN
@@ -136,7 +142,11 @@ END_IF
       <LineId Id="9" Count="0" />
       <LineId Id="220" Count="0" />
       <LineId Id="234" Count="0" />
-      <LineId Id="61" Count="23" />
+      <LineId Id="61" Count="6" />
+      <LineId Id="271" Count="1" />
+      <LineId Id="270" Count="0" />
+      <LineId Id="273" Count="1" />
+      <LineId Id="68" Count="16" />
       <LineId Id="259" Count="1" />
       <LineId Id="88" Count="0" />
       <LineId Id="90" Count="19" />
