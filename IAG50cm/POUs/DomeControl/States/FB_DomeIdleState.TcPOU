@@ -1,0 +1,385 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DomeIdleState" Id="{18941870-4fd2-48dc-9e55-0c95299f7dd7}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeIdleState EXTENDS  FB_DomeState
+
+VAR
+	Stage		: UINT:= 0;
+	tonSleep	: TON := (PT:=T#5S);
+	tonTimeout	: TON:= (PT:=T#3M); // see Baader Handbook
+	tonDelay	: TON:= (PT:=T#20MS);
+	
+	sSeperator		: STRING := 'd#azi';
+	sLeft			: STRING;
+	sAzi			: STRING;
+	fAzi			: LREAL;
+	fAzi_Old		: LREAL;
+	bSplitSuccess 	: BOOL;
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// send 'd#getshut' wait for answer
+// wait 5 seconds
+// send 'd#getazi' wait for answer
+CASE Stage OF
+	0:
+		tonTimeout(IN:=TRUE);
+		Stage := 1;
+	1:
+		pDome^.fbSend(	SendString:= 'd#getshut',
+						TXbuffer:= TxBufferDome,
+						Busy=>,
+						Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 2;
+		END_IF
+	2: 
+		IF pDome^.bStringReceived THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSIF pDome^._ReceivedString = 'd#shutclo' THEN
+				pDome^._DomeState := E_DomeState.closed;
+				Stage := 3;
+			ELSIF pDome^._ReceivedString = 'd#shutope' THEN
+				pDome^._DomeState := E_DomeState.open;
+				Stage := 3;
+			ELSIF pDome^._ReceivedString = 'd#shutrun' THEN
+				pDome^._DomeState := E_DomeState.slewing;
+				Stage := 3;
+			ELSIF pDome^._ReceivedString <> '' THEN
+				// Sometimes the characters are wrong -> ask again
+				Stage := 1;
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			Stage := 1;
+		END_IF
+		IF tonTimeout.Q THEN
+			tonTimeout(IN:=FALSE);
+			FoundError();
+		END_IF
+	3:
+		tonTimeout(IN:=FALSE);
+		tonSleep(IN:=TRUE);
+		IF tonSleep.Q THEN
+			tonSleep(IN:=FALSE);
+			Stage := 4;
+			tonTimeout(IN:=TRUE);
+		END_IF
+	4:
+		pDome^.fbSend(	SendString:= 'd#getazim',
+						TXbuffer:= TxBufferDome,
+						Busy=>,
+						Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 5;
+		END_IF
+	5: 
+		IF pDome^._HasReceivedString THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSE
+				IF pDome^._ReceivedString <> 'd#azi0000' THEN
+					pDome^._Parked := FALSE;
+				END_IF
+				bSplitSuccess := FindAndSplit(
+									pSeparator := ADR(sSeperator),
+									pSrcString := ADR(pDome^.sReceivedString),
+									pLeftString:= ADR(sLeft),
+									nLeftSize	:= 1,
+									pRightString := ADR(sAzi),
+									nRightSize := 5,
+									bSearchFromRight:= FALSE);
+				IF bSplitSuccess THEN
+					fAzi := STRING_TO_LREAL(sAzi)/100.0;
+					//Baader measures azimuth as West of South, so we need to convert it. This works both ways.
+					IF pDome^._Position  >= 180.0 THEN
+						pDome^._Position := fAzi - 180.0;
+					ELSE
+						pDome^._Position := fAzi + 180.0;
+					END_IF
+					Stage := 6;
+				ELSE
+					// mixed up string -> ask again
+					Stage := 4;
+				END_IF
+			END_IF
+		END_IF
+		IF tonTimeout.Q THEN
+			tonTimeout(IN:=FALSE);
+			FoundError();
+		END_IF
+	6:
+		tonTimeout(IN:=FALSE);
+		tonSleep(IN:=TRUE);
+		IF tonSleep.Q THEN
+			tonSleep(IN:=FALSE);
+			Stage := 0;
+		END_IF		
+END_CASE
+
+
+
+]]></ST>
+    </Implementation>
+    <Method Name="CloseCommand" Id="{672045a5-18c7-44e8-b963-3dfd226f80ee}">
+      <Declaration><![CDATA[
+METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeCloseingState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FoundError" Id="{b1011a7e-754f-4d17-83aa-eb0986f7d112}">
+      <Declaration><![CDATA[
+METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^._Error := TRUE;
+pDome^.SetState(pDome^.fbDomeErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OpenCommand" Id="{336403ce-c239-42a6-9c74-883457eb74c5}">
+      <Declaration><![CDATA[
+METHOD OpenCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeOpeningState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ParkCommand" Id="{87d7fae6-5a44-4333-ac1f-722c8d011ed6}">
+      <Declaration><![CDATA[
+METHOD ParkCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeParkingState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{cb13016a-e3a1-402f-bad4-fdf6a2718530}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// send 'd#getshut' wait for answer
+// wait 5 seconds
+// send 'd#getazi' wait for answer
+CASE Stage OF
+	0:
+		tonTimeout(IN:=TRUE);
+		Stage := 1;
+	1:
+		pDome^.fbSend(	SendString:= 'd#getshut',
+						TXbuffer:= TxBufferDome,
+						Busy=>,
+						Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 2;
+		END_IF
+	2: 
+		IF pDome^.bStringReceived THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSIF pDome^._ReceivedString = 'd#shutclo' THEN
+				pDome^._DomeState := E_DomeState.closed;
+				Stage := 3;
+			ELSIF pDome^._ReceivedString = 'd#shutope' THEN
+				pDome^._DomeState := E_DomeState.open;
+				Stage := 3;
+			ELSIF pDome^._ReceivedString = 'd#shutrun' THEN
+				pDome^._DomeState := E_DomeState.slewing;
+				Stage := 3;
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			tonSleep(IN:=TRUE);
+			IF tonSleep.Q THEN
+				tonSleep(IN:=FALSE);
+				Stage := 1;
+			END_IF
+		END_IF
+		IF tonTimeout.Q THEN
+			tonTimeout(IN:=FALSE);
+			FoundError();
+		END_IF
+	3:
+		tonTimeout(IN:=FALSE);
+		tonSleep(IN:=TRUE);
+		IF tonSleep.Q THEN
+			tonSleep(IN:=FALSE);
+			Stage := 4;
+			tonTimeout(IN:=TRUE);
+		END_IF
+	4:
+		pDome^.fbSend(	SendString:= 'd#getazim',
+						TXbuffer:= TxBufferDome,
+						Busy=>,
+						Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 5;
+		END_IF
+	5: 
+		IF pDome^._HasReceivedString THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSE
+				bSplitSuccess := FindAndSplit(
+									pSeparator := ADR(sSeperator),
+									pSrcString := ADR(pDome^.sReceivedString),
+									pLeftString:= ADR(sLeft),
+									nLeftSize	:= 1,
+									pRightString := ADR(sAzi),
+									nRightSize := 5,
+									bSearchFromRight:= FALSE);
+									
+				IF bSplitSuccess AND ( STRING_TO_LREAL(sAzi) <> 0 OR sAzi = '0000') THEN
+					// (STRING_TO_LREAL(sAzi) <> 0 OR sAzi := '0000') -> either sAzi actual 0 OR STRING_TO_LREAL error
+					fAzi := STRING_TO_LREAL(sAzi)/10.0;
+					//Baader measures azimuth as West of South, so we need to convert it. This works both ways.
+					IF fAzi  >= 180.0 THEN
+						pDome^._Position := fAzi - 180.0;
+					ELSE
+						pDome^._Position := fAzi + 180.0;
+					END_IF
+					IF fAzi = fAzi_Old AND ABS(pDome^.Position - 180.0) < 5.0 THEN
+						pDome^._Parked := TRUE;
+					END_IF
+					fAzi_Old := fAzi;
+					Stage := 6;
+				END_IF
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			tonSleep(IN:=TRUE);
+			IF tonSleep.Q THEN
+				tonSleep(IN:=FALSE);
+				Stage := 4;
+			END_IF
+		END_IF
+		IF tonTimeout.Q THEN
+			tonTimeout(IN:=FALSE);
+			FoundError();
+		END_IF
+	6:
+		tonTimeout(IN:=FALSE);
+		tonSleep(IN:=TRUE);
+		IF tonSleep.Q THEN
+			tonSleep(IN:=FALSE);
+			Stage := 0;
+		END_IF		
+END_CASE
+
+
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{25716fec-f7ae-4751-8f4c-4e9b44cfd178}">
+      <Declaration><![CDATA[
+PROPERTY StateID : STRING
+]]></Declaration>
+      <Get Name="Get" Id="{51112923-8420-482a-8c35-1fc4b0cd957c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Idle State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="TrackCommand" Id="{f3c4f054-a43b-464f-8284-7288eb1f1cb3}">
+      <Declaration><![CDATA[
+METHOD TrackCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeTrackingState);]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_DomeIdleState">
+      <LineId Id="330" Count="31" />
+      <LineId Id="429" Count="1" />
+      <LineId Id="362" Count="66" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeIdleState.CloseCommand">
+      <LineId Id="7" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeIdleState.FoundError">
+      <LineId Id="7" Count="0" />
+      <LineId Id="12" Count="1" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeIdleState.OpenCommand">
+      <LineId Id="7" Count="0" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeIdleState.ParkCommand">
+      <LineId Id="7" Count="0" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeIdleState.RunState">
+      <LineId Id="6" Count="3" />
+      <LineId Id="100" Count="2" />
+      <LineId Id="10" Count="20" />
+      <LineId Id="120" Count="0" />
+      <LineId Id="111" Count="0" />
+      <LineId Id="116" Count="3" />
+      <LineId Id="112" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="34" Count="9" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="44" Count="13" />
+      <LineId Id="61" Count="7" />
+      <LineId Id="109" Count="0" />
+      <LineId Id="69" Count="0" />
+      <LineId Id="108" Count="0" />
+      <LineId Id="70" Count="6" />
+      <LineId Id="126" Count="2" />
+      <LineId Id="125" Count="0" />
+      <LineId Id="77" Count="2" />
+      <LineId Id="114" Count="0" />
+      <LineId Id="121" Count="3" />
+      <LineId Id="115" Count="0" />
+      <LineId Id="80" Count="0" />
+      <LineId Id="82" Count="14" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeIdleState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeIdleState.TrackCommand">
+      <LineId Id="7" Count="0" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

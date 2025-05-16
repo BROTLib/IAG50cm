@@ -1,0 +1,190 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DomeClosingState" Id="{8a6f5a3c-ae72-4eae-976a-7d93edd4c94d}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeClosingState EXTENDS  FB_DomeState
+VAR
+	Stage		: UINT:= 0;
+	tonSleep	: TON := (PT:=T#5S);
+	tonTimeout	: TON:= (PT:=T#3M); // see Baader Handbook
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FoundError" Id="{96dff545-3011-469a-a894-b669fe57425f}">
+      <Declaration><![CDATA[METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+pDome^._Error := TRUE;
+pDome^.SetState(pDome^.fbDomeErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OpenCommand" Id="{0e03056c-1c74-4cff-8ebd-a639f27039c7}">
+      <Declaration><![CDATA[
+METHOD OpenCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeOpeningState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{90c99c1b-0afb-40a6-bb12-4cc551df7cd1}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE Stage OF
+	0:
+		tonTimeout(IN:=TRUE);
+		Stage := 1;
+	1:
+		pDome^.fbSend(	SendString:= 'd#closhut',
+					TXbuffer:= TxBufferDome,
+					Busy=>,
+					Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 2;
+		END_IF
+	2:
+		IF pDome^.bStringReceived THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				foundError();
+			ELSIF pDome^._ReceivedString = 'd#gotmess' THEN
+				Stage := 3;
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			tonSleep(IN:=TRUE);
+			IF tonSleep.Q THEN
+				tonSleep(IN:=FALSE);
+				Stage := 1;
+			END_IF
+		END_IF
+		IF tonTimeout.Q THEN
+			tonTimeout(IN:=FALSE);
+			foundError();
+		END_IF
+	3:
+		tonTimeout(IN:=FALSE);
+		
+		tonSleep(IN:=TRUE);
+		IF tonSleep.Q THEN
+			tonSleep(IN:=FALSE);
+			Stage := 4;
+			tonTimeout(IN:=TRUE);
+		END_IF
+	4:
+		pDome^.fbSend(	SendString:= 'd#getshut',
+					TXbuffer:= TxBufferDome,
+					Busy=>,
+					Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 5;
+		END_IF
+	5: 
+		IF pDome^.bStringReceived THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSIF pDome^._ReceivedString = 'd#shutclo' THEN
+				pDome^._DomeState := E_DomeState.closed;
+				Stage := 6;
+			ELSIF pDome^._ReceivedString = 'd#shutope' THEN
+				pDome^._DomeState := E_DomeState.open;
+				Stage := 0;
+			ELSIF pDome^._ReceivedString = 'd#shutrun' THEN
+				pDome^._DomeState := E_DomeState.slewing;
+				Stage := 3;
+			ELSE
+				// mixed up string? ask again
+				Stage := 4;
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			Stage := 4;
+		END_IF
+		IF tonTimeout.Q THEN
+			tonTimeout(IN:=FALSE);
+			FoundError();
+		END_IF
+	
+	6:
+		tonTimeout(IN:=FALSE);
+		SuccessfulFinished();
+		
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{b6536c1f-6c30-4c70-bf10-aba7df39f93f}">
+      <Declaration><![CDATA[
+PROPERTY StateID : STRING
+]]></Declaration>
+      <Get Name="Get" Id="{190c2a86-afe4-41f2-97fa-37fbda85f6bd}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Closing State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="SuccessfulFinished" Id="{065936d6-e0cd-40ab-a52b-24456541a2fb}">
+      <Declaration><![CDATA[
+METHOD SuccessfulFinished : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_DomeClosingState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeClosingState.FoundError">
+      <LineId Id="7" Count="0" />
+      <LineId Id="9" Count="1" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeClosingState.OpenCommand">
+      <LineId Id="7" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeClosingState.RunState">
+      <LineId Id="6" Count="1" />
+      <LineId Id="69" Count="2" />
+      <LineId Id="8" Count="13" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="83" Count="3" />
+      <LineId Id="80" Count="0" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="24" Count="10" />
+      <LineId Id="75" Count="0" />
+      <LineId Id="35" Count="21" />
+      <LineId Id="76" Count="0" />
+      <LineId Id="78" Count="0" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="57" Count="0" />
+      <LineId Id="81" Count="1" />
+      <LineId Id="58" Count="0" />
+      <LineId Id="60" Count="8" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeClosingState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeClosingState.SuccessfulFinished">
+      <LineId Id="7" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

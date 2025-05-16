@@ -1424,6 +1424,56 @@ External Setpoint Generation:
 			</Relations>
 		</DataType>
 		<DataType>
+			<Name GUID="{0146173C-D895-D219-E209-CC005AC77636}" Namespace="Tc2_SerialCom" AutoDeleteType="true">EL6inData22B</Name>
+			<Comment><![CDATA[ This data type is corresponding to the
+   EL-6xxx data structure used in the
+   TwinCAT SystemManager
+   (EL-6xxx version using 22 data bytes) 
+]]></Comment>
+			<BitSize>192</BitSize>
+			<SubItem>
+				<Name>Status</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000004}">WORD</Type>
+				<BitSize>16</BitSize>
+				<BitOffs>0</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>D</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000001}">BYTE</Type>
+				<ArrayInfo>
+					<LBound>0</LBound>
+					<Elements>22</Elements>
+				</ArrayInfo>
+				<BitSize>176</BitSize>
+				<BitOffs>16</BitOffs>
+			</SubItem>
+		</DataType>
+		<DataType>
+			<Name GUID="{D6B0A42D-897A-4B90-95E8-3C741C3CE3EE}" Namespace="Tc2_SerialCom" AutoDeleteType="true">EL6outData22B</Name>
+			<Comment><![CDATA[ This data type is corresponding to the
+   EL-6xxx data structure used in the
+   TwinCAT SystemManager
+   (EL-6xxx version using 22 data bytes) 
+]]></Comment>
+			<BitSize>192</BitSize>
+			<SubItem>
+				<Name>Ctrl</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000004}">WORD</Type>
+				<BitSize>16</BitSize>
+				<BitOffs>0</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>D</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000001}">BYTE</Type>
+				<ArrayInfo>
+					<LBound>0</LBound>
+					<Elements>22</Elements>
+				</ArrayInfo>
+				<BitSize>176</BitSize>
+				<BitOffs>16</BitOffs>
+			</SubItem>
+		</DataType>
+		<DataType>
 			<Name GUID="{0994ABA9-6F32-EEB9-4362-7774F7A1F4F4}" AutoDeleteType="true">FSOE_11</Name>
 			<BitSize>88</BitSize>
 			<SubItem>
@@ -1645,6 +1695,9 @@ External Setpoint Generation:
 				<Task Id="6" Priority="30" CycleTime="2000000" AmsPort="351" DisableFpExceptions="true" AdtTasks="true">
 					<Name>VISU_TASK</Name>
 				</Task>
+				<Task Id="7" Priority="19" CycleTime="20000" AmsPort="352" AdtTasks="true">
+					<Name>PlcTask_Fast</Name>
+				</Task>
 			</Tasks>
 		</System>
 		<Motion>
@@ -1665,15 +1718,15 @@ External Setpoint Generation:
 					<Name>NC-Task 1 SVB</Name>
 				</SvbTask>
 				<Axis Id="1" CreateSymbols="true" AxisType="1">
-					<Name>HourAngle</Name>
+					<Name>Declination</Name>
 					<AxisPara>
 						<General UnitName="°"/>
-						<Dynamic Acceleration="6074.37" Deceleration="6074.37" Jerk="18223.1"/>
-						<Velo RefSearch="40.49582" RefSync="40.49582" SlowManual="202.4791" FastManual="1214.8746" Fast="4049.582" Maximum="4049.58"/>
+						<Dynamic Acceleration="5" Deceleration="5" Jerk="10"/>
+						<Velo RefSearch="0.10384" RefSync="0.10384" SlowManual="0.5192" FastManual="3.1152" Fast="10.384" Maximum="10.384"/>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
 					<Encoder Name="Enc" EncType="19">
-						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="8388608" MaxCount="#xffffffff" ReferenceSystem="1"/>
+						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="3271557120" Offset="-22.9999998899607" MaxCount="#xffffffff" ReferenceSystem="1"/>
 						<Vars VarGrpType="1">
 							<Name>Inputs</Name>
 							<Var>
@@ -1732,7 +1785,7 @@ External Setpoint Generation:
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
 						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
-							<Analog VeloReferenz="4454.5402" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
+							<Analog VeloReferenz="11.4224" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
 						<Vars VarGrpType="1">
@@ -1807,15 +1860,15 @@ External Setpoint Generation:
 					</Vars>
 				</Axis>
 				<Axis Id="2" CreateSymbols="true" AxisType="1">
-					<Name>Declination</Name>
+					<Name>HourAngle</Name>
 					<AxisPara>
 						<General UnitName="°"/>
-						<Dynamic Acceleration="6074.37" Deceleration="6074.37" Jerk="18223.1"/>
-						<Velo RefSearch="40.49582" RefSync="40.49582" SlowManual="202.4791" FastManual="1214.8746" Fast="4049.582" Maximum="4049.58"/>
+						<Dynamic Acceleration="5" Deceleration="5" Jerk="10"/>
+						<Velo RefSearch="0.10384" RefSync="0.10384" SlowManual="0.5192" FastManual="3.1152" Fast="10.384" Maximum="10.384"/>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
 					<Encoder Name="Enc" EncType="19">
-						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="8388608" MaxCount="#xffffffff" ReferenceSystem="1"/>
+						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="3271557120" Offset="7.9615441102248" MaxCount="#xffffffff" ReferenceSystem="1"/>
 						<Vars VarGrpType="1">
 							<Name>Inputs</Name>
 							<Var>
@@ -1874,7 +1927,7 @@ External Setpoint Generation:
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
 						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
-							<Analog VeloReferenz="4454.5402" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
+							<Analog VeloReferenz="11.4224" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
 						<Vars VarGrpType="1">
@@ -1951,16 +2004,14 @@ External Setpoint Generation:
 				<Axis Id="3" CreateSymbols="true" AxisType="1">
 					<Name>Focus</Name>
 					<AxisPara>
-						<General UnitName="°"/>
-						<Dynamic Acceleration="15000" Deceleration="15000" Jerk="145784.961"/>
-						<Velo RefSearch="323.96658" RefSync="323.96658" SlowManual="1619.8329" FastManual="9718.9974" Fast="32396.658" Maximum="32396.658"/>
-						<OtherSettings AllowMotionCmdToSlave="true"/>
+						<Dynamic AccelerationMaximum="15" DecelerationMaximum="15" Acceleration="1" Deceleration="1" Jerk="10"/>
+						<Velo RefSearch="0.26997" RefSync="0.26997" SlowManual="0.1" FastManual="1" Fast="26.997" Maximum="2"/>
+						<OtherSettings AllowMotionCmdToSlave="true" PulseDistancePos="1" PulseDistanceNeg="1"/>
 					</AxisPara>
 					<Encoder Name="Enc" EncType="19">
-						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="1048576" MaxCount="#xffffffff" ReferenceSystem="1">
-							<SoftEndMinControl Enable="true" Range="500"/>
-							<SoftEndMaxControl Enable="true" Range="2000"/>
-							<ParameterChanged>25</ParameterChanged>
+						<EncPara ScaleFactorNumerator="3" ScaleFactorDenominator="10485760" Offset="9.78274383544922" MaxCount="#xffffffff" ReferenceSystem="1">
+							<SoftEndMinControl Enable="true" Range="1"/>
+							<SoftEndMaxControl Enable="true" Range="17"/>
 						</EncPara>
 						<Vars VarGrpType="1">
 							<Name>Inputs</Name>
@@ -2020,7 +2071,7 @@ External Setpoint Generation:
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
 						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
-							<Analog VeloReferenz="35636.3238" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
+							<Analog VeloReferenz="29.6967" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
 						<Vars VarGrpType="1">
@@ -2098,15 +2149,37 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{35633266-4131-D294-62BE-9DEC7A4DB089}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{7FF9619E-AF0D-BEC6-4D3D-4C5D74943723}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
-						<Name>PlcTask Inputs</Name>
+						<Name>PlcTask_Fast Inputs</Name>
 						<Var>
-							<Name>MAIN.focusControl.axisRef.NcToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
+							<Name>SerialBackground.fbDomeSerial.stIn_EL6001</Name>
+							<Comment><![CDATA[ linked to the EL6001 in the TwinCAT System Manager ]]></Comment>
+							<Type GUID="{0146173C-D895-D219-E209-CC005AC77636}" Namespace="Tc2_SerialCom">EL6inData22B</Type>
 						</Var>
+						<Var>
+							<Name>SerialBackground.fbPendantSerial.stIn_EL6001</Name>
+							<Comment><![CDATA[ linked to the EL6001 in the TwinCAT System Manager ]]></Comment>
+							<Type GUID="{0146173C-D895-D219-E209-CC005AC77636}" Namespace="Tc2_SerialCom">EL6inData22B</Type>
+						</Var>
+					</Vars>
+					<Vars VarGrpType="2" AreaNo="1">
+						<Name>PlcTask_Fast Outputs</Name>
+						<Var>
+							<Name>SerialBackground.fbDomeSerial.stOut_EL6001</Name>
+							<Comment><![CDATA[ linked to the EL6001 in the TwinCAT System Manager ]]></Comment>
+							<Type GUID="{D6B0A42D-897A-4B90-95E8-3C741C3CE3EE}" Namespace="Tc2_SerialCom">EL6outData22B</Type>
+						</Var>
+						<Var>
+							<Name>SerialBackground.fbPendantSerial.stOut_EL6001</Name>
+							<Comment><![CDATA[ linked to the EL6001 in the TwinCAT System Manager ]]></Comment>
+							<Type GUID="{D6B0A42D-897A-4B90-95E8-3C741C3CE3EE}" Namespace="Tc2_SerialCom">EL6outData22B</Type>
+						</Var>
+					</Vars>
+					<Vars VarGrpType="1" ContextId="1" AreaNo="16">
+						<Name>PlcTask Inputs</Name>
 						<Var>
 							<Name>MAIN.haControl.axisRef.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
@@ -2115,8 +2188,37 @@ External Setpoint Generation:
 							<Name>MAIN.decControl.axisRef.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContact24V</Name>
+							<Comment><![CDATA[ Auxilary Contact of the 24V DC: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContact48V</Name>
+							<Comment><![CDATA[ Auxilary Contact of the 48V DC: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContactHADEC</Name>
+							<Comment><![CDATA[ Auxilary Contact of the HA DEC motor: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContactFOCUS</Name>
+							<Comment><![CDATA[ Auxilary Contact of the FOCUS motor: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bCollectiveReport24VFuse</Name>
+							<Comment><![CDATA[ Collective Report of the 24V Fuse box: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bState24VFuse</Name>
+							<Type>BOOL</Type>
+						</Var>
 					</Vars>
-					<Vars VarGrpType="2" AreaNo="1">
+					<Vars VarGrpType="2" ContextId="1" AreaNo="17">
 						<Name>PlcTask Outputs</Name>
 						<Var>
 							<Name>GVL_Safety.Run</Name>
@@ -2150,10 +2252,6 @@ External Setpoint Generation:
 						<Var>
 							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
 							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.focusControl.axisRef.PlcToNc</Name>
-							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
 						</Var>
 						<Var>
 							<Name>MAIN.haControl.axisRef.PlcToNc</Name>
@@ -2199,6 +2297,15 @@ External Setpoint Generation:
 					<Contexts>
 						<Context>
 							<Id>0</Id>
+							<Name>PlcTask_Fast</Name>
+							<ManualConfig>
+								<OTCID>#x02010070</OTCID>
+							</ManualConfig>
+							<Priority>19</Priority>
+							<CycleTime>2000000</CycleTime>
+						</Context>
+						<Context>
+							<Id>1</Id>
 							<Name>PlcTask</Name>
 							<ManualConfig>
 								<OTCID>#x02010050</OTCID>
@@ -2208,6 +2315,7 @@ External Setpoint Generation:
 						</Context>
 					</Contexts>
 					<TaskPouOids>
+						<TaskPouOid Prio="19" OTCID="#x08502002"/>
 						<TaskPouOid Prio="20" OTCID="#x08502001"/>
 					</TaskPouOids>
 				</Instance>
@@ -2294,12 +2402,15 @@ External Setpoint Generation:
 				<Image Id="4" AddrType="10" ImageType="3">
 					<Name>Image-2</Name>
 				</Image>
+				<Image Id="5" AddrType="10" ImageType="3">
+					<Name>Image-3</Name>
+				</Image>
 				<Box Id="1" BoxType="9099">
 					<Name>Term 1 (EK1200)</Name>
 					<ImageId>1000</ImageId>
 					<EtherCAT PdiType="#x0100" CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x04b02c52" RevisionNo="#x00001388" InfoDataState="false" PortPhys="49" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EK1200-5000 EtherCAT Power supply (2A E-Bus)" Desc="EK1200" PortABoxInfo="#x00ffffff"/>
 					<Box Id="2" BoxType="9099" BoxFlags="#x00000020">
-						<Name>Term 2 (EL1918)</Name>
+						<Name>Safety (EL1918)</Name>
 						<ImageId>1001</ImageId>
 						<EtherCAT SlaveType="2" PdiType="#x0005" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="3" FoeType="1" VendorId="#x00000002" ProductCode="#x077e3052" RevisionNo="#x00100000" InfoDataAddr="true" RepeatSupport="true" TimeoutStateChange1="5000" TimeoutMailbox2="10000" TComSupport="true" PortPhys="51" DebugMemory="8" SafetyLogicSupported="true" MaxSlotCount="2" Type="EL1918, 8Ch. Safety Input 24V, TwinSAFE" Desc="EL1918" PortABoxInfo="#x01000001">
 							<SyncMan>001000012600010001000000000100010001001026010000</SyncMan>
@@ -2388,41 +2499,8 @@ External Setpoint Generation:
 							</Slot>
 						</EtherCAT>
 					</Box>
-					<Box Id="14" Disabled="true" BoxType="9099" BoxFlags="#x00000020">
-						<Name>Term 14 (EL6910)</Name>
-						<ImageId>1001</ImageId>
-						<EtherCAT SlaveType="2" PdiType="#x0005" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="3" FoeType="1" VendorId="#x00000002" ProductCode="#x1afe3052" RevisionNo="#x00150000" InfoDataAddr="true" RepeatSupport="true" TimeoutStateChange1="5000" TimeoutMailbox2="10000" TComSupport="true" PortPhys="51" DebugMemory="8" SafetyLogicSupported="true" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL6910, TwinSAFE PLC" Desc="EL6910" PortABoxInfo="#x01000002">
-							<SyncMan>001000012600010001000000000100010001001026010000</SyncMan>
-							<SyncMan>001100012200010002000000000100010001001122010000</SyncMan>
-							<SyncMan>001202002400010003000000000000000200001224010000</SyncMan>
-							<SyncMan>001d02002000010004000000000000000200001d20010000</SyncMan>
-							<SyncMan>002e00002400000003000000000000000000002e24000000</SyncMan>
-							<SyncMan>002f00002000000004000000000000000000002f20000000</SyncMan>
-							<Fmmu>0000000000000000001200020100000001000000060000000200000000000000</Fmmu>
-							<Fmmu>0000000000000000001d00010100000002000000060000000300000000000000</Fmmu>
-							<Fmmu>00000000000000000d0800010100000003000000000000000000000000000000</Fmmu>
-							<Fmmu>0000000000000000000000020000000001000000060000000400010000000000</Fmmu>
-							<Fmmu>0000000000000000000000010000000002000000060000000500010000000000</Fmmu>
-							<BootStrapData>0010f400f410f400</BootStrapData>
-							<MBoxUserCmdData>004003000a0000001f000000030010000000000000000000000000000000000020f31005020000000100456e61626c6520446961674d65737361676520617320656d657267656e637900</MBoxUserCmdData>
-							<Pdo Name="FSLOGIC Inputs" Index="#x1bff" Flags="#x0011" SyncMan="3">
-								<Entry Name="Safe Logic State" Index="#xf100" Sub="#x01">
-									<Type>USINT</Type>
-								</Entry>
-								<Entry Name="Cycle Counter" Index="#xf100" Sub="#x02">
-									<Type>USINT</Type>
-								</Entry>
-							</Pdo>
-							<Pdo Name="FSLOGIC Outputs" Index="#x17ff" InOut="1" Flags="#x0011" SyncMan="2">
-								<Entry>
-									<Type GUID="{18071995-0000-0000-0000-002000000010}">ARRAY [0..1] OF BYTE</Type>
-								</Entry>
-							</Pdo>
-							<CoeProfile ProfileNo="5001"/>
-						</EtherCAT>
-					</Box>
 					<Box Id="3" BoxType="9099">
-						<Name>Term 3 (EL1808)</Name>
+						<Name>Power Status (EL1808)</Name>
 						<ImageId>7</ImageId>
 						<EtherCAT SlaveType="1" PdiType="#x0104" CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x07103052" RevisionNo="#x00120000" RepeatSupport="true" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL1808 8Ch. Dig. Input 24V, 3ms" Desc="EL1808" PortABoxInfo="#x01000002">
 							<SyncMan>001001000000010004000000000000000100001000010000</SyncMan>
@@ -2470,21 +2548,22 @@ External Setpoint Generation:
 						</EtherCAT>
 					</Box>
 					<Box Id="4" BoxType="9099" BoxFlags="#x00000020">
-						<Name>Term 4 (ELM7212-9016)</Name>
+						<Name>HA DEC (ELM7212-9016)</Name>
 						<ImageId>1002</ImageId>
 						<Xml>
 							<TcDMDrive>
 								<SortId>0</SortId>
 								<DriveModuleType>14</DriveModuleType>
-								<TcLink>
+								<TcLink ProtocalType="11">
 									<TcPrjPath>..\iag50cm\IAG50cm.tsproj</TcPrjPath>
-									<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)</IoItemPathName>
+									<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)</IoItemPathName>
 									<ItemId>4</ItemId>
 									<ObjectId>#x03020004</ObjectId>
 								</TcLink>
 								<OrderCode>ELM7212-9016</OrderCode>
-								<Name>Term 4 (ELM7212-9016)</Name>
+								<Name>HA DEC (ELM7212-9016)</Name>
 								<FirmwareVersion>04</FirmwareVersion>
+								<BootloaderVersion>L3.1.42.0</BootloaderVersion>
 								<CatalogNo>ELM7212-9016</CatalogNo>
 								<HardwareVersion>00</HardwareVersion>
 								<SerialNr>0</SerialNr>
@@ -2538,8 +2617,8 @@ External Setpoint Generation:
 									<Channel ChnId="0">
 										<TcLink>
 											<TcPrjPath>..\iag50cm\IAG50cm.tsproj</TcPrjPath>
-											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)</IoItemPathName>
-											<NcItemPathName AxisType="1">TINC^NC-Task 1 SAF^Axes^HourAngle</NcItemPathName>
+											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)</IoItemPathName>
+											<NcItemPathName AxisType="1">TINC^NC-Task 1 SAF^Axes^Declination</NcItemPathName>
 										</TcLink>
 										<SelectedModifyOptPDOsMode>0</SelectedModifyOptPDOsMode>
 										<Modulo>
@@ -2978,7 +3057,7 @@ External Setpoint Generation:
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioMotorSide</PropertyName>
-													<Value>8</Value>
+													<Value>3120</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioLoadSide</PropertyName>
@@ -3082,8 +3161,8 @@ External Setpoint Generation:
 									<Channel ChnId="1">
 										<TcLink>
 											<TcPrjPath>..\iag50cm\IAG50cm.tsproj</TcPrjPath>
-											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)</IoItemPathName>
-											<NcItemPathName AxisType="1">TINC^NC-Task 1 SAF^Axes^Declination</NcItemPathName>
+											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)</IoItemPathName>
+											<NcItemPathName AxisType="1">TINC^NC-Task 1 SAF^Axes^HourAngle</NcItemPathName>
 										</TcLink>
 										<SelectedModifyOptPDOsMode>0</SelectedModifyOptPDOsMode>
 										<Modulo>
@@ -3522,7 +3601,7 @@ External Setpoint Generation:
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioMotorSide</PropertyName>
-													<Value>8</Value>
+													<Value>3120</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioLoadSide</PropertyName>
@@ -5178,9 +5257,9 @@ Bit 8 - 15 : reserved]]></Comment>
 						</EtherCAT>
 					</Box>
 					<Box Id="5" BoxType="9099">
-						<Name>Term 5 (EL2612)</Name>
+						<Name>MirrorCover1 (EL2652)</Name>
 						<ImageId>1003</ImageId>
-						<EtherCAT SlaveType="1" PdiType="#x0104" CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x0a343052" RevisionNo="#x00120000" RepeatSupport="true" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL2612 2Ch. Relay Output, CO (125V AC / 30V DC)" Desc="EL2612" PortABoxInfo="#x01000004">
+						<EtherCAT SlaveType="1" PdiType="#x0104" CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x0a5c3052" RevisionNo="#x00120000" RepeatSupport="true" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL2652 2Ch. Relay Output, CO (230V AC / 30V DC)" Desc="EL2652" PortABoxInfo="#x01000004">
 							<SyncMan>000f01004400010003000000000000000000000f44090000</SyncMan>
 							<Fmmu>0000000000000000000f00020100000001000000000000000000000000000000</Fmmu>
 							<Pdo Name="Channel 1" Index="#x1600" InOut="1" Flags="#x0011" SyncMan="0">
@@ -5196,9 +5275,9 @@ Bit 8 - 15 : reserved]]></Comment>
 						</EtherCAT>
 					</Box>
 					<Box Id="6" BoxType="9099">
-						<Name>Term 6 (EL2612)</Name>
+						<Name>MirrorCover2 (EL2652)</Name>
 						<ImageId>1003</ImageId>
-						<EtherCAT SlaveType="1" PdiType="#x0104" CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x0a343052" RevisionNo="#x00120000" RepeatSupport="true" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL2612 2Ch. Relay Output, CO (125V AC / 30V DC)" Desc="EL2612" PortABoxInfo="#x01000005">
+						<EtherCAT SlaveType="1" PdiType="#x0104" CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x0a5c3052" RevisionNo="#x00120000" RepeatSupport="true" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL2652 2Ch. Relay Output, CO (230V AC / 30V DC)" Desc="EL2652" PortABoxInfo="#x01000005">
 							<SyncMan>000f01004400010003000000000000000000000f44090000</SyncMan>
 							<Fmmu>0000000000000000000f00020100000001000000000000000000000000000000</Fmmu>
 							<Pdo Name="Channel 1" Index="#x1600" InOut="1" Flags="#x0011" SyncMan="0">
@@ -5214,7 +5293,7 @@ Bit 8 - 15 : reserved]]></Comment>
 						</EtherCAT>
 					</Box>
 					<Box Id="7" BoxType="9099">
-						<Name>Term 7 (EL9110)</Name>
+						<Name>Power (EL9110)</Name>
 						<ImageId>1004</ImageId>
 						<EtherCAT SlaveType="1" PdiType="#x0104" CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x23963052" RevisionNo="#x00120000" RepeatSupport="true" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL9110 Power Supplier with LED (24V, Diagnostics)" Desc="EL9110" PortABoxInfo="#x01000006">
 							<SyncMan>001001000000010004000000000000000000001000000000</SyncMan>
@@ -5227,7 +5306,7 @@ Bit 8 - 15 : reserved]]></Comment>
 						</EtherCAT>
 					</Box>
 					<Box Id="8" BoxType="9099">
-						<Name>Term 8 (EL2004)</Name>
+						<Name>Reset 24V (EL2004)</Name>
 						<ImageId>1003</ImageId>
 						<EtherCAT SlaveType="1" PdiType="#x0104" CycleMBoxPollingTime="0" VendorId="#x00000002" ProductCode="#x07d43052" RevisionNo="#x00120000" RepeatSupport="true" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL2004 4Ch. Dig. Output 24V, 0.5A" Desc="EL2004" PortABoxInfo="#x01000007">
 							<SyncMan>000f01004400010003000000000000000000000f44090000</SyncMan>
@@ -5255,20 +5334,20 @@ Bit 8 - 15 : reserved]]></Comment>
 						</EtherCAT>
 					</Box>
 					<Box Id="12" BoxType="9099" BoxFlags="#x00000020">
-						<Name>Term 12 (ELM7221-9016)</Name>
+						<Name>FOCUS (ELM7221-9016)</Name>
 						<ImageId>1005</ImageId>
 						<Xml>
 							<TcDMDrive>
 								<SortId>1</SortId>
 								<DriveModuleType>14</DriveModuleType>
-								<TcLink>
+								<TcLink ProtocalType="11">
 									<TcPrjPath>..\iag50cm\IAG50cm.tsproj</TcPrjPath>
-									<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)</IoItemPathName>
+									<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^FOCUS (ELM7221-9016)</IoItemPathName>
 									<ItemId>12</ItemId>
 									<ObjectId>#x0302000c</ObjectId>
 								</TcLink>
 								<OrderCode>ELM7221-9016</OrderCode>
-								<Name>Term 12 (ELM7221-9016)</Name>
+								<Name>FOCUS (ELM7221-9016)</Name>
 								<FirmwareVersion>04</FirmwareVersion>
 								<CatalogNo>ELM7222-9016</CatalogNo>
 								<HardwareVersion>00</HardwareVersion>
@@ -5323,7 +5402,7 @@ Bit 8 - 15 : reserved]]></Comment>
 									<Channel ChnId="0">
 										<TcLink>
 											<TcPrjPath>..\iag50cm\IAG50cm.tsproj</TcPrjPath>
-											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)</IoItemPathName>
+											<IoItemPathName>TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^FOCUS (ELM7221-9016)</IoItemPathName>
 											<NcItemPathName AxisType="1">TINC^NC-Task 1 SAF^Axes^Focus</NcItemPathName>
 										</TcLink>
 										<SelectedModifyOptPDOsMode>0</SelectedModifyOptPDOsMode>
@@ -5340,7 +5419,7 @@ Bit 8 - 15 : reserved]]></Comment>
 											</Parameter>
 											<Parameter>
 												<PropertyName>Modulo_Value</PropertyName>
-												<Value>0</Value>
+												<Value>4294967296</Value>
 											</Parameter>
 											<Parameter>
 												<PropertyName>Modulo_MinPositionRange</PropertyName>
@@ -5348,7 +5427,7 @@ Bit 8 - 15 : reserved]]></Comment>
 											</Parameter>
 											<Parameter>
 												<PropertyName>Modulo_MaxPositionRange</PropertyName>
-												<Value>0</Value>
+												<Value>4294967295</Value>
 											</Parameter>
 										</Modulo>
 										<Block Id="0">
@@ -5749,25 +5828,25 @@ Bit 8 - 15 : reserved]]></Comment>
 													</Parameter>
 												</DatabaseParameters>
 											</Brake>
-											<Load MoveStyle="Rotary">
+											<Load MoveStyle="Linear">
 												<IsMotorRotary>true</IsMotorRotary>
 												<Name>InverterChannelTypeBlockLoad</Name>
 												<ProjectGUID>00000000-0000-0000-0000-000000000000</ProjectGUID>
 												<Parameter>
 													<PropertyName>FeedConstantUnit</PropertyName>
-													<Value>°</Value>
+													<Value>mm</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>FeedConstant</PropertyName>
-													<Value>360</Value>
+													<Value>1</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioMotorSide</PropertyName>
-													<Value>1</Value>
+													<Value>10</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearRatioLoadSide</PropertyName>
-													<Value>1</Value>
+													<Value>3</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>GearboxInertia</PropertyName>
@@ -5787,11 +5866,11 @@ Bit 8 - 15 : reserved]]></Comment>
 												</Parameter>
 												<Parameter>
 													<PropertyName>MaxApplicationTorqueForce</PropertyName>
-													<Value>0.40014</Value>
+													<Value>0.679126</Value>
 												</Parameter>
 												<Parameter>
 													<PropertyName>MaxApplicationSpeed</PropertyName>
-													<Value>1047.1975511966</Value>
+													<Value>1047.19755</Value>
 												</Parameter>
 											</Load>
 											<Controller>
@@ -6720,9 +6799,9 @@ Bit 8 - 15 : reserved]]></Comment>
 						</EtherCAT>
 					</Box>
 					<Box Id="9" BoxType="9101" BoxFlags="#x00000020">
-						<Name>Term 9 (EL6002)</Name>
+						<Name>Dome Pendant (EL6002)</Name>
 						<ImageId>1006</ImageId>
-						<EtherCAT SlaveType="7" PdiType="#x0005" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="39" FoeType="1" VendorId="#x00000002" ProductCode="#x17723052" RevisionNo="#x00130000" InfoDataAddr="true" TimeoutMailbox2="2000" CheckRevisionNoType="3" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL6002 Interface 2Ch. (RS232)" Desc="EL6002" PortABoxInfo="#x0100000c">
+						<EtherCAT SlaveType="7" PdiType="#x0005" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="47" FoeType="1" VendorId="#x00000002" ProductCode="#x17723052" RevisionNo="#x00130000" InfoDataAddr="true" TimeoutMailbox2="2000" CheckRevisionNoType="3" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL6002 Interface 2Ch. (RS232)" Desc="EL6002" PortABoxInfo="#x0100000c">
 							<SyncMan>001080002600010001000000400080008000001026010000</SyncMan>
 							<SyncMan>801080002200010002000000400080008000801022010000</SyncMan>
 							<SyncMan>001130002400010003000000000000003000001124010000</SyncMan>
@@ -6731,33 +6810,35 @@ Bit 8 - 15 : reserved]]></Comment>
 							<Fmmu>0000000000000000201200010100000002000000000000000000000000000000</Fmmu>
 							<Fmmu>00000000000000000d0800010100000003000000000000000000000000000000</Fmmu>
 							<BootStrapData>0010f400f410f400</BootStrapData>
+							<MBoxUserCmdData>02000300090000000e0000000300000000000000000000000000000000000000201080010100000000456e61626c65205254532f43545300</MBoxUserCmdData>
+							<MBoxUserCmdData>02000300090000000e0000000300000000000000000000000000000000000000200080010100000000456e61626c65205254532f43545300</MBoxUserCmdData>
 							<Pdo Name="COM TxPDO-Map Inputs Channel 1" Index="#x1a00" Flags="#x0010" SyncMan="3">
 								<ExcludePdo>#x1a04</ExcludePdo>
-								<Entry Name="Status__Transmit accepted" Index="#x6000" Sub="#x01">
+								<Entry Name="Status__Transmit accepted" Index="#x6000" Sub="#x01" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Receive request" Index="#x6000" Sub="#x02">
+								<Entry Name="Status__Receive request" Index="#x6000" Sub="#x02" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Init accepted" Index="#x6000" Sub="#x03">
+								<Entry Name="Status__Init accepted" Index="#x6000" Sub="#x03" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Buffer full" Index="#x6000" Sub="#x04">
+								<Entry Name="Status__Buffer full" Index="#x6000" Sub="#x04" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Parity error" Index="#x6000" Sub="#x05">
+								<Entry Name="Status__Parity error" Index="#x6000" Sub="#x05" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Framing error" Index="#x6000" Sub="#x06">
+								<Entry Name="Status__Framing error" Index="#x6000" Sub="#x06" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Overrun error" Index="#x6000" Sub="#x07">
+								<Entry Name="Status__Overrun error" Index="#x6000" Sub="#x07" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
 								<Entry Name="Status__">
 									<Type GUID="{18071995-0000-0000-0000-002000000001}">ARRAY [0..0] OF BIT</Type>
 								</Entry>
-								<Entry Name="Status__Input length" Index="#x6000" Sub="#x09">
+								<Entry Name="Status__Input length" Index="#x6000" Sub="#x09" Flags="#x00008020">
 									<Type>USINT</Type>
 								</Entry>
 								<Entry Name="Data In 0" Index="#x6000" Sub="#x11">
@@ -6829,31 +6910,31 @@ Bit 8 - 15 : reserved]]></Comment>
 							</Pdo>
 							<Pdo Name="COM TxPDO-Map Inputs Channel 2" Index="#x1a01" Flags="#x0010" SyncMan="3">
 								<ExcludePdo>#x1a05</ExcludePdo>
-								<Entry Name="Status__Transmit accepted" Index="#x6010" Sub="#x01">
+								<Entry Name="Status__Transmit accepted" Index="#x6010" Sub="#x01" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Receive request" Index="#x6010" Sub="#x02">
+								<Entry Name="Status__Receive request" Index="#x6010" Sub="#x02" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Init accepted" Index="#x6010" Sub="#x03">
+								<Entry Name="Status__Init accepted" Index="#x6010" Sub="#x03" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Buffer full" Index="#x6010" Sub="#x04">
+								<Entry Name="Status__Buffer full" Index="#x6010" Sub="#x04" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Parity error" Index="#x6010" Sub="#x05">
+								<Entry Name="Status__Parity error" Index="#x6010" Sub="#x05" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Framing error" Index="#x6010" Sub="#x06">
+								<Entry Name="Status__Framing error" Index="#x6010" Sub="#x06" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Overrun error" Index="#x6010" Sub="#x07">
+								<Entry Name="Status__Overrun error" Index="#x6010" Sub="#x07" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
 								<Entry Name="Status__">
 									<Type GUID="{18071995-0000-0000-0000-002000000001}">ARRAY [0..0] OF BIT</Type>
 								</Entry>
-								<Entry Name="Status__Input length" Index="#x6010" Sub="#x09">
+								<Entry Name="Status__Input length" Index="#x6010" Sub="#x09" Flags="#x00008020">
 									<Type>USINT</Type>
 								</Entry>
 								<Entry Name="Data In 0" Index="#x6010" Sub="#x11">
@@ -7069,22 +7150,22 @@ Bit 8 - 15 : reserved]]></Comment>
 							</Pdo>
 							<Pdo Name="COM RxPDO-Map Outputs Channel 1" Index="#x1600" InOut="1" Flags="#x0010" SyncMan="2">
 								<ExcludePdo>#x1604</ExcludePdo>
-								<Entry Name="Ctrl__Transmit request" Index="#x7000" Sub="#x01">
+								<Entry Name="Ctrl__Transmit request" Index="#x7000" Sub="#x01" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Ctrl__Receive accepted" Index="#x7000" Sub="#x02">
+								<Entry Name="Ctrl__Receive accepted" Index="#x7000" Sub="#x02" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Ctrl__Init request" Index="#x7000" Sub="#x03">
+								<Entry Name="Ctrl__Init request" Index="#x7000" Sub="#x03" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Ctrl__Send continuous" Index="#x7000" Sub="#x04">
+								<Entry Name="Ctrl__Send continuous" Index="#x7000" Sub="#x04" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
 								<Entry Name="Ctrl__">
 									<Type GUID="{18071995-0000-0000-0000-002000000004}">ARRAY [0..3] OF BIT</Type>
 								</Entry>
-								<Entry Name="Ctrl__Output length" Index="#x7000" Sub="#x09">
+								<Entry Name="Ctrl__Output length" Index="#x7000" Sub="#x09" Flags="#x00008020">
 									<Type>USINT</Type>
 								</Entry>
 								<Entry Name="Data Out 0" Index="#x7000" Sub="#x11">
@@ -7156,16 +7237,16 @@ Bit 8 - 15 : reserved]]></Comment>
 							</Pdo>
 							<Pdo Name="COM RxPDO-Map Outputs Channel 2" Index="#x1601" InOut="1" Flags="#x0010" SyncMan="2">
 								<ExcludePdo>#x1605</ExcludePdo>
-								<Entry Name="Ctrl__Transmit request" Index="#x7010" Sub="#x01">
+								<Entry Name="Ctrl__Transmit request" Index="#x7010" Sub="#x01" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Ctrl__Receive accepted" Index="#x7010" Sub="#x02">
+								<Entry Name="Ctrl__Receive accepted" Index="#x7010" Sub="#x02" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Ctrl__Init request" Index="#x7010" Sub="#x03">
+								<Entry Name="Ctrl__Init request" Index="#x7010" Sub="#x03" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Ctrl__Send continuous" Index="#x7010" Sub="#x04">
+								<Entry Name="Ctrl__Send continuous" Index="#x7010" Sub="#x04" Flags="#x00008020">
 									<Type>BIT</Type>
 								</Entry>
 								<Entry Name="Ctrl__">
@@ -7400,40 +7481,43 @@ Bit 8 - 15 : reserved]]></Comment>
 		</Io>
 	</Project>
 	<Mappings>
-		<MappingInfo Identifier="{00000000-2001-0850-0020-500841000403}" Id="#x02030030"/>
+		<MappingInfo Identifier="{00000000-2001-0850-0120-500852000403}" Id="#x02030040"/>
+		<MappingInfo Identifier="{00000000-2002-0850-0020-500841000403}" Id="#x02030020"/>
 		<MappingInfo Identifier="{00000000-0010-0304-3000-040310000403}" Id="#x02030010"/>
-		<MappingInfo Identifier="{00000000-0020-0304-3000-040322000403}" Id="#x02030040"/>
-		<MappingInfo Identifier="{05000010-2001-0850-3000-040300205008}" Id="#x02030050" Watchdog="14000000040000000400000004000000"/>
-		<MappingInfo Identifier="{03040040-0040-0304-4000-040340000403}" Id="#x02030020" Watchdog="04000000040000000400000004000000"/>
+		<MappingInfo Identifier="{00000000-0020-0304-3000-040323000403}" Id="#x02030060"/>
+		<MappingInfo Identifier="{05000010-2001-0850-3000-040301205008}" Id="#x02030050" Watchdog="14000000040000000400000004000000"/>
+		<MappingInfo Identifier="{03040050-0050-0304-5000-040350000403}" Id="#x02030030" Watchdog="04000000040000000400000004000000"/>
 		<OwnerA Name="TIID^Device 1 (EtherCAT)">
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 2 (EL1918)">
-				<Link VarA="Term 1 (EK1200)^Term 12 (ELM7221-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1" VarB="ConnectionInputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 TxPDO"/>
-				<Link VarA="Term 1 (EK1200)^Term 12 (ELM7221-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1" VarB="ConnectionOutputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 RxPDO"/>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^FOCUS (ELM7221-9016)">
+				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionInputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 TxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1"/>
 			</OwnerB>
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)">
-				<Link VarA="Term 1 (EK1200)^Term 2 (EL1918)^ConnectionInputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 TxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1"/>
-				<Link VarA="Term 1 (EK1200)^Term 2 (EL1918)^ConnectionOutputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 RxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1"/>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
+				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionInputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 TxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Safety (EL1918)">
+				<Link VarA="Term 1 (EK1200)^FOCUS (ELM7221-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1" VarB="ConnectionOutputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 RxPDO"/>
+				<Link VarA="Term 1 (EK1200)^HA DEC (ELM7212-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1" VarB="ConnectionOutputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 RxPDO"/>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Declination">
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)">
-				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value Channel 2^Following error actual value"/>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
+				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value Channel 1^Following error actual value"/>
 				<Link VarA="Drive^Inputs^In^nDcOutputTime" VarB="InfoData^DcOutputShift"/>
-				<Link VarA="Drive^Inputs^In^nState1" VarB="DRV Statusword Channel 2^Statusword"/>
-				<Link VarA="Drive^Inputs^In^nState2" VarB="DRV Statusword Channel 2^Statusword" Size="8" OffsB="8"/>
+				<Link VarA="Drive^Inputs^In^nState1" VarB="DRV Statusword Channel 1^Statusword"/>
+				<Link VarA="Drive^Inputs^In^nState2" VarB="DRV Statusword Channel 1^Statusword" Size="8" OffsB="8"/>
 				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
 				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^WcState0"/>
-				<Link VarA="Drive^Outputs^Out^nCtrl1" VarB="DRV Controlword Channel 2^Controlword"/>
-				<Link VarA="Drive^Outputs^Out^nCtrl2" VarB="DRV Controlword Channel 2^Controlword" Size="8" OffsB="8"/>
-				<Link VarA="Drive^Outputs^Out^nDataOut1" VarB="DRV Target position Channel 2^Target position"/>
-				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="FB Position Channel 2^Position"/>
+				<Link VarA="Drive^Outputs^Out^nCtrl1" VarB="DRV Controlword Channel 1^Controlword"/>
+				<Link VarA="Drive^Outputs^Out^nCtrl2" VarB="DRV Controlword Channel 1^Controlword" Size="8" OffsB="8"/>
+				<Link VarA="Drive^Outputs^Out^nDataOut1" VarB="DRV Target position Channel 1^Target position"/>
+				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="FB Position Channel 1^Position"/>
 				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
 				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
 				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState0"/>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Focus">
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)">
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^FOCUS (ELM7221-9016)">
 				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value^Following error actual value"/>
 				<Link VarA="Drive^Inputs^In^nDcOutputTime" VarB="InfoData^DcOutputShift"/>
 				<Link VarA="Drive^Inputs^In^nState1" VarB="DRV Statusword^Statusword"/>
@@ -7450,51 +7534,149 @@ Bit 8 - 15 : reserved]]></Comment>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^HourAngle">
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)">
-				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value Channel 1^Following error actual value"/>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
+				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value Channel 2^Following error actual value"/>
 				<Link VarA="Drive^Inputs^In^nDcOutputTime" VarB="InfoData^DcOutputShift"/>
-				<Link VarA="Drive^Inputs^In^nState1" VarB="DRV Statusword Channel 1^Statusword"/>
-				<Link VarA="Drive^Inputs^In^nState2" VarB="DRV Statusword Channel 1^Statusword" Size="8" OffsB="8"/>
+				<Link VarA="Drive^Inputs^In^nState1" VarB="DRV Statusword Channel 2^Statusword"/>
+				<Link VarA="Drive^Inputs^In^nState2" VarB="DRV Statusword Channel 2^Statusword" Size="8" OffsB="8"/>
 				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
 				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^WcState0"/>
-				<Link VarA="Drive^Outputs^Out^nCtrl1" VarB="DRV Controlword Channel 1^Controlword"/>
-				<Link VarA="Drive^Outputs^Out^nCtrl2" VarB="DRV Controlword Channel 1^Controlword" Size="8" OffsB="8"/>
-				<Link VarA="Drive^Outputs^Out^nDataOut1" VarB="DRV Target position Channel 1^Target position"/>
-				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="FB Position Channel 1^Position"/>
+				<Link VarA="Drive^Outputs^Out^nCtrl1" VarB="DRV Controlword Channel 2^Controlword"/>
+				<Link VarA="Drive^Outputs^Out^nCtrl2" VarB="DRV Controlword Channel 2^Controlword" Size="8" OffsB="8"/>
+				<Link VarA="Drive^Outputs^Out^nDataOut1" VarB="DRV Target position Channel 2^Target position"/>
+				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="FB Position Channel 2^Position"/>
 				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
 				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
 				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState0"/>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TIPC^IAG50cm^IAG50cm Instance">
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 12 (ELM7221-9016)">
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Dome Pendant (EL6002)">
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 0"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 1" Size="8" OffsA="8"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 10" Size="8" OffsA="80"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 11" Size="8" OffsA="88"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 12" Size="8" OffsA="96"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 13" Size="8" OffsA="104"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 14" Size="8" OffsA="112"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 15" Size="8" OffsA="120"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 16" Size="8" OffsA="128"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 17" Size="8" OffsA="136"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 18" Size="8" OffsA="144"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 19" Size="8" OffsA="152"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 2" Size="8" OffsA="16"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 20" Size="8" OffsA="160"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 21" Size="8" OffsA="168"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 3" Size="8" OffsA="24"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 4" Size="8" OffsA="32"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 5" Size="8" OffsA="40"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 6" Size="8" OffsA="48"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 7" Size="8" OffsA="56"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 8" Size="8" OffsA="64"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 2^Data In 9" Size="8" OffsA="72"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbDomeSerial.stIn_EL6001^Status" VarB="COM TxPDO-Map Inputs Channel 2^Status"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 0"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 1" Size="8" OffsA="8"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 10" Size="8" OffsA="80"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 11" Size="8" OffsA="88"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 12" Size="8" OffsA="96"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 13" Size="8" OffsA="104"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 14" Size="8" OffsA="112"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 15" Size="8" OffsA="120"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 16" Size="8" OffsA="128"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 17" Size="8" OffsA="136"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 18" Size="8" OffsA="144"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 19" Size="8" OffsA="152"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 2" Size="8" OffsA="16"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 20" Size="8" OffsA="160"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 21" Size="8" OffsA="168"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 3" Size="8" OffsA="24"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 4" Size="8" OffsA="32"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 5" Size="8" OffsA="40"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 6" Size="8" OffsA="48"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 7" Size="8" OffsA="56"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 8" Size="8" OffsA="64"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^D" VarB="COM TxPDO-Map Inputs Channel 1^Data In 9" Size="8" OffsA="72"/>
+				<Link VarA="PlcTask_Fast Inputs^SerialBackground.fbPendantSerial.stIn_EL6001^Status" VarB="COM TxPDO-Map Inputs Channel 1^Status"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^Ctrl" VarB="COM RxPDO-Map Outputs Channel 2^Ctrl"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 0"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 1" Size="8" OffsA="8"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 10" Size="8" OffsA="80"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 11" Size="8" OffsA="88"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 12" Size="8" OffsA="96"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 13" Size="8" OffsA="104"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 14" Size="8" OffsA="112"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 15" Size="8" OffsA="120"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 16" Size="8" OffsA="128"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 17" Size="8" OffsA="136"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 18" Size="8" OffsA="144"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 19" Size="8" OffsA="152"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 2" Size="8" OffsA="16"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 20" Size="8" OffsA="160"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 21" Size="8" OffsA="168"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 3" Size="8" OffsA="24"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 4" Size="8" OffsA="32"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 5" Size="8" OffsA="40"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 6" Size="8" OffsA="48"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 7" Size="8" OffsA="56"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 8" Size="8" OffsA="64"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbDomeSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 2^Data Out 9" Size="8" OffsA="72"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^Ctrl" VarB="COM RxPDO-Map Outputs Channel 1^Ctrl"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 0"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 1" Size="8" OffsA="8"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 10" Size="8" OffsA="80"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 11" Size="8" OffsA="88"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 12" Size="8" OffsA="96"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 13" Size="8" OffsA="104"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 14" Size="8" OffsA="112"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 15" Size="8" OffsA="120"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 16" Size="8" OffsA="128"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 17" Size="8" OffsA="136"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 18" Size="8" OffsA="144"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 19" Size="8" OffsA="152"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 2" Size="8" OffsA="16"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 20" Size="8" OffsA="160"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 21" Size="8" OffsA="168"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 3" Size="8" OffsA="24"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 4" Size="8" OffsA="32"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 5" Size="8" OffsA="40"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 6" Size="8" OffsA="48"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 7" Size="8" OffsA="56"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 8" Size="8" OffsA="64"/>
+				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 9" Size="8" OffsA="72"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^FOCUS (ELM7221-9016)">
 				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 3"/>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 2"/>
 			</OwnerB>
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 2 (EL1918)">
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
+				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 3"/>
+				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 2"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^MirrorCover1 (EL2652)">
+				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[1].Relais_Out_A" VarB="Channel 1^Output"/>
+				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[1].Relais_Out_B" VarB="Channel 2^Output"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^MirrorCover2 (EL2652)">
+				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[2].Relais_Out_A" VarB="Channel 1^Output"/>
+				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[2].Relais_Out_B" VarB="Channel 2^Output"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Power Status (EL1808)">
+				<Link VarA="PlcTask Inputs^MAIN.telescopeControl.fbCabinet.bAuxiliaryContact24V" VarB="Channel 1^Input"/>
+				<Link VarA="PlcTask Inputs^MAIN.telescopeControl.fbCabinet.bAuxiliaryContact48V" VarB="Channel 2^Input"/>
+				<Link VarA="PlcTask Inputs^MAIN.telescopeControl.fbCabinet.bAuxiliaryContactFOCUS" VarB="Channel 4^Input"/>
+				<Link VarA="PlcTask Inputs^MAIN.telescopeControl.fbCabinet.bAuxiliaryContactHADEC" VarB="Channel 3^Input"/>
+				<Link VarA="PlcTask Inputs^MAIN.telescopeControl.fbCabinet.bCollectiveReport24VFuse" VarB="Channel 6^Input"/>
+				<Link VarA="PlcTask Inputs^MAIN.telescopeControl.fbCabinet.bState24VFuse" VarB="Channel 5^Input"/>
+			</OwnerB>
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Safety (EL1918)">
 				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="StandardOutputs^TwinSafeGroup1.ErrorAcknowledgement_2"/>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Restart" VarB="StandardOutputs^TwinSafeGroup1.Restart_6"/>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="StandardOutputs^TwinSafeGroup1.Run_1"/>
 			</OwnerB>
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 4 (ELM7212-9016)">
-				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 3"/>
-				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 2"/>
-			</OwnerB>
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 5 (EL2612)">
-				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[1].Relais_Out_A" VarB="Channel 1^Output"/>
-				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[1].Relais_Out_B" VarB="Channel 2^Output"/>
-			</OwnerB>
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Term 6 (EL2612)">
-				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[2].Relais_Out_A" VarB="Channel 1^Output"/>
-				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[2].Relais_Out_B" VarB="Channel 2^Output"/>
-			</OwnerB>
 			<OwnerB Name="TINC^NC-Task 1 SAF^Axes^Declination">
 				<Link VarA="PlcTask Inputs^MAIN.decControl.axisRef.NcToPlc" VarB="Outputs^ToPlc"/>
 				<Link VarA="PlcTask Outputs^MAIN.decControl.axisRef.PlcToNc" VarB="Inputs^FromPlc"/>
-			</OwnerB>
-			<OwnerB Name="TINC^NC-Task 1 SAF^Axes^Focus">
-				<Link VarA="PlcTask Inputs^MAIN.focusControl.axisRef.NcToPlc" VarB="Outputs^ToPlc"/>
-				<Link VarA="PlcTask Outputs^MAIN.focusControl.axisRef.PlcToNc" VarB="Inputs^FromPlc"/>
 			</OwnerB>
 			<OwnerB Name="TINC^NC-Task 1 SAF^Axes^HourAngle">
 				<Link VarA="PlcTask Inputs^MAIN.haControl.axisRef.NcToPlc" VarB="Outputs^ToPlc"/>

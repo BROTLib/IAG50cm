@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_CabinetControl" Id="{94f0225c-1833-4eaa-8813-82b334d0ee64}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CabinetControl
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	bCabinetError : BOOL;
+	
+	bAuxiliaryContact24V AT %I* : BOOL; // Auxilary Contact of the 24V DC: TRUE = operational
+	bAuxiliaryContact48V AT %I* : BOOL; // Auxilary Contact of the 48V DC: TRUE = operational
+	bAuxiliaryContactHADEC AT %I* : BOOL; // Auxilary Contact of the HA DEC motor: TRUE = operational
+	bAuxiliaryContactFOCUS AT %I* : BOOL; // Auxilary Contact of the FOCUS motor: TRUE = operational
+	bCollectiveReport24VFuse AT %I*: BOOL; // Collective Report of the 24V Fuse box: TRUE = operational
+	bState24VFuse AT %I*: BOOL; 
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[bCabinetError := NOT( bAuxiliaryContact24V OR bAuxiliaryContact48V OR bAuxiliaryContactHADEC OR bAuxiliaryContactFOCUS OR bCollectiveReport24VFuse);]]></ST>
+    </Implementation>
+    <Property Name="Error" Id="{2fd28cb2-1a27-461e-9a1b-c500f525d0b9}">
+      <Declaration><![CDATA[PROPERTY Error : BOOL]]></Declaration>
+      <Get Name="Get" Id="{135dc6c4-8dcc-48ff-8eb2-581d00ebd979}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Error := bCabinetError;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="FB_CabinetControl">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CabinetControl.Error.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

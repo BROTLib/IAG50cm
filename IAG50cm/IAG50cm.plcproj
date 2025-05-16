@@ -20,6 +20,9 @@
     <CompilerDefines />
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="DUTs\E_DomeState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
       <SubType>Code</SubType>
     </Compile>
@@ -33,13 +36,65 @@
       <SubType>Code</SubType>
       <LinkAlways>true</LinkAlways>
     </Compile>
+    <Compile Include="GVLs\GVL_Serial.TcGVL">
+      <SubType>Code</SubType>
+      <LinkAlways>true</LinkAlways>
+    </Compile>
     <Compile Include="PlcTask.TcTTO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="PlcTask_Fast.TcTTO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\FB_DomeControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeClosingState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeErrorState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeHomingState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeIdleState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeOpeningState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeParkingState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeTrackingState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\DomeControl\States\I_DomeState.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_PendantControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_SerialBackground.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_TelescopeControlNEW.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\SerialBackground.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_AxisControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_BaseAxis.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_CabinetControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_FocusControl.TcPOU">
@@ -83,7 +138,9 @@
   <ItemGroup>
     <Folder Include="DUTs" />
     <Folder Include="GVLs" />
+    <Folder Include="POUs\DomeControl\States" />
     <Folder Include="POUs\Functions" />
+    <Folder Include="POUs\DomeControl" />
     <Folder Include="VISUs" />
     <Folder Include="POUs" />
   </ItemGroup>
@@ -154,6 +211,9 @@
       <DefaultResolution>Tc2_MC2_Drive, * (Beckhoff Automation GmbH)</DefaultResolution>
       <Namespace>Tc2_MC2_Drive</Namespace>
     </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_SerialCom">
+      <DefaultResolution>Tc2_SerialCom, * (Beckhoff Automation GmbH)</DefaultResolution>
+    </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Standard">
       <DefaultResolution>Tc2_Standard, * (Beckhoff Automation GmbH)</DefaultResolution>
       <Namespace>Tc2_Standard</Namespace>
@@ -197,9 +257,6 @@
     </LibraryReference>
   </ItemGroup>
   <ItemGroup>
-    <PlaceholderResolution Include="System_VisuElemXYChart">
-      <Resolution>VisuElemXYChart, 3.5.13.0 (System)</Resolution>
-    </PlaceholderResolution>
     <PlaceholderResolution Include="VisuDialogs">
       <Resolution>VisuDialogs, * (System)</Resolution>
     </PlaceholderResolution>

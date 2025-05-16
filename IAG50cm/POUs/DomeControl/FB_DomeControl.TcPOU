@@ -1,0 +1,512 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DomeControl" Id="{6d19e4e0-cd8e-40f8-8605-b776152ffcc0}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeControl
+VAR_IN_OUT
+	TxBuffer	: ComBuffer;
+	RxBuffer	: ComBuffer;
+END_VAR
+VAR
+	ipState		: I_DomeState := fbDomeIdleState;
+	bOpen		: BOOL;
+	bClose		: BOOL;
+	bReset		: BOOL;
+	bHome		: BOOL;
+	bTrack		: BOOL;
+	bStopTrack	: BOOL;
+	bPark		: BOOL;
+	
+	fDomeAzi_go		: LREAL;
+	fDomeAzi_current: LREAL := 0.0;
+	eDomeState		: E_DomeState;
+	eDomeStateOld	: E_DomeState;
+	bParked		: BOOL;
+	
+	bDomeError	: BOOL;
+	iDomeErrorID: UINT;
+	
+	ipStateOld			: I_DomeState := fbDomeIdleState;
+	fbDomeCloseingState : FB_DomeClosingState(THIS);
+	fbDomeErrorState	: FB_DomeErrorState(THIS);
+	fbDomeHomeingState	: FB_DomeHomingState(THIS);
+	fbDomeIdleState		: FB_DomeIdleState(THIS);
+	fbDomeOpeningState	: FB_DomeOpeningState(THIS);
+	fbDomeTrackingState	: FB_DomeTrackingState(THIS);
+	fbDomeParkingState	: FB_DomeParkingState(THIS);
+	
+
+	rtrigOpen		: R_TRIG;
+	rtrigClose		: R_TRIG;
+	rtrigReset		: R_TRIG;
+	rtrigHome		: R_TRIG;
+	rtrigTrack		: R_TRIG;
+	rtrigStopTrack	: R_TRIG;
+	rtrigPark		: R_TRIG;
+	
+	fbComm			: I_Comm;
+	
+	fbDomeStateEvent:	FB_EventLog;
+	fbDomeShutterEvent:	FB_EventLog;
+	fbDomeParkedEvent:	FB_EventLog;
+	fbDomeErrorEvent: FB_EventLog;
+	
+	sSendstring	: STRING;
+	Stage		: UINT:= 0;
+	Timer		: TON := (PT:=T#30S);
+	fbSend		: SendString;
+	bSendBusy	: BOOL;
+	eSendErrorID: ComError_t;
+
+	fbReceive		: ReceiveString;
+	sReceivedString	: STRING;
+	sLastReceivedString: STRING;
+	bStringReceived	: BOOL;
+	bReceiveBusy	: BOOL;
+	bReceiveError	: BOOL;
+	eReceiveErrorID	: ComError_t;
+	bReceiveTimeout	: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[//	Receive string data:
+fbReceive(
+	Prefix:='',
+	Suffix:= '',
+	Timeout:= T#1S,
+	ReceivedString:= sReceivedString,
+	RXbuffer:= THIS^.RxBuffer,
+	StringReceived=> bStringReceived,
+	Busy=> bReceiveBusy,
+	Error=> ,
+	RxTimeout=> bReceiveTimeout );
+// Check Errors
+IF fbSend.Error <> COMERROR_NOERROR THEN
+	eSendErrorID := fbSend.Error;
+	bDomeError := TRUE;
+END_IF
+IF fbReceive.Error <> COMERROR_NOERROR THEN
+	eReceiveErrorID := fbReceive.Error;
+	bDomeError := TRUE;
+END_IF
+
+IF bDomeError THEN
+	THIS^.ipState.FoundError();
+END_IF
+
+rtrigOpen(CLK := bOpen);
+rtrigClose(CLK := bClose);
+rtrigReset(CLK := bReset);
+rtrigHome(CLK := bHome);
+rtrigTrack(CLK := bTrack);
+rtrigStopTrack(CLK := bStopTrack);
+rtrigPark(CLK := bPark);
+
+IF (rtrigReset.Q) THEN
+	bReset := FALSE;
+	ipState.ResetCommand();
+END_IF
+
+IF (rtrigClose.Q) THEN
+	bClose := FALSE;
+	ipState.CloseCommand();
+END_IF
+
+IF (rtrigOpen.Q) THEN
+	bOpen := FALSE;
+	ipState.OpenCommand();
+END_IF
+
+IF (rtrigHome.Q) THEN
+	bHome := FALSE;
+	ipState.HomeCommand();
+END_IF
+
+IF (rtrigTrack.Q) THEN
+	bTrack := FALSE;
+	ipState.TrackCommand();
+END_IF
+
+IF (rtrigStopTrack.Q) THEN
+	bHome := FALSE;
+	ipState.StopTrackCommand();
+END_IF
+
+IF (rtrigPark.Q) THEN
+	bPark := FALSE;
+	ipState.ParkCommand();
+END_IF
+
+ipState.RunState();
+(*
+fbDomeStateEvent(
+	Trigger := ipState <> ipStateOld,
+	Level :=	ADSLOG_MSGTYPE_HINT,
+	FormatString := 'Dome State: %s',
+	OnMessage := ipState.StateID,
+	comm := fbComm);
+fbDomeShutterEvent(
+	Trigger := eDomeState <> eDomeStateOld,
+	Level :=	ADSLOG_MSGTYPE_HINT,
+	FormatString := 'Dome is: %s',
+	OnMessage := INT_TO_STRING(eDomeState),
+	comm := fbComm);
+fbDomeParkedEvent(
+	Trigger := bParked,
+	Level := ADSLOG_MSGTYPE_HINT,
+	OnMessage := 'Dome is in parking position.',
+	comm:= fbComm);
+fbDomeErrorEvent(
+	Trigger := bDomeError,
+	Level := ADSLOG_MSGTYPE_ERROR,
+	FormatString := 'Dome Error %s',
+	OnMessage := 'found.',
+	OffMessage := 'resolved.',
+	comm:= fbComm);
+*)
+// Buffer
+ipStateOld := ipState;
+eDomeStateOld := eDomeState;]]></ST>
+    </Implementation>
+    <Folder Name="internal properties" Id="{f2b50677-3a48-4dff-8e4d-06640225c481}" />
+    <Property Name="_DomeState" Id="{94e281da-2d55-4137-b423-8bf7bc330143}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _DomeState : E_DomeState]]></Declaration>
+      <Get Name="Get" Id="{e931b510-c0b8-460e-90fe-ec0def1d87ff}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_DomeState := eDomeState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{444b45a3-ce96-43fc-b5d3-4fd60b06192b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[eDomeState := _DomeState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_Error" Id="{c93dc26f-1216-4281-a3a2-0ba8e3029faf}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY  _Error : BOOL]]></Declaration>
+      <Get Name="Get" Id="{766ee077-f5ca-4c10-8364-d6db87eb6439}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Error := bDomeError;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{e7ecb5f9-adba-48a7-aafb-40be532480f0}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bDomeError := _Error;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_HasReceivedString" Id="{efe4ec58-b013-4bd3-91d7-a40e68ac61d6}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _HasReceivedString : Bool]]></Declaration>
+      <Get Name="Get" Id="{6af32aed-d4e7-435f-a147-9af66e31cbf3}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_HasReceivedString := bStringReceived;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{82b0d852-aa2b-4f8d-8a49-7fbd2bfaec1c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_Parked" Id="{1b15552c-bfee-42da-88e4-7dcb176a1825}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Parked : BOOL]]></Declaration>
+      <Get Name="Get" Id="{ce33e28b-4dd6-4d2b-bf76-aba9b91ad629}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Parked := bParked;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{4c46eccf-1f31-4481-83e7-6180d7889bee}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bParked := _Parked;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_Position" Id="{ae105779-0aa0-4d2f-821e-0f47310d89e1}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Position : LREAL]]></Declaration>
+      <Get Name="Get" Id="{0c9924d3-2af6-4b94-83fc-e627953dfa21}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Position := fDomeAzi_go;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{651597fa-a85f-49cd-8330-7278a65501fd}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[fDomeAzi_current := _Position;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_ReceivedString" Id="{ff9987e3-3e05-4fae-a5e0-cb86b6b8209d}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _ReceivedString : STRING]]></Declaration>
+      <Get Name="Get" Id="{caa6b28d-538c-43d7-8264-8d51b155f525}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ReceivedString := sReceivedString;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{d34cb6a8-9699-4b13-9e1d-7c89f67e2095}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Closed" Id="{6d997260-0381-44c8-9f75-ce63c1cb4011}">
+      <Declaration><![CDATA[PROPERTY Closed : BOOL]]></Declaration>
+      <Get Name="Get" Id="{748e5a80-31e8-4286-bfa0-1a642c517ee7}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Error" Id="{268476f6-d236-45b6-8bd2-428f6ed1c5c5}">
+      <Declaration><![CDATA[PROPERTY Error : Bool]]></Declaration>
+      <Get Name="Get" Id="{1e94d00a-28b4-4617-af13-fff028d77e00}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Error := bDomeError;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ErrorID" Id="{e66424b4-fdaf-4b3d-92ec-390d6ab9acbb}">
+      <Declaration><![CDATA[PROPERTY ErrorID : UDINT]]></Declaration>
+      <Get Name="Get" Id="{1eb8ee0b-47e9-4214-bdd5-d2740de92e5f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_Init" Id="{0ad2fe54-2f8b-455c-ac43-fce68b95c2e8}">
+      <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
+//The return value is not evaluated. For a specific influence, you can also declare the
+//methods explicitly and provide additional code there with the standard initialization
+//code. You can evaluate the return value.
+METHOD FB_Init: BOOL
+VAR_INPUT
+    bInitRetains	: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
+    bInCopyCode		: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)
+	comm			: I_Comm;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.fbComm 				:= fbComm;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Opened" Id="{65547067-38a4-4670-ad36-0884355dc8d3}">
+      <Declaration><![CDATA[PROPERTY Opened : BOOL]]></Declaration>
+      <Get Name="Get" Id="{f8408426-5aa1-4ac5-8fa2-912147109708}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Parked" Id="{e400500f-7f31-4456-b38c-60e2d41191a1}">
+      <Declaration><![CDATA[PROPERTY Parked : BOOL]]></Declaration>
+      <Get Name="Get" Id="{b243146e-6556-4e7d-843a-c7cbc2974276}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Parked := bParked;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Position" Id="{566a0c40-7cf6-4687-b475-98742f4a3e93}">
+      <Declaration><![CDATA[PROPERTY Position : LREAL]]></Declaration>
+      <Get Name="Get" Id="{51596a5f-29ff-4600-84cd-814b0fa48e76}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Position := fDomeAzi_current;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{ac1cf9b5-c5c0-487f-baa8-762c0c8e8d55}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[fDomeAzi_go := Position;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="SetState" Id="{bac7998a-96e0-484d-9b0b-984b4f2ae380}">
+      <Declaration><![CDATA[METHOD SetState : BOOL
+VAR_INPUT
+	newState :I_DomeState;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.ipState := newState;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Slewing" Id="{f4557448-d077-4c28-8ed8-f77cf26bab9c}">
+      <Declaration><![CDATA[PROPERTY Slewing : BOOL]]></Declaration>
+      <Get Name="Get" Id="{b28436fa-18d0-4eee-9d60-f0af07e234ec}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="FB_DomeControl">
+      <LineId Id="44" Count="0" />
+      <LineId Id="373" Count="9" />
+      <LineId Id="436" Count="0" />
+      <LineId Id="438" Count="1" />
+      <LineId Id="445" Count="0" />
+      <LineId Id="440" Count="2" />
+      <LineId Id="446" Count="0" />
+      <LineId Id="443" Count="1" />
+      <LineId Id="437" Count="0" />
+      <LineId Id="448" Count="1" />
+      <LineId Id="491" Count="0" />
+      <LineId Id="481" Count="3" />
+      <LineId Id="489" Count="1" />
+      <LineId Id="488" Count="0" />
+      <LineId Id="506" Count="3" />
+      <LineId Id="505" Count="0" />
+      <LineId Id="503" Count="0" />
+      <LineId Id="500" Count="2" />
+      <LineId Id="499" Count="0" />
+      <LineId Id="485" Count="1" />
+      <LineId Id="496" Count="0" />
+      <LineId Id="487" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="521" Count="3" />
+      <LineId Id="520" Count="0" />
+      <LineId Id="493" Count="0" />
+      <LineId Id="525" Count="13" />
+      <LineId Id="579" Count="0" />
+      <LineId Id="577" Count="0" />
+      <LineId Id="539" Count="0" />
+      <LineId Id="492" Count="0" />
+      <LineId Id="544" Count="0" />
+      <LineId Id="543" Count="0" />
+      <LineId Id="545" Count="2" />
+      <LineId Id="540" Count="0" />
+      <LineId Id="548" Count="4" />
+      <LineId Id="541" Count="0" />
+      <LineId Id="554" Count="0" />
+      <LineId Id="553" Count="0" />
+      <LineId Id="555" Count="1" />
+      <LineId Id="542" Count="0" />
+      <LineId Id="557" Count="3" />
+      <LineId Id="562" Count="0" />
+      <LineId Id="561" Count="0" />
+      <LineId Id="570" Count="0" />
+      <LineId Id="498" Count="0" />
+      <LineId Id="572" Count="1" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._DomeState.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._DomeState.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._Error.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._Error.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._HasReceivedString.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._HasReceivedString.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._Parked.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._Parked.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._Position.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._Position.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._ReceivedString.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._ReceivedString.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Closed.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Error.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.ErrorID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.FB_Init">
+      <LineId Id="7" Count="1" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Opened.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Parked.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Position.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Position.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.SetState">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Slewing.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

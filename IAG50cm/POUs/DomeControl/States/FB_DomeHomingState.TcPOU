@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DomeHomingState" Id="{0b46cf97-8cde-4d7b-9e21-a3cae61e4b6e}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeHomingState EXTENDS  FB_DomeState
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="StateID" Id="{ea9d5ebe-24bb-49b3-9665-3a8e0bb9c382}">
+      <Declaration><![CDATA[
+PROPERTY StateID : STRING
+]]></Declaration>
+      <Get Name="Get" Id="{0414bc37-926c-4615-961d-e31436f44336}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Homing State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="FB_DomeHomingState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeHomingState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

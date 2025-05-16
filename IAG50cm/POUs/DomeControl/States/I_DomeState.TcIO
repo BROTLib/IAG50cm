@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <Itf Name="I_DomeState" Id="{b2f6f88a-d56f-445b-bc00-0624b5738555}">
+    <Declaration><![CDATA[INTERFACE I_DomeState
+]]></Declaration>
+    <Method Name="CloseCommand" Id="{352be468-d16c-467b-8726-c306ee7cd90f}">
+      <Declaration><![CDATA[
+METHOD CloseCommand : BOOL
+]]></Declaration>
+    </Method>
+    <Method Name="FoundError" Id="{0caae5f8-f18c-4307-9bec-4166c3cd7048}">
+      <Declaration><![CDATA[
+METHOD FoundError : BOOL
+]]></Declaration>
+    </Method>
+    <Method Name="HomeCommand" Id="{4293f3b0-e171-44c9-8fef-6f942c3184b3}">
+      <Declaration><![CDATA[
+METHOD HomeCommand : BOOL
+]]></Declaration>
+    </Method>
+    <Method Name="OpenCommand" Id="{1498c54d-e157-48b4-93fc-793d93dafc87}">
+      <Declaration><![CDATA[
+METHOD OpenCommand : BOOL
+]]></Declaration>
+    </Method>
+    <Method Name="ParkCommand" Id="{1bd7bd84-309d-4e44-9197-c040b737bab3}">
+      <Declaration><![CDATA[
+METHOD ParkCommand : BOOL
+]]></Declaration>
+    </Method>
+    <Method Name="ResetCommand" Id="{29e0b9ab-e0df-46b5-bed4-b60c365a37ef}">
+      <Declaration><![CDATA[
+METHOD ResetCommand : BOOL
+]]></Declaration>
+    </Method>
+    <Method Name="RunState" Id="{6706d0a6-a1c6-4fc8-8135-c05165ca8028}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Property Name="StateID" Id="{4d221df5-80db-4dcb-a3c7-2fb94a57b90d}">
+      <Declaration><![CDATA[
+PROPERTY StateID : STRING
+]]></Declaration>
+      <Get Name="Get" Id="{c4f4c2de-fb35-4b58-88c6-915a0d449a2e}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+    <Method Name="StoptrackCommand" Id="{6e431a8d-905f-42b9-bd77-c182042fe19a}">
+      <Declaration><![CDATA[
+METHOD StoptrackCommand : BOOL
+]]></Declaration>
+    </Method>
+    <Method Name="SuccessfulFinished" Id="{ac769bc0-6135-4613-8474-4662273aa323}">
+      <Declaration><![CDATA[
+METHOD SuccessfulFinished : BOOL
+]]></Declaration>
+    </Method>
+    <Method Name="TrackCommand" Id="{774e64e6-d9ba-4540-9c00-6a315ffbcabc}">
+      <Declaration><![CDATA[
+METHOD TrackCommand : BOOL
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

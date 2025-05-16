@@ -25,6 +25,8 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	fTimeOffset			: LREAL := 0.0;		// absolute offset for time
 	fHorizon			: LREAL := 10.0;	// ELEVATION below which value the telescope will not go
 	
+	fSlewVelocity		: LREAL := 2.0;		// Motor velocity for moving the telescope in degree/s
+	
 	bEstopTriggered		: BOOL	:= FALSE;	// TODO: CHANGE
 	bMainReady			: BOOL	:= TRUE;
 	
@@ -38,6 +40,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 END_VAR
 VAR
 	comm 				: I_Comm;
+	fbCabinet			: FB_CabinetControl;
 	
 	TCS_command			: E_TCSCommand;	// actual command from the TCS
 	jd					: LREAL;	// current Julian Date calculated from system time
@@ -122,13 +125,25 @@ END_VAR]]></Declaration>
 fbTime();
 jd := DateTime2JD(fbTime.time_RTCEX2);
 lst := CT2LST(telescopeConfig.longitude, jd);
+
+// State of the Cabinet
+fbCabinet();
+
 // set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
 
 
 reset_trigger(CLK := bReset);
-// if reset, the bHorizonError can be switched off
+
 IF bReset THEN
-	bHorizonError := FALSE;
+	bHorizonError := FALSE; // if reset, the bHorizonError can be switched off
+	
+	// reset the stages of all statemachine methods
+	bInterupted := TRUE; 
+	_HomeTelescope();
+	_GotoTelescope();
+	_SlewTelescope();
+	_ParkTelescope();
+	bInterupted := FALSE;
 END_IF
 
 // get error ID, reset if bReset command is set
@@ -149,25 +164,23 @@ ELSIF fbFocus <> 0 AND_THEN fbFocus.Error THEN
 	END_IF
 END_IF
 
-bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR bHorizonError;
-
-
-
+// slewtime
 slewtime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
+
+// ERROR (either one of the Axis or below safe Horizon (fHorizon))
+bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR bHorizonError OR fbCabinet.Error;
 			
 IF bError THEN
 	bGoHome := 	FALSE;
 	bTrack := 	FALSE;
 	bGoto := 	FALSE;
 	bSlew := 	FALSE;
+	fbHourAngle.Enable := FALSE;
+	fbDeclination.Enable := FALSE;
 ELSE
 	errorid := 0;
 END_IF
 
-IF fbHourAngle.bError THEN
-	fbHourAngle.Enable := FALSE;
-	fbDeclination.Enable := FALSE;
-END_IF
 
 // calculate fHourAngle (and also horizontal coord. -> used for checking if target is on sky or in ground)
 eq2hor(
@@ -366,11 +379,7 @@ tracking_delay(in := fbHourAngle.fbAxis.isTracking AND
 bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
 			(NOT fbDeclination.bEnable OR fbDeclination.fbAxis.StandStill);
 			
-bHomed := fbHourAngle.bCalibrated AND
-			fbDeclination.bCalibrated;
-IF fbFocus <> 0 THEN
-	bHomed := bHomed AND fbFocus.Calibrated;
-END_IF
+bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated; //AND (fbFocus <> 0 AND_THEN fbFocus.Calibrated);
 			
 bReady := bHomed AND 
 	//fbCovers.Opened AND 
@@ -378,11 +387,8 @@ bReady := bHomed AND
 	fbDeclination.bEnable AND
     NOT bError;
 
-bBusy := fbHourAngle.fbAxis.Busy OR
-		fbDeclination.fbAxis.Busy;
-IF fbFocus <> 0 THEN
-	bBusy := bBusy AND fbFocus.Busy;
-END_IF		
+bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy;// OR (fbFocus <> 0 AND_THEN fbFocus.Busy);
+	
 
 // unset the STOP command if telescope is already stopped
 IF bStopped THEN
@@ -398,10 +404,13 @@ IF bEstopTriggered THEN
 	fbHourAngle.Enable := FALSE;
 	fbDeclination.Enable := FALSE;
 END_IF
+
+// send telemetry
+
 IF bSliding OR bTrack OR bTracking THEN
-	MQTTTimer.PT := T#1000MS;
+	MQTTTimer.PT := T#1000MS; // during movement every second
 ELSE
-	MQTTTimer.PT := T#5000MS;
+	MQTTTimer.PT := T#5000MS; // otherwise every five seconds
 END_IF
 MQTTTimer(IN:=TRUE);
 IF MQTTTimer.Q THEN // publish new payload every second
@@ -581,8 +590,8 @@ CASE Stage OF
 			fbHourAngle.Position := fHourAngle;
 		END_IF
 		fbDeclination.Position := fDeclination;
-		fbHourAngle.Velocity := 10.0;
-		fbDeclination.Velocity := 10.0;
+		fbHourAngle.Velocity := fSlewVelocity;
+		fbDeclination.Velocity := fSlewVelocity;
 		
 		// make sure to never drive under Horizon
 		IF ABS(fbHourAngle.Position) < ABS(hourangle_current) THEN
@@ -697,9 +706,9 @@ CASE Stage OF
 		END_IF
 	20:
 		fbHourAngle.Position := telescopeConfig.hourangleHome;
-		fbHourAngle.Velocity := 10.0;
+		fbHourAngle.Velocity := fSlewVelocity;
 		fbDeclination.Position := telescopeConfig.declinationHome;
-		fbDeclination.Velocity := 10;
+		fbDeclination.Velocity := fSlewVelocity;
 		
 		// make sure to never drive under Horizon
 		IF ABS(telescopeConfig.hourangleHome) < ABS(hourangle_current) THEN
@@ -811,9 +820,9 @@ CASE Stage OF
 		END_IF
 	20:
 		fbHourAngle.Position := telescopeConfig.houranglePark;
-		fbHourAngle.Velocity := 10.0;
+		fbHourAngle.Velocity := fSlewVelocity;
 		fbDeclination.Position := telescopeConfig.declinationPark;
-		fbDeclination.Velocity := 10;
+		fbDeclination.Velocity := fSlewVelocity;
 		
 		// make sure to never drive under Horizon
 		IF ABS(telescopeConfig.houranglePark) < ABS(hourangle_current) THEN
@@ -889,8 +898,8 @@ CASE Stage OF
 		IF fbHourAngle.Enable OR fbDeclination.Enable THEN
 			stage := 60;
 		END_IF
-		//fbCovers.Close();
-		Stage := 100;	
+		fbCovers.Close();
+		Stage := 90;	
 	90:
 		IF fbCovers.Closed THEN
 			Stage := 100;
@@ -921,12 +930,12 @@ ELSE
 END_IF
 // COVER MUST BE OPENED FOR A SUCCESSFUL WAKE & SHAKE COMMAND!
 
-//fbCovers.Open();
+fbCovers.Open();
 
 
 
 // enable elevation, enable azimuth
-IF bMainReady THEN // AND fbCovers.Opened
+IF bMainReady AND fbCovers.Opened THEN 
 	fbHourAngle.Enable := TRUE;
 	fbDeclination.Enable := TRUE;
 END_IF
@@ -1015,9 +1024,9 @@ CASE Stage OF
 		ELSE
 			fbHourAngle.Position := hourangle_calc;
 		END_IF
-		fbHourAngle.Velocity := 10.0;
+		fbHourAngle.Velocity := fSlewVelocity;
 		fbDeclination.Position := declination_calc;
-		fbDeclination.Velocity := 10.0;
+		fbDeclination.Velocity := fSlewVelocity;
 		// make sure to never drive under Horizon
 		IF ABS(fbHourAngle.Position) < ABS(hourangle_current) THEN
 			// move Ha then Dec
@@ -1117,7 +1126,7 @@ ELSE
 		fbDeclination.StopAxis := TRUE;
 	ELSE
 		fbDeclination.StopAxis := FALSE;
-	END_IF
+	END_IF	
 
 	IF bStopped THEN
 		fbHourAngle.StopAxis := FALSE;
@@ -1149,15 +1158,12 @@ IF NOT fbHourAngle.Tracking THEN
 	IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 		fbHourAngle.MoveAxis := FALSE;
 		IF fbHourAngle.isTracking THEN
-			fbHourAngle.Velocity := 0.5;//siderial_velocity;
-		ELSE
-			fbHourAngle.Velocity := 1.0;//siderial_velocity;
+			fbHourAngle.Velocity := 0.5*0.004;
 		END_IF
-		//fbHourAngle.Velocity := 1.0;//siderial_velocity;
 		fbHourAngle.Tracking := TRUE;
 	END_IF
 ELSE
-	fbHourAngle.Velocity := 0.5;//siderial_velocity;
+	fbHourAngle.Velocity := 0.5*0.004;
 END_IF
 
 // Declination (should not move while tracking)
@@ -1347,11 +1353,24 @@ bTrack			:= TRUE;
       </Implementation>
     </Method>
     <LineIds Name="FB_TelescopeControl">
-      <LineId Id="5427" Count="4" />
+      <LineId Id="5427" Count="3" />
+      <LineId Id="7367" Count="0" />
+      <LineId Id="7248" Count="0" />
+      <LineId Id="7247" Count="0" />
+      <LineId Id="7368" Count="0" />
+      <LineId Id="5431" Count="0" />
       <LineId Id="5434" Count="2" />
       <LineId Id="6752" Count="0" />
       <LineId Id="6637" Count="0" />
-      <LineId Id="6750" Count="1" />
+      <LineId Id="6750" Count="0" />
+      <LineId Id="7122" Count="0" />
+      <LineId Id="7124" Count="0" />
+      <LineId Id="7117" Count="0" />
+      <LineId Id="7119" Count="1" />
+      <LineId Id="7118" Count="0" />
+      <LineId Id="7121" Count="0" />
+      <LineId Id="7123" Count="0" />
+      <LineId Id="6751" Count="0" />
       <LineId Id="6753" Count="0" />
       <LineId Id="5437" Count="2" />
       <LineId Id="6630" Count="2" />
@@ -1361,10 +1380,15 @@ bTrack			:= TRUE;
       <LineId Id="6635" Count="1" />
       <LineId Id="5447" Count="0" />
       <LineId Id="5452" Count="0" />
-      <LineId Id="6511" Count="1" />
-      <LineId Id="6515" Count="0" />
-      <LineId Id="5456" Count="0" />
-      <LineId Id="5458" Count="14" />
+      <LineId Id="7111" Count="0" />
+      <LineId Id="7110" Count="0" />
+      <LineId Id="5459" Count="0" />
+      <LineId Id="7113" Count="0" />
+      <LineId Id="7112" Count="0" />
+      <LineId Id="7114" Count="0" />
+      <LineId Id="5460" Count="5" />
+      <LineId Id="7115" Count="1" />
+      <LineId Id="5466" Count="2" />
       <LineId Id="5474" Count="0" />
       <LineId Id="5910" Count="0" />
       <LineId Id="5475" Count="9" />
@@ -1455,13 +1479,17 @@ bTrack			:= TRUE;
       <LineId Id="5580" Count="37" />
       <LineId Id="5619" Count="3" />
       <LineId Id="5624" Count="2" />
-      <LineId Id="5628" Count="2" />
-      <LineId Id="5632" Count="7" />
-      <LineId Id="5641" Count="3" />
-      <LineId Id="5646" Count="7" />
+      <LineId Id="5628" Count="1" />
+      <LineId Id="5635" Count="4" />
+      <LineId Id="5641" Count="2" />
+      <LineId Id="5648" Count="5" />
       <LineId Id="6990" Count="0" />
       <LineId Id="5654" Count="7" />
-      <LineId Id="5663" Count="13" />
+      <LineId Id="5663" Count="0" />
+      <LineId Id="7127" Count="0" />
+      <LineId Id="7126" Count="0" />
+      <LineId Id="7128" Count="0" />
+      <LineId Id="5664" Count="12" />
       <LineId Id="5678" Count="4" />
       <LineId Id="5686" Count="1" />
       <LineId Id="6147" Count="6" />
@@ -1611,10 +1639,8 @@ bTrack			:= TRUE;
       <LineId Id="34" Count="0" />
       <LineId Id="81" Count="4" />
       <LineId Id="35" Count="6" />
-      <LineId Id="76" Count="1" />
-      <LineId Id="42" Count="0" />
+      <LineId Id="76" Count="0" />
       <LineId Id="45" Count="0" />
-      <LineId Id="75" Count="0" />
       <LineId Id="47" Count="24" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.AltAz.Get">

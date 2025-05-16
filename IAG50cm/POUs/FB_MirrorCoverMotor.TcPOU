@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_MirrorCoverMotor" Id="{ad6a0aff-220c-488b-a97b-ed536bb59202}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_MirrorCoverMotor
 VAR_INPUT
@@ -10,7 +10,7 @@ VAR_OUTPUT
 END_VAR
 VAR
 	// Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP
-	Relais_Out_A	AT%Q*	: BOOL := TRUE;
+	Relais_Out_A	AT%Q*	: BOOL := FALSE;
 	Relais_Out_B	AT%Q*	: BOOL := FALSE;
 	// stop movement untill reset command
 	bStop			: BOOL;
@@ -39,13 +39,13 @@ END_VAR
 		bReset := FALSE;
 	END_IF
 	// STOP -> put both Relais on same Voltage so motor stops
-	Relais_OUT_A := TRUE;
+	Relais_OUT_A := FALSE;
 	Relais_OUT_B := FALSE;
 
 ELSIF bClose THEN
 	// set Relais to CLOSED
 	Relais_Out_A := FALSE;
-	Relais_Out_B := FALSE;
+	Relais_Out_B := TRUE;
 	// Motor is closing or closed
 	motor_state := E_MirrorCoverState.closing;
 	bClose := FALSE;
@@ -53,7 +53,7 @@ ELSIF bClose THEN
 ELSIF bOpen THEN
 	// set Relais to OPEN
 	Relais_Out_A := TRUE;
-	Relais_Out_B := TRUE;
+	Relais_Out_B := FALSE;
 	// Motor is opening or open
 	motor_state := E_MirrorCoverState.opening;
 	bOpen := FALSE;

@@ -1,0 +1,79 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_TelescopeControlNEW" Id="{666438a4-c118-44a0-899f-c0d937e30ad6}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_TelescopeControlNEW EXTENDS FB_RaDecTelescopeControl
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="_Initialize" Id="{cb21f2a1-f693-4e5b-9002-19effb5392a2}">
+      <Declaration><![CDATA[METHOD _Initialize : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_Park" Id="{54dc84c6-0a8d-4027-bf16-c287626a28c1}">
+      <Declaration><![CDATA[METHOD _Park : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_Slew" Id="{300c98f5-cbc5-4c95-b6e1-c8e2e37338c1}">
+      <Declaration><![CDATA[METHOD _Slew : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_Stop" Id="{67f27b9b-ce02-49a0-90a6-aa0266735ba3}">
+      <Declaration><![CDATA[METHOD _Stop : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_Track" Id="{6e131920-83fc-4005-8f59-962f91b9e135}">
+      <Declaration><![CDATA[METHOD _Track : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_TelescopeControlNEW">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControlNEW._Initialize">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControlNEW._Park">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControlNEW._Slew">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControlNEW._Stop">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControlNEW._Track">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

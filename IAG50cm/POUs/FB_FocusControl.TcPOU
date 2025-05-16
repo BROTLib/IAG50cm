@@ -5,7 +5,7 @@
 VAR_INPUT
 	fMinPosition		: LREAL := 1000.0;		// minimum Position
 	fMaxPosition		: LREAL := 1500.0;		// maximum Position
-	fTolerance			: LREAL := 0.5;
+	fTolerance			: LREAL := 0.05;
 END_VAR
 VAR
 	mqttTimer 			: TON := (PT:=T#5S);

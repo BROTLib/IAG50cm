@@ -1,0 +1,162 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DomeState" Id="{ea26d2af-4995-4266-b54f-40ec64c0b456}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeState IMPLEMENTS I_DomeState
+
+VAR
+	TxBuffer	: ComBuffer;
+	RxBuffer	: ComBuffer;
+	pDome : POINTER TO FB_DomeControl;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="CloseCommand" Id="{fb5de5a5-4a4d-45df-af61-071cca59aada}">
+      <Declaration><![CDATA[
+METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{22775cbc-30f9-4d1f-bce5-a59c9bbf2750}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	pDome : POINTER TO FB_DomeControl;
+
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.pDome := pDome;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FoundError" Id="{42e4fbb5-dfee-4804-865e-273f0d90a6a6}">
+      <Declaration><![CDATA[
+METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HomeCommand" Id="{573db44f-d9cf-4414-a9a5-4863a1da9bd1}">
+      <Declaration><![CDATA[
+METHOD HomeCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OpenCommand" Id="{4d93018e-c4bd-4e1d-936d-acd45775b515}">
+      <Declaration><![CDATA[
+METHOD OpenCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ParkCommand" Id="{cf08df73-a434-4c35-812b-6a2a7fad3eb0}">
+      <Declaration><![CDATA[
+METHOD ParkCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ResetCommand" Id="{885bf905-2242-4d03-aaf3-a4eea3c12535}">
+      <Declaration><![CDATA[
+METHOD ResetCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{551f815e-d0a0-47f3-a1bf-76df06e0e526}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{33df2a26-65cb-4808-8c76-7a370a7d0a18}">
+      <Declaration><![CDATA[
+PROPERTY StateID : STRING
+]]></Declaration>
+      <Get Name="Get" Id="{843679fd-fc2f-4f1a-b85a-a970f396d2f1}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="StoptrackCommand" Id="{4d982227-1478-4c88-8c1e-b787654c2e0b}">
+      <Declaration><![CDATA[
+METHOD StoptrackCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SuccessfulFinished" Id="{062c433e-903b-4e33-8ead-c5a8ea2c9e66}">
+      <Declaration><![CDATA[
+METHOD SuccessfulFinished : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="TrackCommand" Id="{dc19c696-fcda-492e-bd3e-af40a5f27b32}">
+      <Declaration><![CDATA[
+METHOD TrackCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_DomeState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.CloseCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.FB_init">
+      <LineId Id="7" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.FoundError">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.HomeCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.OpenCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.ParkCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.ResetCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.RunState">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.StoptrackCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.SuccessfulFinished">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeState.TrackCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

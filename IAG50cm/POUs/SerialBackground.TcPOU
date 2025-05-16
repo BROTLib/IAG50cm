@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="SerialBackground" Id="{9a20473f-0d3f-4584-b429-33e10587a848}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM SerialBackground
+VAR
+	fbDomeSerial : FB_SerialBackground;
+	fbPendantSerial : FB_SerialBackground;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbDomeSerial(RxBuffer:=RxBufferDome, TxBuffer:=TxBufferDome);
+
+fbPendantSerial(RxBuffer:=RxBufferPendant, TxBuffer:=TxBufferPendant);]]></ST>
+    </Implementation>
+    <LineIds Name="SerialBackground">
+      <LineId Id="2" Count="0" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="72" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

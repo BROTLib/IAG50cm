@@ -1,0 +1,243 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DomeParkingState" Id="{38fd3f71-8ee5-411c-9502-503e70ff8fa9}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeParkingState EXTENDS FB_DomeState
+
+VAR
+	Stage		: UINT:= 0;
+	tonTimeout	: TON:= (PT:=T#3M); // see Baader Handbook
+	tonSleep	: TON := (PT:=T#2S);
+	tonDelay	: TON:= (PT:=T#20MS);
+	
+	sSeperator		: STRING := 'd#azi';
+	sLeft			: STRING;
+	sAzi			: STRING;
+	fAzi			: LREAL;
+	fAzi_Old		: LREAL;
+	bSplitSuccess 	: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="CloseCommand" Id="{6974039e-2ad8-4be3-a7c5-073290f4b5f6}">
+      <Declaration><![CDATA[
+METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage := 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeCloseingState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FoundError" Id="{973b9bd2-f8fb-469d-9375-7bbf24d458da}">
+      <Declaration><![CDATA[
+METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^._Error := TRUE;
+pDome^.SetState(pDome^.fbDomeErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OpenCommand" Id="{9df60541-5e83-447d-86fb-d70ae39cfb87}">
+      <Declaration><![CDATA[METHOD OpenCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeOpeningState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{74c4ccf9-d5e0-427f-ae6f-4cf604480af3}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE Stage OF
+	0:
+		tonTimeout(IN:=TRUE);
+		IF NOT pDome^.fbReceive.Busy AND NOT pDome^.fbSend.Busy THEN
+			Stage := 1;
+		END_IF
+	1:
+		pDome^.fbSend(	SendString:= 'd#azi0000',
+					TXbuffer:= TxBufferDome,
+					Busy=>,
+					Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 2;
+		END_IF
+	2:
+		IF pDome^._HasReceivedString THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSIF pDome^._ReceivedString = 'd#gotmess' THEN
+				Stage := 3;
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			tonSleep(IN:=TRUE);
+			IF tonSleep.Q THEN
+				tonSleep(IN:=FALSE);
+				Stage := 1;
+			END_IF
+		END_IF
+		IF tonTimeout.Q THEN
+			tonTimeout(IN:=FALSE);
+			FoundError();
+		END_IF
+	3:
+		tonTimeout(IN:=FALSE);
+		tonSleep(IN:=TRUE);
+		IF tonSleep.Q THEN
+			tonSleep(IN:=FALSE);
+			Stage := 4;
+			tonTimeout(IN:=TRUE);
+		END_IF
+	4:
+		pDome^.fbSend(	SendString:= 'd#getazim',
+					TXbuffer:= TxBufferDome,
+					Busy=>,
+					Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 5;
+		END_IF
+	5: 
+		IF pDome^._HasReceivedString THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSE
+				bSplitSuccess := FindAndSplit(
+									pSeparator := ADR(sSeperator),
+									pSrcString := ADR(pDome^.sReceivedString),
+									pLeftString:= ADR(sLeft),
+									nLeftSize	:= 1,
+									pRightString := ADR(sAzi),
+									nRightSize := 5,
+									bSearchFromRight:= FALSE);
+				IF bSplitSuccess AND ( STRING_TO_LREAL(sAzi) <> 0 OR sAzi = '0000' ) THEN
+					// (STRING_TO_LREAL(sAzi) <> 0 OR sAzi := '0000') -> either sAzi actual 0 OR STRING_TO_LREAL error
+					fAzi := STRING_TO_LREAL(sAzi)/10.0;
+					//Baader measures azimuth as West of South, so we need to convert it. This works both ways.
+					IF fAzi  >= 180.0 THEN
+						pDome^._Position := fAzi - 180.0;
+					ELSE
+						pDome^._Position := fAzi + 180.0;
+					END_IF
+					IF fAzi = fAzi_Old AND ABS(pDome^.Position - 180.0) < 5.0 THEN
+						pDome^._Parked := TRUE;
+					END_IF
+					fAzi_Old := fAzi;
+					Stage := 3;
+				END_IF
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			tonSleep(IN:=TRUE);
+			IF tonSleep.Q THEN
+				tonSleep(IN:=FALSE);
+				Stage := 4;
+			END_IF
+		END_IF
+		IF tonTimeout.Q THEN
+			tonTimeout(IN:=FALSE);
+			FoundError();
+		END_IF
+	6:
+		tonTimeout(IN:=FALSE);
+		pDome^._Parked := TRUE;
+		SuccessfulFinished();
+		
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{077ee837-ee21-442d-8c88-4822066bbecc}">
+      <Declaration><![CDATA[PROPERTY StateID : STRING
+]]></Declaration>
+      <Get Name="Get" Id="{06c04b97-ab55-46ea-a2de-63112be1cd2b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Parking State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="SuccessfulFinished" Id="{eaa94ad4-58a6-4ca5-9c6f-84da24826579}">
+      <Declaration><![CDATA[
+METHOD SuccessfulFinished : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_DomeParkingState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeParkingState.CloseCommand">
+      <LineId Id="4" Count="0" />
+      <LineId Id="9" Count="1" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="7" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeParkingState.FoundError">
+      <LineId Id="7" Count="0" />
+      <LineId Id="10" Count="1" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeParkingState.OpenCommand">
+      <LineId Id="7" Count="0" />
+      <LineId Id="9" Count="1" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeParkingState.RunState">
+      <LineId Id="6" Count="1" />
+      <LineId Id="80" Count="0" />
+      <LineId Id="107" Count="1" />
+      <LineId Id="81" Count="1" />
+      <LineId Id="8" Count="13" />
+      <LineId Id="103" Count="0" />
+      <LineId Id="109" Count="3" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="22" Count="0" />
+      <LineId Id="24" Count="9" />
+      <LineId Id="86" Count="0" />
+      <LineId Id="34" Count="12" />
+      <LineId Id="49" Count="9" />
+      <LineId Id="102" Count="0" />
+      <LineId Id="95" Count="6" />
+      <LineId Id="117" Count="3" />
+      <LineId Id="94" Count="0" />
+      <LineId Id="67" Count="1" />
+      <LineId Id="105" Count="0" />
+      <LineId Id="113" Count="3" />
+      <LineId Id="106" Count="0" />
+      <LineId Id="69" Count="0" />
+      <LineId Id="71" Count="8" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeParkingState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeParkingState.SuccessfulFinished">
+      <LineId Id="7" Count="0" />
+      <LineId Id="9" Count="1" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
