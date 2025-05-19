@@ -78,7 +78,7 @@ CASE Stage OF
 		Stage:=1;
 	1:
 		pDome^.fbSend(	SendString:= 'd#getshut',
-					TXbuffer:= TxBuffer,
+					TXbuffer:= TxBufferDome,
 					Busy=>,
 					Error=> );
 		IF NOT pDome^.fbSend.Busy  THEN
@@ -128,7 +128,7 @@ CASE Stage OF
 			fAzi := pDome^._Position + 180.0;
 		END_IF
 		pDome^.fbSend(	SendString:= CONCAT('d#azi', INT_TO_STRING(LREAL_TO_INT(fAzi*10))),
-					TXbuffer:= TxBuffer,
+					TXbuffer:= TxBufferDome,
 					Busy=>,
 					Error=> );
 		IF NOT pDome^.fbSend.Busy  THEN
