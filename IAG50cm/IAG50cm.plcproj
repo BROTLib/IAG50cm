@@ -20,9 +20,6 @@
     <CompilerDefines />
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="DUTs\E_DomeState.TcDUT">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
       <SubType>Code</SubType>
     </Compile>

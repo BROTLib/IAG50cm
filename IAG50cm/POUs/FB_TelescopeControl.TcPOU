@@ -32,6 +32,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	
 	fbFocus				: I_Focus;
 	fbCovers			: I_MirrorCovers;
+	fbDome				: I_Dome;
 
 	fbHourAngle			: REFERENCE TO FB_HourAngleControl;
 	fbDeclination		: REFERENCE TO FB_DeclinationControl;
@@ -248,6 +249,10 @@ IF bPower THEN
 	
 ELSIF bStop THEN
 	bTrack := FALSE;
+	IF fbDome <> 0 THEN
+		fbDome.StopTrack();
+	END_IF
+	
 	// If the stop is during a movement, reset the stage of the movement first
 	IF bPark THEN
 		bPark := FALSE;
@@ -379,15 +384,15 @@ tracking_delay(in := fbHourAngle.fbAxis.isTracking AND
 bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
 			(NOT fbDeclination.bEnable OR fbDeclination.fbAxis.StandStill);
 			
-bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated; //AND (fbFocus <> 0 AND_THEN fbFocus.Calibrated);
+bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated AND (fbFocus <> 0 AND_THEN fbFocus.Calibrated);
 			
 bReady := bHomed AND 
-	//fbCovers.Opened AND 
+	fbCovers.Opened AND 
 	fbHourAngle.bEnable AND
 	fbDeclination.bEnable AND
     NOT bError;
 
-bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy;// OR (fbFocus <> 0 AND_THEN fbFocus.Busy);
+bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy OR (fbFocus <> 0 AND_THEN fbFocus.Busy);
 	
 
 // unset the STOP command if telescope is already stopped
@@ -1379,7 +1384,7 @@ bTrack			:= TRUE;
       <LineId Id="5443" Count="2" />
       <LineId Id="6635" Count="1" />
       <LineId Id="5447" Count="0" />
-      <LineId Id="5452" Count="0" />
+      <LineId Id="7497" Count="0" />
       <LineId Id="7111" Count="0" />
       <LineId Id="7110" Count="0" />
       <LineId Id="5459" Count="0" />
@@ -1415,6 +1420,8 @@ bTrack			:= TRUE;
       <LineId Id="6991" Count="0" />
       <LineId Id="5533" Count="0" />
       <LineId Id="6850" Count="0" />
+      <LineId Id="7489" Count="2" />
+      <LineId Id="7488" Count="0" />
       <LineId Id="6793" Count="0" />
       <LineId Id="6779" Count="0" />
       <LineId Id="6984" Count="0" />

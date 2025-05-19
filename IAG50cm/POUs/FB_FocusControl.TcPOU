@@ -3,8 +3,8 @@
   <POU Name="FB_FocusControl" Id="{758e08ff-7d69-4056-9327-dc96b024961b}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_FocusControl EXTENDS FB_AxisControl IMPLEMENTS I_Focus
 VAR_INPUT
-	fMinPosition		: LREAL := 1000.0;		// minimum Position
-	fMaxPosition		: LREAL := 1500.0;		// maximum Position
+	fMinPosition		: LREAL := 1.0;			// minimum Position
+	fMaxPosition		: LREAL := 17.0;		// maximum Position
 	fTolerance			: LREAL := 0.05;
 END_VAR
 VAR

@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_DomeControl" Id="{6d19e4e0-cd8e-40f8-8605-b776152ffcc0}" SpecialFunc="None">
-    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeControl
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeControl IMPLEMENTS I_Dome
 VAR_IN_OUT
 	TxBuffer	: ComBuffer;
 	RxBuffer	: ComBuffer;
@@ -20,7 +20,8 @@ VAR
 	fDomeAzi_current: LREAL := 0.0;
 	eDomeState		: E_DomeState;
 	eDomeStateOld	: E_DomeState;
-	bParked		: BOOL;
+	bParked			: BOOL;
+	bTracking		: BOOL;
 	
 	bDomeError	: BOOL;
 	iDomeErrorID: UINT;
@@ -44,9 +45,8 @@ VAR
 	rtrigPark		: R_TRIG;
 	
 	fbComm			: I_Comm;
+	tonComm 		: TON := (PT:=T#5S);
 	
-	fbDomeStateEvent:	FB_EventLog;
-	fbDomeShutterEvent:	FB_EventLog;
 	fbDomeParkedEvent:	FB_EventLog;
 	fbDomeErrorEvent: FB_EventLog;
 	
@@ -137,19 +137,23 @@ IF (rtrigPark.Q) THEN
 END_IF
 
 ipState.RunState();
-(*
-fbDomeStateEvent(
-	Trigger := ipState <> ipStateOld,
-	Level :=	ADSLOG_MSGTYPE_HINT,
-	FormatString := 'Dome State: %s',
-	OnMessage := ipState.StateID,
-	comm := fbComm);
-fbDomeShutterEvent(
-	Trigger := eDomeState <> eDomeStateOld,
-	Level :=	ADSLOG_MSGTYPE_HINT,
-	FormatString := 'Dome is: %s',
-	OnMessage := INT_TO_STRING(eDomeState),
-	comm := fbComm);
+IF ipState.StateID = 'Tracking State' THEN
+	bTracking := TRUE;
+ELSE
+	bTracking := FALSE;
+END_IF
+// send telemetry
+tonComm(IN:=TRUE);
+IF tonComm.Q THEN // publish new payload every second
+	tonComm(IN:=FALSE);
+
+	fbComm.Publish('telescope', 'dome', 'DomeShutter', TO_STRING(eDomeState));
+	fbComm.Publish('telescope', 'dome', 'DomeParked', BOOL_TO_STRING(bParked));
+	fbComm.Publish('telescope', 'dome', 'DomeTracking', BOOL_TO_STRING(bTracking));
+	fbComm.Publish('telescope', 'dome', 'DomeError', BOOL_TO_STRING(bDomeError));
+END_IF
+
+
 fbDomeParkedEvent(
 	Trigger := bParked,
 	Level := ADSLOG_MSGTYPE_HINT,
@@ -162,7 +166,6 @@ fbDomeErrorEvent(
 	OnMessage := 'found.',
 	OffMessage := 'resolved.',
 	comm:= fbComm);
-*)
 // Buffer
 ipStateOld := ipState;
 eDomeStateOld := eDomeState;]]></ST>
@@ -282,6 +285,15 @@ END_VAR
         </Implementation>
       </Set>
     </Property>
+    <Method Name="Close" Id="{df2077f2-da90-4613-b060-6d6c3ae4fa51}">
+      <Declaration><![CDATA[METHOD Close : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bClose:=True;]]></ST>
+      </Implementation>
+    </Method>
     <Property Name="Closed" Id="{6d997260-0381-44c8-9f75-ce63c1cb4011}">
       <Declaration><![CDATA[PROPERTY Closed : BOOL]]></Declaration>
       <Get Name="Get" Id="{748e5a80-31e8-4286-bfa0-1a642c517ee7}">
@@ -327,8 +339,17 @@ VAR_INPUT
 	comm			: I_Comm;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[THIS^.fbComm 				:= fbComm;
+        <ST><![CDATA[THIS^.fbComm 				:= comm;
 ]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Open" Id="{06a72384-aba2-42e8-9b34-7edb45f49723}">
+      <Declaration><![CDATA[METHOD Open : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bOpen := True;]]></ST>
       </Implementation>
     </Method>
     <Property Name="Opened" Id="{65547067-38a4-4670-ad36-0884355dc8d3}">
@@ -342,6 +363,15 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
+    <Method Name="Park" Id="{3be05401-3914-4f1f-9af7-03ba8643ddec}">
+      <Declaration><![CDATA[METHOD Park : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bPark := TRUE;]]></ST>
+      </Implementation>
+    </Method>
     <Property Name="Parked" Id="{e400500f-7f31-4456-b38c-60e2d41191a1}">
       <Declaration><![CDATA[PROPERTY Parked : BOOL]]></Declaration>
       <Get Name="Get" Id="{b243146e-6556-4e7d-843a-c7cbc2974276}">
@@ -372,6 +402,15 @@ END_VAR
         </Implementation>
       </Set>
     </Property>
+    <Method Name="Reset" Id="{64e6a766-3201-41a9-a8b3-86ae4ee59491}">
+      <Declaration><![CDATA[METHOD Reset : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bReset := True;]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SetState" Id="{bac7998a-96e0-484d-9b0b-984b4f2ae380}">
       <Declaration><![CDATA[METHOD SetState : BOOL
 VAR_INPUT
@@ -390,6 +429,46 @@ END_VAR
 ]]></Declaration>
         <Implementation>
           <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="State" Id="{8c2c601e-a673-493f-a0e6-8cb4c126be63}">
+      <Declaration><![CDATA[PROPERTY State : E_DomeState]]></Declaration>
+      <Get Name="Get" Id="{1b5f019c-56a3-4acd-86fa-be8fed03a696}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[State := eDomeState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="StopTrack" Id="{592d7f7e-1fdb-4ea9-b619-2542fb2b964e}">
+      <Declaration><![CDATA[METHOD StopTrack : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bStopTrack := True;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Track" Id="{098e5b71-cc16-4ffe-ab71-96c1984155a2}">
+      <Declaration><![CDATA[METHOD Track : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bTrack := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Tracking" Id="{1a2cedbc-ec50-4d4c-88f2-62da93b16706}">
+      <Declaration><![CDATA[PROPERTY Tracking : BOOL]]></Declaration>
+      <Get Name="Get" Id="{6f0c9f90-dee6-4c1b-b31b-03a846e8a5b2}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Tracking := bTracking;]]></ST>
         </Implementation>
       </Get>
     </Property>
@@ -423,13 +502,18 @@ END_VAR
       <LineId Id="525" Count="13" />
       <LineId Id="579" Count="0" />
       <LineId Id="577" Count="0" />
+      <LineId Id="649" Count="0" />
+      <LineId Id="667" Count="0" />
+      <LineId Id="669" Count="1" />
+      <LineId Id="668" Count="0" />
+      <LineId Id="650" Count="0" />
+      <LineId Id="657" Count="3" />
+      <LineId Id="648" Count="0" />
+      <LineId Id="663" Count="1" />
+      <LineId Id="666" Count="0" />
+      <LineId Id="661" Count="0" />
       <LineId Id="539" Count="0" />
-      <LineId Id="492" Count="0" />
-      <LineId Id="544" Count="0" />
-      <LineId Id="543" Count="0" />
-      <LineId Id="545" Count="2" />
-      <LineId Id="540" Count="0" />
-      <LineId Id="548" Count="4" />
+      <LineId Id="552" Count="0" />
       <LineId Id="541" Count="0" />
       <LineId Id="554" Count="0" />
       <LineId Id="553" Count="0" />
@@ -438,7 +522,6 @@ END_VAR
       <LineId Id="557" Count="3" />
       <LineId Id="562" Count="0" />
       <LineId Id="561" Count="0" />
-      <LineId Id="570" Count="0" />
       <LineId Id="498" Count="0" />
       <LineId Id="572" Count="1" />
     </LineIds>
@@ -478,6 +561,9 @@ END_VAR
     <LineIds Name="FB_DomeControl._ReceivedString.Set">
       <LineId Id="2" Count="0" />
     </LineIds>
+    <LineIds Name="FB_DomeControl.Close">
+      <LineId Id="5" Count="0" />
+    </LineIds>
     <LineIds Name="FB_DomeControl.Closed.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
@@ -490,8 +576,14 @@ END_VAR
     <LineIds Name="FB_DomeControl.FB_Init">
       <LineId Id="7" Count="1" />
     </LineIds>
+    <LineIds Name="FB_DomeControl.Open">
+      <LineId Id="5" Count="0" />
+    </LineIds>
     <LineIds Name="FB_DomeControl.Opened.Get">
       <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Park">
+      <LineId Id="5" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl.Parked.Get">
       <LineId Id="2" Count="0" />
@@ -502,10 +594,25 @@ END_VAR
     <LineIds Name="FB_DomeControl.Position.Set">
       <LineId Id="2" Count="0" />
     </LineIds>
+    <LineIds Name="FB_DomeControl.Reset">
+      <LineId Id="5" Count="0" />
+    </LineIds>
     <LineIds Name="FB_DomeControl.SetState">
       <LineId Id="5" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl.Slewing.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.State.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.StopTrack">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Track">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Tracking.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
   </POU>

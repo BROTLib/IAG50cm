@@ -65,6 +65,7 @@ END_VAR
 				Stage := 1;
 			END_IF
 		END_IF
+		tonTimeout(IN:=TRUE);
 		IF tonTimeout.Q THEN
 			tonTimeout(IN:=FALSE);
 			foundError();
@@ -106,6 +107,7 @@ END_VAR
 		ELSIF NOT pDome^.fbReceive.Busy THEN
 			Stage := 4;
 		END_IF
+		tonTimeout(IN:=TRUE);
 		IF tonTimeout.Q THEN
 			tonTimeout(IN:=FALSE);
 			FoundError();
@@ -165,6 +167,7 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="83" Count="3" />
       <LineId Id="80" Count="0" />
       <LineId Id="22" Count="0" />
+      <LineId Id="90" Count="0" />
       <LineId Id="24" Count="10" />
       <LineId Id="75" Count="0" />
       <LineId Id="35" Count="21" />
@@ -174,6 +177,7 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="57" Count="0" />
       <LineId Id="81" Count="1" />
       <LineId Id="58" Count="0" />
+      <LineId Id="91" Count="0" />
       <LineId Id="60" Count="8" />
       <LineId Id="5" Count="0" />
     </LineIds>

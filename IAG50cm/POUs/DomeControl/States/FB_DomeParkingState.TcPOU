@@ -90,6 +90,7 @@ END_VAR
 				Stage := 1;
 			END_IF
 		END_IF
+		tonTimeout(IN:=TRUE);
 		IF tonTimeout.Q THEN
 			tonTimeout(IN:=FALSE);
 			FoundError();
@@ -146,6 +147,7 @@ END_VAR
 				Stage := 4;
 			END_IF
 		END_IF
+		tonTimeout(IN:=TRUE);
 		IF tonTimeout.Q THEN
 			tonTimeout(IN:=FALSE);
 			FoundError();
@@ -214,6 +216,7 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="109" Count="3" />
       <LineId Id="104" Count="0" />
       <LineId Id="22" Count="0" />
+      <LineId Id="124" Count="0" />
       <LineId Id="24" Count="9" />
       <LineId Id="86" Count="0" />
       <LineId Id="34" Count="12" />
@@ -227,6 +230,7 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="113" Count="3" />
       <LineId Id="106" Count="0" />
       <LineId Id="69" Count="0" />
+      <LineId Id="125" Count="0" />
       <LineId Id="71" Count="8" />
       <LineId Id="5" Count="0" />
     </LineIds>

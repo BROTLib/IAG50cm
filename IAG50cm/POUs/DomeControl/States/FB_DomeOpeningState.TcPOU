@@ -10,68 +10,7 @@ VAR
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[CASE Stage OF
-	0:
-		pDome^.fbSend(	SendString:= 'd#opeshut',
-					TXbuffer:= TxBufferDome,
-					Busy=>,
-					Error=> );
-		IF NOT pDome^.fbSend.Busy  THEN
-			Stage := 1;
-		END_IF
-	1:
-		IF pDome^.bStringReceived THEN
-			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
-				FoundError();
-			ELSIF pDome^._ReceivedString = 'd#gotmess' THEN
-				Stage := 2;
-			END_IF
-		END_IF
-		tonTimeout(IN:=TRUE);
-		IF tonTimeout.Q THEN
-			tonTimeout(IN:=FALSE);
-			FoundError();
-		END_IF
-	2:
-		tonTimeout(IN:=FALSE);
-		tonSleep(IN:=TRUE);
-		IF tonSleep.Q THEN
-			tonSleep(IN:=FALSE);
-			Stage := 3;
-		END_IF
-	3:
-		pDome^.fbSend(	SendString:= 'd#getshut',
-					TXbuffer:= TxBufferDome,
-					Busy=>,
-					Error=> );
-		IF NOT pDome^.fbSend.Busy  THEN
-			Stage := 4;
-		END_IF
-	4: 
-		IF pDome^.bStringReceived THEN
-			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
-				FoundError();
-			ELSIF pDome^._ReceivedString = 'd#shutclo' THEN
-				pDome^._DomeState := E_DomeState.closed;
-				Stage := 0; // restart
-			ELSIF pDome^._ReceivedString = 'd#shutope' THEN
-				pDome^._DomeState := E_DomeState.open;
-				Stage := 5;
-			ELSIF pDome^._ReceivedString = 'd#shutrun' THEN
-				pDome^._DomeState := E_DomeState.slewing;
-				Stage := 2; // wait longer
-			END_IF
-		END_IF
-		tonTimeout(IN:=TRUE);
-		IF tonTimeout.Q THEN
-			tonTimeout(IN:=FALSE);
-			FoundError();
-		END_IF
-	
-	5:
-		tonTimeout(IN:=FALSE);
-		SuccessfulFinished();
-END_CASE]]></ST>
+      <ST><![CDATA[]]></ST>
     </Implementation>
     <Method Name="CloseCommand" Id="{96f991ad-71d3-4ec1-acd3-5b8cde4fd821}">
       <Declaration><![CDATA[
@@ -128,6 +67,7 @@ END_VAR
 				Stage := 1;
 			END_IF
 		END_IF
+		tonTimeout(IN:=TRUE);
 		IF tonTimeout.Q THEN
 			tonTimeout(IN:=FALSE);
 			FoundError();
@@ -170,6 +110,7 @@ END_VAR
 				Stage := 4;
 			END_IF
 		END_IF
+		
 		tonTimeout(IN:=TRUE);
 		IF tonTimeout.Q THEN
 			tonTimeout(IN:=FALSE);
@@ -207,20 +148,6 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       </Implementation>
     </Method>
     <LineIds Name="FB_DomeOpeningState">
-      <LineId Id="9" Count="0" />
-      <LineId Id="25" Count="0" />
-      <LineId Id="28" Count="5" />
-      <LineId Id="27" Count="0" />
-      <LineId Id="34" Count="0" />
-      <LineId Id="36" Count="3" />
-      <LineId Id="41" Count="0" />
-      <LineId Id="48" Count="5" />
-      <LineId Id="35" Count="0" />
-      <LineId Id="70" Count="0" />
-      <LineId Id="112" Count="0" />
-      <LineId Id="71" Count="34" />
-      <LineId Id="113" Count="0" />
-      <LineId Id="55" Count="0" />
       <LineId Id="26" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeOpeningState.CloseCommand">
@@ -241,6 +168,7 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="81" Count="3" />
       <LineId Id="78" Count="0" />
       <LineId Id="22" Count="0" />
+      <LineId Id="92" Count="0" />
       <LineId Id="24" Count="9" />
       <LineId Id="73" Count="0" />
       <LineId Id="34" Count="14" />
@@ -249,7 +177,9 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="79" Count="0" />
       <LineId Id="85" Count="3" />
       <LineId Id="80" Count="0" />
-      <LineId Id="57" Count="9" />
+      <LineId Id="57" Count="0" />
+      <LineId Id="93" Count="0" />
+      <LineId Id="58" Count="8" />
       <LineId Id="5" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeOpeningState.StateID.Get">

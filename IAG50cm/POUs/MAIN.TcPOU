@@ -5,7 +5,7 @@
 VAR
 	comm			: FB_Comm_MQTT_Influx;
 	coverControl 	: FB_MirrorCoverControl(comm:=comm);
-	//focusControl	: FB_FocusControl(comm:=comm);
+	focusControl	: FB_FocusControl(comm:=comm);
 	haControl		: FB_HourAngleControl(comm:=comm);
 	decControl		: FB_DeclinationControl(comm:=comm);
 	telescopeControl: FB_TelescopeControl(comm := comm);
@@ -15,7 +15,7 @@ VAR
 END_VAR
 VAR CONSTANT
 	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
-													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 1000.0,
+													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 1.0,
 													hourangleHome := 0.0, declinationHome := -23.0);
 END_VAR]]></Declaration>
     <Implementation>
@@ -25,13 +25,14 @@ domeControl(TxBuffer:=TxBufferDome, RxBuffer:=RxBufferDome);
 pendant_Test(TxBuffer:=TxBufferPendant, RxBuffer:=RxBufferPendant);
 
 coverControl(delta_t:= T#5s);
-//focusControl(fVelocity:=10);
+focusControl(fVelocity:=1);
 haControl();
 decControl();
 telescopeControl(
 	fbHourAngle		:= haControl,
 	fbDeclination	:= decControl,
-	//fbFocus			:= focusControl,
+	fbFocus			:= focusControl,
+	fbDome			:= domeControl,
 	fbCovers		:= coverControl,
 	telescopeConfig	:= telescopeConfig,
 );
@@ -44,7 +45,8 @@ comm(
 	sTopicPublish		:= '50cm/Telemetry',
 	sTopicLog			:= '50cm/Log',
 	Telescope			:= telescopeControl,
-	//Focus				:= focusControl
+	Focus				:= focusControl,
+	Dome				:= domeControl
 );
 ]]></ST>
     </Implementation>
@@ -57,12 +59,15 @@ comm(
       <LineId Id="54" Count="2" />
       <LineId Id="41" Count="0" />
       <LineId Id="70" Count="0" />
-      <LineId Id="43" Count="3" />
+      <LineId Id="43" Count="2" />
+      <LineId Id="169" Count="0" />
+      <LineId Id="46" Count="0" />
       <LineId Id="50" Count="0" />
       <LineId Id="42" Count="0" />
       <LineId Id="39" Count="0" />
       <LineId Id="22" Count="6" />
       <LineId Id="84" Count="1" />
+      <LineId Id="168" Count="0" />
       <LineId Id="20" Count="0" />
       <LineId Id="151" Count="0" />
     </LineIds>
