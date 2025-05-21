@@ -133,11 +133,21 @@ END_VAR
 					ELSE
 						pDome^._Position := fAzi + 180.0;
 					END_IF
-					IF fAzi = fAzi_Old AND ABS(pDome^.Position - 180.0) < 5.0 THEN
-						pDome^._Parked := TRUE;
+					IF fAzi = fAzi_Old THEN
+						IF ABS(pDome^.Position - 180.0) < 5.0 THEN
+							pDome^._DomeRotationState := E_DomeRotationState.parked;
+							Stage := 6;
+						ELSE
+							pDome^._DomeRotationState := E_DomeRotationState.idle;
+							// stopped but not parked? try again
+							Stage := 0;
+						END_IF
+					ELSE
+						pDome^._DomeRotationState := E_DomeRotationState.slewing;
+						// carry on
+						Stage := 3;
 					END_IF
 					fAzi_Old := fAzi;
-					Stage := 3;
 				END_IF
 			END_IF
 		ELSIF NOT pDome^.fbReceive.Busy THEN
@@ -154,7 +164,6 @@ END_VAR
 		END_IF
 	6:
 		tonTimeout(IN:=FALSE);
-		pDome^._Parked := TRUE;
 		SuccessfulFinished();
 		
 END_CASE]]></ST>
@@ -223,15 +232,23 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="49" Count="9" />
       <LineId Id="102" Count="0" />
       <LineId Id="95" Count="6" />
-      <LineId Id="117" Count="3" />
-      <LineId Id="94" Count="0" />
+      <LineId Id="129" Count="2" />
+      <LineId Id="137" Count="0" />
+      <LineId Id="132" Count="1" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="138" Count="0" />
+      <LineId Id="134" Count="2" />
+      <LineId Id="141" Count="0" />
+      <LineId Id="140" Count="0" />
+      <LineId Id="119" Count="1" />
       <LineId Id="67" Count="1" />
       <LineId Id="105" Count="0" />
       <LineId Id="113" Count="3" />
       <LineId Id="106" Count="0" />
       <LineId Id="69" Count="0" />
       <LineId Id="125" Count="0" />
-      <LineId Id="71" Count="8" />
+      <LineId Id="71" Count="5" />
+      <LineId Id="78" Count="1" />
       <LineId Id="5" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeParkingState.StateID.Get">

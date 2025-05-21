@@ -49,6 +49,13 @@ METHOD HomeCommand : BOOL
         <ST><![CDATA[]]></ST>
       </Implementation>
     </Method>
+    <Method Name="MoveCommand" Id="{4d982227-1478-4c88-8c1e-b787654c2e0b}">
+      <Declaration><![CDATA[METHOD MoveCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="OpenCommand" Id="{4d93018e-c4bd-4e1d-936d-acd45775b515}">
       <Declaration><![CDATA[
 METHOD OpenCommand : BOOL
@@ -95,14 +102,6 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Method Name="StoptrackCommand" Id="{4d982227-1478-4c88-8c1e-b787654c2e0b}">
-      <Declaration><![CDATA[
-METHOD StoptrackCommand : BOOL
-]]></Declaration>
-      <Implementation>
-        <ST><![CDATA[]]></ST>
-      </Implementation>
-    </Method>
     <Method Name="SuccessfulFinished" Id="{062c433e-903b-4e33-8ead-c5a8ea2c9e66}">
       <Declaration><![CDATA[
 METHOD SuccessfulFinished : BOOL
@@ -134,6 +133,9 @@ METHOD TrackCommand : BOOL
     <LineIds Name="FB_DomeState.HomeCommand">
       <LineId Id="4" Count="0" />
     </LineIds>
+    <LineIds Name="FB_DomeState.MoveCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
     <LineIds Name="FB_DomeState.OpenCommand">
       <LineId Id="4" Count="0" />
     </LineIds>
@@ -148,9 +150,6 @@ METHOD TrackCommand : BOOL
     </LineIds>
     <LineIds Name="FB_DomeState.StateID.Get">
       <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_DomeState.StoptrackCommand">
-      <LineId Id="4" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeState.SuccessfulFinished">
       <LineId Id="4" Count="0" />

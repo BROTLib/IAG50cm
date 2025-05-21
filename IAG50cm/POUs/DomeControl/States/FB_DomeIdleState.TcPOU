@@ -26,11 +26,14 @@ END_VAR
 METHOD CloseCommand : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[Stage:= 0;
-tonSleep(IN:=FALSE);
-tonTimeout(IN:=FALSE);
-tonDelay(IN:=FALSE);
-pDome^.SetState(pDome^.fbDomeCloseingState);]]></ST>
+        <ST><![CDATA[IF pDome^._DomeRotationState <> E_DomeRotationState.slewing THEN
+	Stage:= 0;
+	tonSleep(IN:=FALSE);
+	tonTimeout(IN:=FALSE);
+	tonDelay(IN:=FALSE);
+	pDome^.SetState(pDome^.fbDomeCloseingState);
+END_IF
+]]></ST>
       </Implementation>
     </Method>
     <Method Name="FoundError" Id="{b1011a7e-754f-4d17-83aa-eb0986f7d112}">
@@ -44,6 +47,17 @@ tonTimeout(IN:=FALSE);
 tonDelay(IN:=FALSE);
 pDome^._Error := TRUE;
 pDome^.SetState(pDome^.fbDomeErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MoveCommand" Id="{f3c4f054-a43b-464f-8284-7288eb1f1cb3}">
+      <Declaration><![CDATA[METHOD MoveCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeMovingState);]]></ST>
       </Implementation>
     </Method>
     <Method Name="OpenCommand" Id="{336403ce-c239-42a6-9c74-883457eb74c5}">
@@ -96,13 +110,13 @@ CASE Stage OF
 			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
 				FoundError();
 			ELSIF pDome^._ReceivedString = 'd#shutclo' THEN
-				pDome^._DomeState := E_DomeState.closed;
+				pDome^._DomeShutterState := E_RoofState.closed;
 				Stage := 3;
 			ELSIF pDome^._ReceivedString = 'd#shutope' THEN
-				pDome^._DomeState := E_DomeState.open;
+				pDome^._DomeShutterState := E_RoofState.opened;
 				Stage := 3;
 			ELSIF pDome^._ReceivedString = 'd#shutrun' THEN
-				pDome^._DomeState := E_DomeState.slewing;
+				pDome^._DomeShutterState := E_RoofState.unknown;
 				Stage := 3;
 			END_IF
 		ELSIF NOT pDome^.fbReceive.Busy THEN
@@ -156,8 +170,14 @@ CASE Stage OF
 					ELSE
 						pDome^._Position := fAzi + 180.0;
 					END_IF
-					IF fAzi = fAzi_Old AND ABS(pDome^.Position - 180.0) < 5.0 THEN
-						pDome^._Parked := TRUE;
+					IF fAzi = fAzi_Old THEN
+						IF ABS(pDome^.Position - 180.0) < 5.0 THEN
+							pDome^._DomeRotationState := E_DomeRotationState.parked;
+						ELSE
+							pDome^._DomeRotationState := E_DomeRotationState.idle;
+						END_IF
+					ELSE
+						pDome^._DomeRotationState := E_DomeRotationState.slewing;
 					END_IF
 					fAzi_Old := fAzi;
 					Stage := 6;
@@ -177,6 +197,12 @@ CASE Stage OF
 		END_IF
 	6:
 		tonTimeout(IN:=FALSE);
+		IF ABS(fAzi - pDome^._Position) > 10.0 THEN
+			MoveCommand();
+		ELSE
+			Stage:= 7;
+		END_IF
+	7:
 		tonSleep(IN:=TRUE);
 		IF tonSleep.Q THEN
 			tonSleep(IN:=FALSE);
@@ -202,26 +228,13 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Method Name="TrackCommand" Id="{f3c4f054-a43b-464f-8284-7288eb1f1cb3}">
-      <Declaration><![CDATA[
-METHOD TrackCommand : BOOL
-]]></Declaration>
-      <Implementation>
-        <ST><![CDATA[Stage:= 0;
-tonSleep(IN:=FALSE);
-tonTimeout(IN:=FALSE);
-tonDelay(IN:=FALSE);
-pDome^.SetState(pDome^.fbDomeTrackingState);]]></ST>
-      </Implementation>
-    </Method>
     <LineIds Name="FB_DomeIdleState">
       <LineId Id="9" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeIdleState.CloseCommand">
-      <LineId Id="7" Count="0" />
-      <LineId Id="11" Count="0" />
-      <LineId Id="10" Count="0" />
-      <LineId Id="13" Count="0" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="19" Count="3" />
+      <LineId Id="17" Count="1" />
       <LineId Id="4" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeIdleState.FoundError">
@@ -229,6 +242,12 @@ pDome^.SetState(pDome^.fbDomeTrackingState);]]></ST>
       <LineId Id="12" Count="1" />
       <LineId Id="11" Count="0" />
       <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeIdleState.MoveCommand">
+      <LineId Id="7" Count="0" />
+      <LineId Id="11" Count="1" />
+      <LineId Id="10" Count="0" />
       <LineId Id="4" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeIdleState.OpenCommand">
@@ -261,7 +280,12 @@ pDome^.SetState(pDome^.fbDomeTrackingState);]]></ST>
       <LineId Id="69" Count="0" />
       <LineId Id="108" Count="0" />
       <LineId Id="70" Count="6" />
-      <LineId Id="126" Count="2" />
+      <LineId Id="126" Count="0" />
+      <LineId Id="137" Count="1" />
+      <LineId Id="140" Count="1" />
+      <LineId Id="139" Count="0" />
+      <LineId Id="142" Count="1" />
+      <LineId Id="128" Count="0" />
       <LineId Id="125" Count="0" />
       <LineId Id="77" Count="2" />
       <LineId Id="114" Count="0" />
@@ -269,17 +293,16 @@ pDome^.SetState(pDome^.fbDomeTrackingState);]]></ST>
       <LineId Id="115" Count="0" />
       <LineId Id="80" Count="0" />
       <LineId Id="133" Count="0" />
-      <LineId Id="82" Count="14" />
+      <LineId Id="82" Count="4" />
+      <LineId Id="149" Count="0" />
+      <LineId Id="144" Count="1" />
+      <LineId Id="147" Count="1" />
+      <LineId Id="146" Count="0" />
+      <LineId Id="87" Count="9" />
       <LineId Id="5" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeIdleState.StateID.Get">
       <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_DomeIdleState.TrackCommand">
-      <LineId Id="7" Count="0" />
-      <LineId Id="11" Count="1" />
-      <LineId Id="10" Count="0" />
-      <LineId Id="4" Count="0" />
     </LineIds>
   </POU>
 </TcPlcObject>

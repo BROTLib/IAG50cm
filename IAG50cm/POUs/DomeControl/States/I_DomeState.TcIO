@@ -18,6 +18,11 @@ METHOD FoundError : BOOL
 METHOD HomeCommand : BOOL
 ]]></Declaration>
     </Method>
+    <Method Name="MoveCommand" Id="{6e431a8d-905f-42b9-bd77-c182042fe19a}">
+      <Declaration><![CDATA[
+METHOD MoveCommand : BOOL
+]]></Declaration>
+    </Method>
     <Method Name="OpenCommand" Id="{1498c54d-e157-48b4-93fc-793d93dafc87}">
       <Declaration><![CDATA[
 METHOD OpenCommand : BOOL
@@ -47,19 +52,9 @@ PROPERTY StateID : STRING
         <Declaration><![CDATA[]]></Declaration>
       </Get>
     </Property>
-    <Method Name="StoptrackCommand" Id="{6e431a8d-905f-42b9-bd77-c182042fe19a}">
-      <Declaration><![CDATA[
-METHOD StoptrackCommand : BOOL
-]]></Declaration>
-    </Method>
     <Method Name="SuccessfulFinished" Id="{ac769bc0-6135-4613-8474-4662273aa323}">
       <Declaration><![CDATA[
 METHOD SuccessfulFinished : BOOL
-]]></Declaration>
-    </Method>
-    <Method Name="TrackCommand" Id="{774e64e6-d9ba-4540-9c00-6a315ffbcabc}">
-      <Declaration><![CDATA[
-METHOD TrackCommand : BOOL
 ]]></Declaration>
     </Method>
   </Itf>

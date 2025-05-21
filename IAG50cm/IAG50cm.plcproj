@@ -67,7 +67,7 @@
     <Compile Include="POUs\DomeControl\States\FB_DomeState.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\DomeControl\States\FB_DomeTrackingState.TcPOU">
+    <Compile Include="POUs\DomeControl\States\FB_DomeMovingState.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\DomeControl\States\I_DomeState.TcIO">

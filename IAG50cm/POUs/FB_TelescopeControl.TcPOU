@@ -1205,6 +1205,45 @@ AltAz.Azimuth 	:= azimuth_calc;]]></ST>
         </Implementation>
       </Get>
     </Property>
+    <Property Name="Altitude" Id="{77878183-ff56-458d-9713-573db093fec2}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY Altitude : LREAL
+]]></Declaration>
+      <Get Name="Get" Id="{d42084e4-5702-4d63-9998-7aed13913cd3}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Azimuth" Id="{af0c56f8-138d-4c6a-9afa-2054c20456bc}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY Azimuth : LREAL
+]]></Declaration>
+      <Get Name="Get" Id="{9755fb63-911d-4e5f-a9b2-82e25bd608d3}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Declination" Id="{9fcba06b-96da-4b28-85d9-479fe50b914c}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY Declination : LREAL
+]]></Declaration>
+      <Get Name="Get" Id="{6f7da282-4cc8-4a40-b385-90b0f4ce4349}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
     <Method Name="FB_Init" Id="{034c34d9-521a-4d54-9624-e4d1bdeb670c}">
       <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
 //The return value is not evaluated. For a specific influence, you can also declare the
@@ -1287,6 +1326,19 @@ RaDec.Declination		:= declination_calc;]]></ST>
         <ST><![CDATA[bReset := TRUE;]]></ST>
       </Implementation>
     </Method>
+    <Property Name="RightAscension" Id="{fbe599ea-0c8f-4d80-a746-e4e19f11c40d}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY RightAscension : LREAL
+]]></Declaration>
+      <Get Name="Get" Id="{db4c8087-9b17-4688-a0aa-8aab9120b914}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
     <Method Name="SetAltitudeOffset" Id="{25d1cab5-c5af-446c-a8a4-81112d093153}">
       <Declaration><![CDATA[METHOD SetAltitudeOffset : BOOL
 VAR_INPUT
@@ -1337,11 +1389,35 @@ END_VAR
         <ST><![CDATA[fRightAscensionOffset := Offset;]]></ST>
       </Implementation>
     </Method>
+    <Method Name="Slew" Id="{ba7a2a47-75f1-41c1-b2bd-a1c9f655c1f4}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD Slew : BOOL
+VAR_INPUT
+	fAzimuth	: LREAL;
+	fAltitude	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="Stop" Id="{e66d844d-991d-4af1-8b55-fe6740342385}">
       <Declaration><![CDATA[METHOD Stop : BOOL
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bStop := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Track" Id="{6d7c3b1b-06e1-4002-b952-698198812e9b}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD Track : BOOL
+VAR_INPUT
+	fRightAscension	: LREAL;
+	fDeclination	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
       </Implementation>
     </Method>
     <Method Name="TrackRaDec" Id="{30315973-ed3d-4ebf-826f-7c2c721d63f9}">
@@ -1653,6 +1729,15 @@ bTrack			:= TRUE;
     <LineIds Name="FB_TelescopeControl.AltAz.Get">
       <LineId Id="1" Count="1" />
     </LineIds>
+    <LineIds Name="FB_TelescopeControl.Altitude.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControl.Azimuth.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControl.Declination.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
     <LineIds Name="FB_TelescopeControl.FB_Init">
       <LineId Id="7" Count="1" />
     </LineIds>
@@ -1678,6 +1763,9 @@ bTrack			:= TRUE;
     <LineIds Name="FB_TelescopeControl.Reset">
       <LineId Id="9" Count="0" />
     </LineIds>
+    <LineIds Name="FB_TelescopeControl.RightAscension.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
     <LineIds Name="FB_TelescopeControl.SetAltitudeOffset">
       <LineId Id="1" Count="0" />
     </LineIds>
@@ -1693,8 +1781,14 @@ bTrack			:= TRUE;
     <LineIds Name="FB_TelescopeControl.SetRightAscensionOffset">
       <LineId Id="1" Count="0" />
     </LineIds>
+    <LineIds Name="FB_TelescopeControl.Slew">
+      <LineId Id="8" Count="0" />
+    </LineIds>
     <LineIds Name="FB_TelescopeControl.Stop">
       <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControl.Track">
+      <LineId Id="8" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.TrackRaDec">
       <LineId Id="1" Count="2" />

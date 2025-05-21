@@ -93,14 +93,14 @@ END_VAR
 			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
 				FoundError();
 			ELSIF pDome^._ReceivedString = 'd#shutclo' THEN
-				pDome^._DomeState := E_DomeState.closed;
+				pDome^._DomeShutterState := E_RoofState.closed;
 				tonTimeout(IN:=FALSE);
 				Stage := 0; // restart
 			ELSIF pDome^._ReceivedString = 'd#shutope' THEN
-				pDome^._DomeState := E_DomeState.open;
+				pDome^._DomeShutterState := E_RoofState.opened;
 				Stage := 6;
 			ELSIF pDome^._ReceivedString = 'd#shutrun' THEN
-				pDome^._DomeState := E_DomeState.slewing;
+				pDome^._DomeShutterState := E_RoofState.opening;
 				Stage := 3; // wait longer
 			END_IF
 		ELSIF NOT pDome^.fbReceive.Busy THEN

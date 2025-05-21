@@ -6,6 +6,9 @@ VAR_IN_OUT
 	TxBuffer	: ComBuffer;
 	RxBuffer	: ComBuffer;
 END_VAR
+VAR_INPUT
+	ipTelescope: I_Telescope;
+END_VAR
 VAR
 	ipState		: I_DomeState := fbDomeIdleState;
 	bOpen		: BOOL;
@@ -13,15 +16,15 @@ VAR
 	bReset		: BOOL;
 	bHome		: BOOL;
 	bTrack		: BOOL;
-	bStopTrack	: BOOL;
 	bPark		: BOOL;
 	
-	fDomeAzi_go		: LREAL;
+	fDomeAzi_go		: LREAL := 0.0;
 	fDomeAzi_current: LREAL := 0.0;
-	eDomeState		: E_DomeState;
-	eDomeStateOld	: E_DomeState;
+	eDomeRotationState		: E_DomeRotationState;
+	eDomeRotationStateOld	: E_DomeRotationState;
+	eDomeShutterState		: E_RoofState;
+	eDomeShutterStateOld	: E_RoofState;
 	bParked			: BOOL;
-	bTracking		: BOOL;
 	
 	bDomeError	: BOOL;
 	iDomeErrorID: UINT;
@@ -32,7 +35,7 @@ VAR
 	fbDomeHomeingState	: FB_DomeHomingState(THIS);
 	fbDomeIdleState		: FB_DomeIdleState(THIS);
 	fbDomeOpeningState	: FB_DomeOpeningState(THIS);
-	fbDomeTrackingState	: FB_DomeTrackingState(THIS);
+	fbDomeMovingState	: FB_DomeMovingState(THIS);
 	fbDomeParkingState	: FB_DomeParkingState(THIS);
 	
 
@@ -40,8 +43,6 @@ VAR
 	rtrigClose		: R_TRIG;
 	rtrigReset		: R_TRIG;
 	rtrigHome		: R_TRIG;
-	rtrigTrack		: R_TRIG;
-	rtrigStopTrack	: R_TRIG;
 	rtrigPark		: R_TRIG;
 	
 	fbComm			: I_Comm;
@@ -68,7 +69,10 @@ VAR
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[//	Receive string data:
+      <ST><![CDATA[IF ipTelescope <> 0 THEN
+	fDomeAzi_go := ipTelescope.Azimuth;
+END_IF
+//	Receive string data:
 fbReceive(
 	Prefix:='',
 	Suffix:= '',
@@ -97,8 +101,6 @@ rtrigOpen(CLK := bOpen);
 rtrigClose(CLK := bClose);
 rtrigReset(CLK := bReset);
 rtrigHome(CLK := bHome);
-rtrigTrack(CLK := bTrack);
-rtrigStopTrack(CLK := bStopTrack);
 rtrigPark(CLK := bPark);
 
 IF (rtrigReset.Q) THEN
@@ -121,35 +123,27 @@ IF (rtrigHome.Q) THEN
 	ipState.HomeCommand();
 END_IF
 
-IF (rtrigTrack.Q) THEN
-	bTrack := FALSE;
-	ipState.TrackCommand();
-END_IF
-
-IF (rtrigStopTrack.Q) THEN
-	bStopTrack := FALSE;
-	ipState.StopTrackCommand();
-END_IF
-
 IF (rtrigPark.Q) THEN
 	bPark := FALSE;
 	ipState.ParkCommand();
 END_IF
 
 ipState.RunState();
-IF ipState.StateID = 'Tracking State' THEN
-	bTracking := TRUE;
+
+IF eDomeRotationState = E_DomeRotationState.parked AND eDomeShutterState = E_RoofState.closed THEN
+	bParked := TRUE;
 ELSE
-	bTracking := FALSE;
+	bParked := FALSE;
 END_IF
 // send telemetry
 tonComm(IN:=TRUE);
 IF tonComm.Q THEN // publish new payload every second
 	tonComm(IN:=FALSE);
 
-	fbComm.Publish('telescope', 'dome', 'DomeShutter', TO_STRING(eDomeState));
+	fbComm.Publish('telescope', 'dome', 'DomeShutter', TO_STRING(eDomeShutterState));
+	fbComm.Publish('telescope', 'dome', 'DomeRotation', TO_STRING(eDomeRotationState));
 	fbComm.Publish('telescope', 'dome', 'DomeParked', BOOL_TO_STRING(bParked));
-	fbComm.Publish('telescope', 'dome', 'DomeTracking', BOOL_TO_STRING(bTracking));
+	fbComm.Publish('telescope', 'dome', 'DomeTracking', BOOL_TO_STRING(bTrack));
 	fbComm.Publish('telescope', 'dome', 'DomeError', BOOL_TO_STRING(bDomeError));
 END_IF
 
@@ -157,7 +151,7 @@ END_IF
 fbDomeParkedEvent(
 	Trigger := bParked,
 	Level := ADSLOG_MSGTYPE_HINT,
-	OnMessage := 'Dome is in parking position.',
+	OnMessage := 'Dome is in parking position and closed.',
 	comm:= fbComm);
 fbDomeErrorEvent(
 	Trigger := bDomeError,
@@ -168,17 +162,18 @@ fbDomeErrorEvent(
 	comm:= fbComm);
 // Buffer
 ipStateOld := ipState;
-eDomeStateOld := eDomeState;]]></ST>
+eDomeRotationStateOld := eDomeRotationState;
+eDomeShutterStateOld := eDomeShutterState;]]></ST>
     </Implementation>
     <Folder Name="internal properties" Id="{f2b50677-3a48-4dff-8e4d-06640225c481}" />
-    <Property Name="_DomeState" Id="{94e281da-2d55-4137-b423-8bf7bc330143}" FolderPath="internal properties\">
-      <Declaration><![CDATA[PROPERTY _DomeState : E_DomeState]]></Declaration>
+    <Property Name="_DomeRotationState" Id="{94e281da-2d55-4137-b423-8bf7bc330143}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _DomeRotationState : E_DomeRotationState]]></Declaration>
       <Get Name="Get" Id="{e931b510-c0b8-460e-90fe-ec0def1d87ff}">
         <Declaration><![CDATA[VAR
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[_DomeState := eDomeState;]]></ST>
+          <ST><![CDATA[_DomeRotationState := eDomeRotationState;]]></ST>
         </Implementation>
       </Get>
       <Set Name="Set" Id="{444b45a3-ce96-43fc-b5d3-4fd60b06192b}">
@@ -186,7 +181,26 @@ END_VAR
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[eDomeState := _DomeState;]]></ST>
+          <ST><![CDATA[eDomeRotationState := _DomeRotationState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_DomeShutterState" Id="{5d37da6d-da48-4528-837f-be475da99739}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _DomeShutterState : E_RoofState]]></Declaration>
+      <Get Name="Get" Id="{3e09792f-5402-466e-8155-6362efadc1a5}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_DomeShutterState := eDomeShutterState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{b69684dc-6640-4585-a298-28b78eac4adb}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[eDomeShutterState := _DomeShutterState;]]></ST>
         </Implementation>
       </Set>
     </Property>
@@ -411,6 +425,17 @@ END_VAR
         <ST><![CDATA[bReset := True;]]></ST>
       </Implementation>
     </Method>
+    <Property Name="RotState" Id="{8c2c601e-a673-493f-a0e6-8cb4c126be63}">
+      <Declaration><![CDATA[PROPERTY RotState : E_DomeRotationState]]></Declaration>
+      <Get Name="Get" Id="{1b5f019c-56a3-4acd-86fa-be8fed03a696}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[RotState := eDomeRotationState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
     <Method Name="SetState" Id="{bac7998a-96e0-484d-9b0b-984b4f2ae380}">
       <Declaration><![CDATA[METHOD SetState : BOOL
 VAR_INPUT
@@ -421,6 +446,27 @@ END_VAR
         <ST><![CDATA[THIS^.ipState := newState;]]></ST>
       </Implementation>
     </Method>
+    <Property Name="ShutterState" Id="{5fd910c8-e41a-4706-b0a5-896ca2b3fba0}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY ShutterState : BROTLib.E_RoofState
+]]></Declaration>
+      <Get Name="Get" Id="{cd0a457a-ce60-4149-bafe-b923afc36585}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{366d60c6-d226-4cf0-928a-a262b9375329}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
     <Property Name="Slewing" Id="{f4557448-d077-4c28-8ed8-f77cf26bab9c}">
       <Declaration><![CDATA[PROPERTY Slewing : BOOL]]></Declaration>
       <Get Name="Get" Id="{b28436fa-18d0-4eee-9d60-f0af07e234ec}">
@@ -432,24 +478,13 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="State" Id="{8c2c601e-a673-493f-a0e6-8cb4c126be63}">
-      <Declaration><![CDATA[PROPERTY State : E_DomeState]]></Declaration>
-      <Get Name="Get" Id="{1b5f019c-56a3-4acd-86fa-be8fed03a696}">
-        <Declaration><![CDATA[VAR
-END_VAR
-]]></Declaration>
-        <Implementation>
-          <ST><![CDATA[State := eDomeState;]]></ST>
-        </Implementation>
-      </Get>
-    </Property>
     <Method Name="StopTrack" Id="{592d7f7e-1fdb-4ea9-b619-2542fb2b964e}">
       <Declaration><![CDATA[METHOD StopTrack : BOOL
 VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[bStopTrack := True;]]></ST>
+        <ST><![CDATA[bTrack := FALSE;]]></ST>
       </Implementation>
     </Method>
     <Method Name="Track" Id="{098e5b71-cc16-4ffe-ab71-96c1984155a2}">
@@ -468,11 +503,12 @@ END_VAR
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[Tracking := bTracking;]]></ST>
+          <ST><![CDATA[Tracking := bTrack;]]></ST>
         </Implementation>
       </Get>
     </Property>
     <LineIds Name="FB_DomeControl">
+      <LineId Id="817" Count="2" />
       <LineId Id="44" Count="0" />
       <LineId Id="373" Count="9" />
       <LineId Id="436" Count="0" />
@@ -485,7 +521,6 @@ END_VAR
       <LineId Id="448" Count="1" />
       <LineId Id="491" Count="0" />
       <LineId Id="481" Count="3" />
-      <LineId Id="489" Count="1" />
       <LineId Id="488" Count="0" />
       <LineId Id="506" Count="3" />
       <LineId Id="505" Count="0" />
@@ -498,17 +533,18 @@ END_VAR
       <LineId Id="9" Count="0" />
       <LineId Id="521" Count="3" />
       <LineId Id="520" Count="0" />
-      <LineId Id="493" Count="0" />
-      <LineId Id="525" Count="13" />
+      <LineId Id="534" Count="4" />
       <LineId Id="579" Count="0" />
       <LineId Id="577" Count="0" />
-      <LineId Id="649" Count="0" />
-      <LineId Id="667" Count="0" />
-      <LineId Id="669" Count="1" />
-      <LineId Id="668" Count="0" />
+      <LineId Id="741" Count="0" />
+      <LineId Id="739" Count="0" />
+      <LineId Id="742" Count="0" />
+      <LineId Id="744" Count="1" />
+      <LineId Id="743" Count="0" />
       <LineId Id="650" Count="0" />
       <LineId Id="657" Count="3" />
       <LineId Id="648" Count="0" />
+      <LineId Id="746" Count="0" />
       <LineId Id="663" Count="1" />
       <LineId Id="666" Count="0" />
       <LineId Id="661" Count="0" />
@@ -524,11 +560,18 @@ END_VAR
       <LineId Id="561" Count="0" />
       <LineId Id="498" Count="0" />
       <LineId Id="572" Count="1" />
+      <LineId Id="738" Count="0" />
     </LineIds>
-    <LineIds Name="FB_DomeControl._DomeState.Get">
+    <LineIds Name="FB_DomeControl._DomeRotationState.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
-    <LineIds Name="FB_DomeControl._DomeState.Set">
+    <LineIds Name="FB_DomeControl._DomeRotationState.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._DomeShutterState.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._DomeShutterState.Set">
       <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl._Error.Get">
@@ -597,13 +640,19 @@ END_VAR
     <LineIds Name="FB_DomeControl.Reset">
       <LineId Id="5" Count="0" />
     </LineIds>
+    <LineIds Name="FB_DomeControl.RotState.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
     <LineIds Name="FB_DomeControl.SetState">
       <LineId Id="5" Count="0" />
     </LineIds>
-    <LineIds Name="FB_DomeControl.Slewing.Get">
+    <LineIds Name="FB_DomeControl.ShutterState.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
-    <LineIds Name="FB_DomeControl.State.Get">
+    <LineIds Name="FB_DomeControl.ShutterState.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Slewing.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl.StopTrack">
