@@ -5,7 +5,7 @@
 VAR_INPUT
 	fMinPosition		: LREAL := 1.0;			// minimum Position
 	fMaxPosition		: LREAL := 17.0;		// maximum Position
-	fTolerance			: LREAL := 0.05;
+	fTolerance			: LREAL := 0.005;
 END_VAR
 VAR
 	mqttTimer 			: TON := (PT:=T#5S);
@@ -24,11 +24,14 @@ IF fbAxis.Calibrated THEN
 	bHomeAxis := FALSE;
 	bCalibrated := fbAxis.Calibrated;
 	IF ABS(fPosition - fActualPosition) > fTolerance THEN
-			IF fbAxis.Ready THEN
+			IF fbAxis.Ready AND NOT fbAxis.MoveDone THEN
 				bMoveAxis := TRUE;
+			ELSE
+				bMoveAxis := FALSE;
 			END_IF;
 	END_IF;
 END_IF
+
 
 IF bHomeAxis THEN
 	fPosition := fPosition;
@@ -43,8 +46,8 @@ fbAxis(
 	HomingMode 		:= MC_ForceCalibration,
 	Position 		:= fPosition, 
 	Velocity 		:= fVelocity,
-	Enable_Positive := NOT axisRef.Status.SoftLimitMaxExceeded,
-	Enable_Negative := NOT axisRef.Status.SoftLimitMinExceeded,
+	Enable_Positive := TRUE,//NOT axisRef.Status.SoftLimitMaxExceeded,
+	Enable_Negative := TRUE,// NOT axisRef.Status.SoftLimitMinExceeded,
 	Jog_Forward 	:= bMovePos,
 	Jog_Backwards 	:= bMoveNeg,
 	isModuloAxis 	:= FALSE,
@@ -145,8 +148,11 @@ END_IF
       <LineId Id="61" Count="6" />
       <LineId Id="271" Count="1" />
       <LineId Id="270" Count="0" />
+      <LineId Id="287" Count="1" />
       <LineId Id="273" Count="1" />
-      <LineId Id="68" Count="16" />
+      <LineId Id="68" Count="1" />
+      <LineId Id="285" Count="0" />
+      <LineId Id="70" Count="14" />
       <LineId Id="259" Count="1" />
       <LineId Id="88" Count="0" />
       <LineId Id="90" Count="19" />

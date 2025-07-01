@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PendantPreInitState" Id="{79cdc163-ce8d-4317-a0b7-e539911b12eb}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PendantPreInitState EXTENDS FB_PendantState
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FoundError" Id="{068bbf7a-f119-4b44-9bb0-3b3f032c4a80}">
+      <Declaration><![CDATA[METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pPendant^.SetState(pPendant^.fbPendantErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="InitCommand" Id="{0e339302-0e5c-4517-896c-4d890de71cf3}">
+      <Declaration><![CDATA[METHOD InitCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pPendant^.SetState(pPendant^.fbPendantInitState);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{bac1925c-c344-4e99-a865-978a2d14402e}">
+      <Declaration><![CDATA[PROPERTY StateID : STRING]]></Declaration>
+      <Get Name="Get" Id="{fb8a5ea7-6134-4bcc-9c7e-949fd01d9f60}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Pre Init State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="FB_PendantPreInitState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantPreInitState.FoundError">
+      <LineId Id="6" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantPreInitState.InitCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantPreInitState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

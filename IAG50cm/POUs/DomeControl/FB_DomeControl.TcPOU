@@ -2,12 +2,8 @@
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_DomeControl" Id="{6d19e4e0-cd8e-40f8-8605-b776152ffcc0}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeControl IMPLEMENTS I_Dome
-VAR_IN_OUT
-	TxBuffer	: ComBuffer;
-	RxBuffer	: ComBuffer;
-END_VAR
 VAR_INPUT
-	ipTelescope: I_Telescope;
+	ipTelescope: I_RaDecTelescope;
 END_VAR
 VAR
 	ipState		: I_DomeState := fbDomeIdleState;
@@ -78,7 +74,7 @@ fbReceive(
 	Suffix:= '',
 	Timeout:= T#1S,
 	ReceivedString:= sReceivedString,
-	RXbuffer:= THIS^.RxBuffer,
+	RXbuffer:= RxBufferDome,
 	StringReceived=> bStringReceived,
 	Busy=> bReceiveBusy,
 	Error=> ,
@@ -166,6 +162,7 @@ eDomeRotationStateOld := eDomeRotationState;
 eDomeShutterStateOld := eDomeShutterState;]]></ST>
     </Implementation>
     <Folder Name="internal properties" Id="{f2b50677-3a48-4dff-8e4d-06640225c481}" />
+    <Folder Name="properties" Id="{aebe3fd9-357f-41e3-8c30-105b311d4951}" />
     <Property Name="_DomeRotationState" Id="{94e281da-2d55-4137-b423-8bf7bc330143}" FolderPath="internal properties\">
       <Declaration><![CDATA[PROPERTY _DomeRotationState : E_DomeRotationState]]></Declaration>
       <Get Name="Get" Id="{e931b510-c0b8-460e-90fe-ec0def1d87ff}">
@@ -299,6 +296,17 @@ END_VAR
         </Implementation>
       </Set>
     </Property>
+    <Property Name="_Track" Id="{a690fc2a-3ca4-499b-bcfe-9a72b5ec9057}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Track : BOOL]]></Declaration>
+      <Get Name="Get" Id="{64355058-626f-404d-8e97-1c1fd171de1e}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Track := bTrack;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
     <Method Name="Close" Id="{df2077f2-da90-4613-b060-6d6c3ae4fa51}">
       <Declaration><![CDATA[METHOD Close : BOOL
 VAR_INPUT
@@ -308,7 +316,7 @@ END_VAR
         <ST><![CDATA[bClose:=True;]]></ST>
       </Implementation>
     </Method>
-    <Property Name="Closed" Id="{6d997260-0381-44c8-9f75-ce63c1cb4011}">
+    <Property Name="Closed" Id="{6d997260-0381-44c8-9f75-ce63c1cb4011}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY Closed : BOOL]]></Declaration>
       <Get Name="Get" Id="{748e5a80-31e8-4286-bfa0-1a642c517ee7}">
         <Declaration><![CDATA[VAR
@@ -319,7 +327,7 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="Error" Id="{268476f6-d236-45b6-8bd2-428f6ed1c5c5}">
+    <Property Name="Error" Id="{268476f6-d236-45b6-8bd2-428f6ed1c5c5}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY Error : Bool]]></Declaration>
       <Get Name="Get" Id="{1e94d00a-28b4-4617-af13-fff028d77e00}">
         <Declaration><![CDATA[VAR
@@ -330,7 +338,7 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="ErrorID" Id="{e66424b4-fdaf-4b3d-92ec-390d6ab9acbb}">
+    <Property Name="ErrorID" Id="{e66424b4-fdaf-4b3d-92ec-390d6ab9acbb}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY ErrorID : UDINT]]></Declaration>
       <Get Name="Get" Id="{1eb8ee0b-47e9-4214-bdd5-d2740de92e5f}">
         <Declaration><![CDATA[VAR
@@ -366,7 +374,7 @@ END_VAR
         <ST><![CDATA[bOpen := True;]]></ST>
       </Implementation>
     </Method>
-    <Property Name="Opened" Id="{65547067-38a4-4670-ad36-0884355dc8d3}">
+    <Property Name="Opened" Id="{65547067-38a4-4670-ad36-0884355dc8d3}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY Opened : BOOL]]></Declaration>
       <Get Name="Get" Id="{f8408426-5aa1-4ac5-8fa2-912147109708}">
         <Declaration><![CDATA[VAR
@@ -386,7 +394,7 @@ END_VAR
         <ST><![CDATA[bPark := TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Property Name="Parked" Id="{e400500f-7f31-4456-b38c-60e2d41191a1}">
+    <Property Name="Parked" Id="{e400500f-7f31-4456-b38c-60e2d41191a1}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY Parked : BOOL]]></Declaration>
       <Get Name="Get" Id="{b243146e-6556-4e7d-843a-c7cbc2974276}">
         <Declaration><![CDATA[VAR
@@ -397,7 +405,7 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="Position" Id="{566a0c40-7cf6-4687-b475-98742f4a3e93}">
+    <Property Name="Position" Id="{566a0c40-7cf6-4687-b475-98742f4a3e93}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY Position : LREAL]]></Declaration>
       <Get Name="Get" Id="{51596a5f-29ff-4600-84cd-814b0fa48e76}">
         <Declaration><![CDATA[VAR
@@ -425,7 +433,7 @@ END_VAR
         <ST><![CDATA[bReset := True;]]></ST>
       </Implementation>
     </Method>
-    <Property Name="RotState" Id="{8c2c601e-a673-493f-a0e6-8cb4c126be63}">
+    <Property Name="RotState" Id="{8c2c601e-a673-493f-a0e6-8cb4c126be63}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY RotState : E_DomeRotationState]]></Declaration>
       <Get Name="Get" Id="{1b5f019c-56a3-4acd-86fa-be8fed03a696}">
         <Declaration><![CDATA[VAR
@@ -446,7 +454,7 @@ END_VAR
         <ST><![CDATA[THIS^.ipState := newState;]]></ST>
       </Implementation>
     </Method>
-    <Property Name="ShutterState" Id="{5fd910c8-e41a-4706-b0a5-896ca2b3fba0}">
+    <Property Name="ShutterState" Id="{5fd910c8-e41a-4706-b0a5-896ca2b3fba0}" FolderPath="properties\">
       <Declaration><![CDATA[{warning 'add property implementation'}
 PROPERTY ShutterState : BROTLib.E_RoofState
 ]]></Declaration>
@@ -467,7 +475,7 @@ END_VAR
         </Implementation>
       </Set>
     </Property>
-    <Property Name="Slewing" Id="{f4557448-d077-4c28-8ed8-f77cf26bab9c}">
+    <Property Name="Slewing" Id="{f4557448-d077-4c28-8ed8-f77cf26bab9c}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY Slewing : BOOL]]></Declaration>
       <Get Name="Get" Id="{b28436fa-18d0-4eee-9d60-f0af07e234ec}">
         <Declaration><![CDATA[VAR
@@ -496,7 +504,7 @@ END_VAR
         <ST><![CDATA[bTrack := TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Property Name="Tracking" Id="{1a2cedbc-ec50-4d4c-88f2-62da93b16706}">
+    <Property Name="Tracking" Id="{1a2cedbc-ec50-4d4c-88f2-62da93b16706}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY Tracking : BOOL]]></Declaration>
       <Get Name="Get" Id="{6f0c9f90-dee6-4c1b-b31b-03a846e8a5b2}">
         <Declaration><![CDATA[VAR
@@ -508,7 +516,9 @@ END_VAR
       </Get>
     </Property>
     <LineIds Name="FB_DomeControl">
-      <LineId Id="817" Count="2" />
+      <LineId Id="817" Count="0" />
+      <LineId Id="831" Count="0" />
+      <LineId Id="819" Count="0" />
       <LineId Id="44" Count="0" />
       <LineId Id="373" Count="9" />
       <LineId Id="436" Count="0" />
@@ -602,6 +612,9 @@ END_VAR
       <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl._ReceivedString.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._Track.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl.Close">

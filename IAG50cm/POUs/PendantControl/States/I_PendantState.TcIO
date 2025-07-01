@@ -1,0 +1,67 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <Itf Name="I_PendantState" Id="{eb553c50-f593-4acc-a219-643bb18bff36}">
+    <Declaration><![CDATA[INTERFACE I_PendantState
+]]></Declaration>
+    <Method Name="DecCommand" Id="{429fbc99-b2b6-4806-ae85-e740593d47b6}">
+      <Declaration><![CDATA[METHOD DecCommand : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="FocusCommand" Id="{2b372a74-8b8f-47ca-8ba0-72487eec371d}">
+      <Declaration><![CDATA[METHOD FocusCommand : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="FoundError" Id="{5e0b5088-01e7-4c80-9638-25edafb84ed1}">
+      <Declaration><![CDATA[METHOD FoundError : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="HaCommand" Id="{1cf14697-ed63-4eb2-bacb-c3a93886b738}">
+      <Declaration><![CDATA[METHOD HaCommand : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="InitCommand" Id="{925719a3-23f1-4895-8a4e-15c97c6539f8}">
+      <Declaration><![CDATA[METHOD InitCommand : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="ResetCommand" Id="{26d0957e-22f7-4923-8c95-0c94ec128782}">
+      <Declaration><![CDATA[METHOD ResetCommand : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="RunState" Id="{dd8a0d82-fda4-464a-b777-4bdab93b641e}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Property Name="StateID" Id="{b9c0bc64-c8c0-41c1-8e1a-221ba8a1c98a}">
+      <Declaration><![CDATA[PROPERTY StateID : STRING]]></Declaration>
+      <Get Name="Get" Id="{7eaf0261-5770-4375-9f53-b00d2686bb98}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+    <Method Name="Timeout" Id="{eb56c014-214f-414f-95a9-2234ddd8b726}">
+      <Declaration><![CDATA[METHOD Timeout : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="ToIdle" Id="{fc679e58-7d92-4b03-bef9-f98a660eb12e}">
+      <Declaration><![CDATA[METHOD ToIdle : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_TelescopeControl" Id="{10c2c294-efcf-424f-afd3-75ac57a5e8bc}" SpecialFunc="None">
-    <Declaration><![CDATA[FUNCTION_BLOCK FB_TelescopeControl IMPLEMENTS I_Telescope
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_TelescopeControl IMPLEMENTS I_RaDecTelescope
 VAR_INPUT
 (*
 TCS interface section
@@ -207,8 +207,8 @@ hor2eq(alt := fElevation,
 
 
 // get current coordinates (of motors)
-declination_current := fbDeclination.fActualPosition;
-hourangle_current := fbHourAngle.fActualPosition;
+declination_current := fbDeclination.fActualPosition ;
+hourangle_current := fbHourAngle.fActualPosition ;
 // transform into needed coordinates
 ha2ra(
 	ha := hourangle_current,
@@ -538,7 +538,10 @@ TCSCTOEvent(	Trigger := command_timeout.Q,
 				OnMessage := 'NOCOMMAND', 
 				Comm := comm);]]></ST>
     </Implementation>
-    <Method Name="_GotoTelescope" Id="{43ebaf76-c0fc-41db-8c98-2f7671dc6b31}">
+    <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
+    <Folder Name="internal methods" Id="{43f8a5dc-2166-4fdb-b436-34a8f62ea04a}" />
+    <Folder Name="properties" Id="{65c2c08a-67b2-43de-bf16-65ce2beac397}" />
+    <Method Name="_GotoTelescope" Id="{43ebaf76-c0fc-41db-8c98-2f7671dc6b31}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _GotoTelescope : USINT
 VAR_INPUT
 END_VAR
@@ -672,7 +675,7 @@ LastStage := Stage;
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="_HomeTelescope" Id="{b2d9dfb4-bf7c-4f17-8ac5-7f074d6808c9}">
+    <Method Name="_HomeTelescope" Id="{b2d9dfb4-bf7c-4f17-8ac5-7f074d6808c9}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _HomeTelescope : USINT
 VAR_INPUT
 END_VAR
@@ -784,7 +787,7 @@ HomeEvent(Trigger := Stage > LastStage, FormatString := 'GOHOME progress: %s', O
 LastStage := Stage;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="_ParkTelescope" Id="{94a12771-4c75-4743-9ad3-850f66878f1f}">
+    <Method Name="_ParkTelescope" Id="{94a12771-4c75-4743-9ad3-850f66878f1f}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _ParkTelescope : USINT
 VAR_INPUT
 END_VAR
@@ -920,7 +923,7 @@ LastStage := Stage;
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="_PowerOn" Id="{1dafa267-4251-4a45-a8e2-ae0ece289894}">
+    <Method Name="_PowerOn" Id="{1dafa267-4251-4a45-a8e2-ae0ece289894}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _PowerOn : BOOL
 VAR_INPUT
 END_VAR
@@ -978,7 +981,7 @@ END_IF
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="_SlewTelescope" Id="{4aaca2e7-2dba-4c2d-80b3-cd4dcc5ad38b}">
+    <Method Name="_SlewTelescope" Id="{4aaca2e7-2dba-4c2d-80b3-cd4dcc5ad38b}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _SlewTelescope : USINT
 VAR_INPUT
 END_VAR
@@ -1107,7 +1110,7 @@ LastStage := Stage;
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="_StopTelescope" Id="{cc9583d1-2578-4480-8aee-f6d55f373bf1}">
+    <Method Name="_StopTelescope" Id="{cc9583d1-2578-4480-8aee-f6d55f373bf1}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _StopTelescope : BOOL
 VAR_INPUT
 END_VAR
@@ -1144,7 +1147,7 @@ END_IF
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="_TrackTelescope" Id="{0dd53d55-2f74-4268-9438-8bb832d1c59b}">
+    <Method Name="_TrackTelescope" Id="{0dd53d55-2f74-4268-9438-8bb832d1c59b}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _TrackTelescope : BOOL
 VAR_INPUT
 END_VAR
@@ -1192,7 +1195,7 @@ END_IF
 ]]></ST>
       </Implementation>
     </Method>
-    <Property Name="AltAz" Id="{82dbc2ee-80ef-40a3-8c1f-856f0af6c171}">
+    <Property Name="AltAz" Id="{82dbc2ee-80ef-40a3-8c1f-856f0af6c171}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY AltAz : BROTLib.ST_AltAzCoordinate
 ]]></Declaration>
       <Get Name="Get" Id="{8533a901-9986-4274-8ee4-831d970f2e24}">
@@ -1205,7 +1208,7 @@ AltAz.Azimuth 	:= azimuth_calc;]]></ST>
         </Implementation>
       </Get>
     </Property>
-    <Property Name="Altitude" Id="{77878183-ff56-458d-9713-573db093fec2}">
+    <Property Name="Altitude" Id="{77878183-ff56-458d-9713-573db093fec2}" FolderPath="properties\">
       <Declaration><![CDATA[{warning 'add property implementation'}
 PROPERTY Altitude : LREAL
 ]]></Declaration>
@@ -1218,7 +1221,7 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="Azimuth" Id="{af0c56f8-138d-4c6a-9afa-2054c20456bc}">
+    <Property Name="Azimuth" Id="{af0c56f8-138d-4c6a-9afa-2054c20456bc}" FolderPath="properties\">
       <Declaration><![CDATA[{warning 'add property implementation'}
 PROPERTY Azimuth : LREAL
 ]]></Declaration>
@@ -1227,11 +1230,11 @@ PROPERTY Azimuth : LREAL
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[]]></ST>
+          <ST><![CDATA[Azimuth := azimuth_current;]]></ST>
         </Implementation>
       </Get>
     </Property>
-    <Property Name="Declination" Id="{9fcba06b-96da-4b28-85d9-479fe50b914c}">
+    <Property Name="Declination" Id="{9fcba06b-96da-4b28-85d9-479fe50b914c}" FolderPath="properties\">
       <Declaration><![CDATA[{warning 'add property implementation'}
 PROPERTY Declination : LREAL
 ]]></Declaration>
@@ -1243,6 +1246,26 @@ END_VAR
           <ST><![CDATA[]]></ST>
         </Implementation>
       </Get>
+    </Property>
+    <Property Name="DeclinationOffset" Id="{653ff89d-921b-48cd-89fc-23fb937bb1d4}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY DeclinationOffset : LREAL]]></Declaration>
+      <Get Name="Get" Id="{354ef6de-7ef9-4e01-82b0-872878ba7d1c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[DeclinationOffset := fDeclinationOffset;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{e59e1fb5-c6b1-429a-a0d7-2bdcae218f85}">
+        <Declaration><![CDATA[
+VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[fDeclinationOffset := DeclinationOffset;]]></ST>
+        </Implementation>
+      </Set>
     </Property>
     <Method Name="FB_Init" Id="{034c34d9-521a-4d54-9624-e4d1bdeb670c}">
       <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
@@ -1260,21 +1283,41 @@ END_VAR]]></Declaration>
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Home" Id="{1ffeeb7f-e086-4ec6-b333-bf9ff24723c8}">
+    <Method Name="Home" Id="{1ffeeb7f-e086-4ec6-b333-bf9ff24723c8}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD Home : BOOL
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bGoHome := TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Init" Id="{a631cabc-b5f9-4584-b7df-b1ee9d39f6ec}">
+    <Property Name="HourAngleOffset" Id="{ac27a626-cead-47ea-868b-f24be3bdcddc}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY HourAngleOffset : LREAL]]></Declaration>
+      <Get Name="Get" Id="{84bac731-b27e-41a5-ad78-15f19c3b02c7}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[HourAngleOffset := fRightAscensionOffset;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{7568e91e-7602-412a-ac33-275760080a3c}">
+        <Declaration><![CDATA[
+VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[fRightAscensionOffset := HourAngleOffset;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Init" Id="{a631cabc-b5f9-4584-b7df-b1ee9d39f6ec}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD Init : BOOL
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bPower := TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="MoveAltAz" Id="{c6c43861-5da1-4194-b463-81c0490ebb78}">
+    <Method Name="MoveAltAz" Id="{c6c43861-5da1-4194-b463-81c0490ebb78}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD MoveAltAz : BOOL
 VAR_INPUT
 	AltAz	: BROTLib.ST_AltAzCoordinate;
@@ -1286,7 +1329,7 @@ fAzimuth 	:= AltAz.Azimuth;
 bSlew		:= TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="MoveRaDec" Id="{f860f1af-1ff9-4d1a-a407-9f1e7e899f51}">
+    <Method Name="MoveRaDec" Id="{f860f1af-1ff9-4d1a-a407-9f1e7e899f51}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD MoveRaDec : BOOL
 VAR_INPUT
 	RaDec	: BROTLib.ST_RaDecCoordinate;
@@ -1298,7 +1341,7 @@ fDeclination	:= RaDec.Declination;
 bGoto			:= TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Park" Id="{d8a2b837-9b51-4592-a9b7-5ddb1b1403bd}">
+    <Method Name="Park" Id="{d8a2b837-9b51-4592-a9b7-5ddb1b1403bd}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD Park : BOOL
 ]]></Declaration>
       <Implementation>
@@ -1306,7 +1349,7 @@ bGoto			:= TRUE;]]></ST>
 ]]></ST>
       </Implementation>
     </Method>
-    <Property Name="RaDec" Id="{03d00136-4b42-4017-a768-650b9915ac54}">
+    <Property Name="RaDec" Id="{03d00136-4b42-4017-a768-650b9915ac54}" FolderPath="properties\">
       <Declaration><![CDATA[PROPERTY RaDec : BROTLib.ST_RaDecCoordinate
 ]]></Declaration>
       <Get Name="Get" Id="{51953765-9c9c-4236-b443-cc2f78a3c091}">
@@ -1319,14 +1362,14 @@ RaDec.Declination		:= declination_calc;]]></ST>
         </Implementation>
       </Get>
     </Property>
-    <Method Name="Reset" Id="{f3acfef0-ab57-4326-aaf5-f5730beeec6a}">
+    <Method Name="Reset" Id="{f3acfef0-ab57-4326-aaf5-f5730beeec6a}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD Reset : BOOL
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bReset := TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Property Name="RightAscension" Id="{fbe599ea-0c8f-4d80-a746-e4e19f11c40d}">
+    <Property Name="RightAscension" Id="{fbe599ea-0c8f-4d80-a746-e4e19f11c40d}" FolderPath="properties\">
       <Declaration><![CDATA[{warning 'add property implementation'}
 PROPERTY RightAscension : LREAL
 ]]></Declaration>
@@ -1339,7 +1382,7 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Method Name="SetAltitudeOffset" Id="{25d1cab5-c5af-446c-a8a4-81112d093153}">
+    <Method Name="SetAltitudeOffset" Id="{25d1cab5-c5af-446c-a8a4-81112d093153}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD SetAltitudeOffset : BOOL
 VAR_INPUT
 	Offset	: LREAL;
@@ -1349,7 +1392,7 @@ END_VAR
         <ST><![CDATA[]]></ST>
       </Implementation>
     </Method>
-    <Method Name="SetAzimuthOffset" Id="{4fec041c-6825-4034-99a8-88dde866e4e2}">
+    <Method Name="SetAzimuthOffset" Id="{4fec041c-6825-4034-99a8-88dde866e4e2}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD SetAzimuthOffset : BOOL
 VAR_INPUT
 	Offset	: LREAL;
@@ -1359,7 +1402,7 @@ END_VAR
         <ST><![CDATA[]]></ST>
       </Implementation>
     </Method>
-    <Method Name="SetDeclinationOffset" Id="{f9c99137-b576-45ed-a746-cd632ae8760e}">
+    <Method Name="SetDeclinationOffset" Id="{f9c99137-b576-45ed-a746-cd632ae8760e}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD SetDeclinationOffset : BOOL
 VAR_INPUT
 	Offset	: LREAL;
@@ -1369,7 +1412,7 @@ END_VAR
         <ST><![CDATA[fDeclinationOffset := Offset;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="SetDerotatorOffset" Id="{8c2a0fde-b71d-4d4a-9c60-3a9072f29e99}">
+    <Method Name="SetDerotatorOffset" Id="{8c2a0fde-b71d-4d4a-9c60-3a9072f29e99}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD SetDerotatorOffset : BOOL
 VAR_INPUT
 	Offset	: LREAL;
@@ -1379,7 +1422,7 @@ END_VAR
         <ST><![CDATA[]]></ST>
       </Implementation>
     </Method>
-    <Method Name="SetRightAscensionOffset" Id="{10a7c758-0667-41d2-90bb-38e90ad006bf}">
+    <Method Name="SetRightAscensionOffset" Id="{10a7c758-0667-41d2-90bb-38e90ad006bf}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD SetRightAscensionOffset : BOOL
 VAR_INPUT
 	Offset	: LREAL;
@@ -1389,7 +1432,7 @@ END_VAR
         <ST><![CDATA[fRightAscensionOffset := Offset;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Slew" Id="{ba7a2a47-75f1-41c1-b2bd-a1c9f655c1f4}">
+    <Method Name="Slew" Id="{ba7a2a47-75f1-41c1-b2bd-a1c9f655c1f4}" FolderPath="command methods\">
       <Declaration><![CDATA[{warning 'add method implementation '}
 METHOD Slew : BOOL
 VAR_INPUT
@@ -1401,14 +1444,14 @@ END_VAR
         <ST><![CDATA[]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Stop" Id="{e66d844d-991d-4af1-8b55-fe6740342385}">
+    <Method Name="Stop" Id="{e66d844d-991d-4af1-8b55-fe6740342385}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD Stop : BOOL
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bStop := TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Track" Id="{6d7c3b1b-06e1-4002-b952-698198812e9b}">
+    <Method Name="Track" Id="{6d7c3b1b-06e1-4002-b952-698198812e9b}" FolderPath="command methods\">
       <Declaration><![CDATA[{warning 'add method implementation '}
 METHOD Track : BOOL
 VAR_INPUT
@@ -1420,7 +1463,7 @@ END_VAR
         <ST><![CDATA[]]></ST>
       </Implementation>
     </Method>
-    <Method Name="TrackRaDec" Id="{30315973-ed3d-4ebf-826f-7c2c721d63f9}">
+    <Method Name="TrackRaDec" Id="{30315973-ed3d-4ebf-826f-7c2c721d63f9}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD TrackRaDec : BOOL
 VAR_INPUT
 	RaDec	: BROTLib.ST_RaDecCoordinate;
@@ -1738,11 +1781,23 @@ bTrack			:= TRUE;
     <LineIds Name="FB_TelescopeControl.Declination.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
+    <LineIds Name="FB_TelescopeControl.DeclinationOffset.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControl.DeclinationOffset.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
     <LineIds Name="FB_TelescopeControl.FB_Init">
       <LineId Id="7" Count="1" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Home">
       <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControl.HourAngleOffset.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControl.HourAngleOffset.Set">
+      <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Init">
       <LineId Id="1" Count="0" />

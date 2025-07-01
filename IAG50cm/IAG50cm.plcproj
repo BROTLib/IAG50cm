@@ -73,13 +73,52 @@
     <Compile Include="POUs\DomeControl\States\I_DomeState.TcIO">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_PendantControl.TcPOU">
+    <Compile Include="POUs\FB_Axis3.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_LatchHome.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_RefMarkerSearch.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_SerialBackground.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_TelescopeControlNEW.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\F_RoundLREAL.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\FB_PendantControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\FB_PendantErrorState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\FB_PendantPreInitState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\FB_PendantSetDECState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\FB_PendantSetFocusState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\FB_PendantSetHAState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\FB_PendantInitState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\FB_PendantState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\FB_PendantIdleState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\PendantControl\States\I_PendantState.TcIO">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\SerialBackground.TcPOU">
@@ -127,7 +166,7 @@
     <Compile Include="Visualization Manager.TcVMO">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="VISUs\Visualization.TcVIS">
+    <Compile Include="VISUs\Safety.TcVIS">
       <SubType>Code</SubType>
       <DependentUpon>Visualization Manager.TcVMO</DependentUpon>
     </Compile>
@@ -138,6 +177,8 @@
     <Folder Include="POUs\DomeControl\States" />
     <Folder Include="POUs\Functions" />
     <Folder Include="POUs\DomeControl" />
+    <Folder Include="POUs\PendantControl" />
+    <Folder Include="POUs\PendantControl\States" />
     <Folder Include="VISUs" />
     <Folder Include="POUs" />
   </ItemGroup>
@@ -210,6 +251,7 @@
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_SerialCom">
       <DefaultResolution>Tc2_SerialCom, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_SerialCom</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Standard">
       <DefaultResolution>Tc2_Standard, * (Beckhoff Automation GmbH)</DefaultResolution>
@@ -230,6 +272,10 @@
     <PlaceholderReference Include="Tc3_IotCommunicator">
       <DefaultResolution>Tc3_IotCommunicator, * (Beckhoff Automation GmbH)</DefaultResolution>
       <Namespace>Tc3_IotCommunicator</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc3_MC2_AdvancedHoming">
+      <DefaultResolution>Tc3_MC2_AdvancedHoming, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc3_MC2_AdvancedHoming</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc3_Module">
       <DefaultResolution>Tc3_Module, * (Beckhoff Automation GmbH)</DefaultResolution>

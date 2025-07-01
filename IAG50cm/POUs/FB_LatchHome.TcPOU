@@ -1,0 +1,488 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_LatchHome" Id="{0b377430-54ed-4537-932a-357e8a08a6c5}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_LatchHome
+
+VAR_IN_OUT
+	Axis						: AXIS_REF;
+END_VAR
+VAR_INPUT
+	Execute					: BOOL;										(* B *)
+
+	(* static parameters *)
+	Direction					: MC_Home_Direction;						(* E *)
+	
+
+	Velocity					: LREAL;									(* E *)
+	Acceleration				: LREAL;									(* V *)	(* Beckhoff proprietary input *)
+	Deceleration				: LREAL;									(* V *)	(* Beckhoff proprietary input *)
+	Jerk						: LREAL;									(* V *)	(* Beckhoff proprietary input *)
+	
+	MoveIsCountDirection		: BOOL := TRUE;								(* If not specified : TRUE *)
+
+	RefPosition					: LREAL;									(* Position (physical) of first marker of RefDistance in travel direction [deg]*)
+	RefDistance					: LREAL; 									(* Reference distance to calibrate Latch distances to physical coords. ( >5.00 deg!!!)*)
+	(* maximum time for one ref search process *)
+	TimeLimit					: TIME;										(* E *)
+
+	(* maximum travel distance for on calibration step (should be 6) *)
+	DistanceLimit				: LREAL;									(* E *)
+	
+	(* Set bipolar torque limit to this value to avoid mechanical damadges [%] *)
+	TorqueLimit					: LREAL;								(* E *)
+
+	BufferMode					: MC_BufferMode;							(* E *)
+	Options						: ST_Home_Options4;
+END_VAR
+VAR_OUTPUT
+	Done						: BOOL;										(* B *)
+	Busy						: BOOL;										(* E *)
+	Active						: BOOL;										(* E *)
+	CommandAborted				: BOOL;										(* E *)
+	Error						: BOOL;										(* B *)
+	ErrorID						: UDINT;									(* E *)
+END_VAR
+VAR	
+	RefSignal					: MC_Ref_Signal_Ref;
+	ReadApplicationRequest		: MC_ReadApplicationRequest;
+	ApplicationRequest			: ST_NcApplicationRequest;
+
+	Parameter					: MC_HomingParameter;
+
+	Axis_Status:	MC_ReadStatus;
+	Axis_Power:		MC_Power;
+	
+	bEnable						: BOOL;
+	bReady						: BOOL;
+	bCalibrated					: BOOL;
+
+	Request						: BOOL;		(* application request bit [0/1] *)
+	RequestType					: UINT;		(* application request TYPE/ID *)
+
+	StepReferencePulseDetection			: MC_StepReferencePulseDetection;
+	MoveAxis					: MC_Jog;
+
+	SetPos						: MC_SetPosition;
+	
+	StepFinishHoming			: MC_FinishHoming;
+	StepAbortHoming				: MC_AbortHoming;
+	
+	(* Need three Ref positions for absolut calibration *)
+	(* One way *)
+	RecordedPositions_to		: ARRAY [0..2] OF LREAL;
+	(* Going back for checking*)
+	RecordedPositions_back		: ARRAY [0..2] OF LREAL;
+	
+	RecordedDistances_to		: ARRAY [0..1] OF LREAL;
+	RecordedDistances_back		: ARRAY [0..1] OF LREAL;
+	
+	PostionReset				: ARRAY [0..2] OF LREAL := [0,0,0];
+	DistanceReset				: ARRAY [0..1] OF LREAL := [0,0];
+	
+	PositionOffset				: LREAL;
+	iErrorId					: UDINT;
+	iCommandAborted				: BOOL;
+	
+	nState						: INT;
+	nSearch						: INT;
+
+	fbExecute					: R_TRIG;
+	fbReady						: R_TRIG;
+	fbTimeOut					: TON;
+END_VAR
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbExecute(CLK:= Execute);
+
+RefSignal.TouchProbe := E_TouchProbe.TouchProbe1;
+
+CASE nState OF
+	0 :	(* init *)
+		IF NOT Execute THEN
+			(* reset at falling edge of Execute *)
+			Busy 			:= FALSE;
+			Done			:= FALSE;
+			CommandAborted 	:= FALSE;
+			Error 			:= FALSE;
+			ErrorID 		:= 0;
+			iErrorID 		:= 0;
+			
+			bEnable			:= FALSE;
+			
+			nSearch 		:= 0;
+			
+			//Reset Arrays to zeros
+			RecordedPositions_to	:= PostionReset;
+			RecordedPositions_back	:= PostionReset;
+			RecordedDistances_to	:= DistanceReset;
+			RecordedDistances_back	:= DistanceReset;
+		END_IF
+ 	
+	  	IF fbExecute.Q THEN
+			(* initialize output values *)
+	  		Busy 				:= TRUE;
+
+			IF BufferMode <> 0 THEN
+				Busy := FALSE;
+				Error := TRUE;
+				ErrorID := MC_ERROR_BUFFERMODE_NOT_SUPPORTED;
+
+				nState := 0;
+			ELSE
+				(* For axis with non Beckhoff components -> needs to be true (don't get why)*)
+				Options.DisableDriveAccess := TRUE;
+				nSearch:=0;
+				nState := nState + 1; 
+			END_IF
+		END_IF
+	1: (* Search one Block *)
+		StepReferencePulseDetection(
+			Execute 			:= TRUE,
+			Direction 			:= Direction,
+			ReferenceSignal 	:= RefSignal,
+			Velocity 			:= Velocity,
+			Acceleration 		:= Acceleration,
+			Deceleration 		:= Deceleration,
+			Jerk				:= Jerk,
+			TimeLimit 			:= TimeLimit,
+			TorqueLimit			:= TorqueLimit,
+			DistanceLimit 		:= DistanceLimit,
+			Axis				:= Axis,
+			Parameter			:= Parameter,
+			BufferMode			:= BufferMode, 
+			Options				:= Options, 
+			RecordedPosition	=> RecordedPositions_to[nSearch]);
+			
+		IF NOT StepReferencePulseDetection.Busy AND StepReferencePulseDetection.Done THEN
+			StepReferencePulseDetection(	
+				Execute					:= FALSE, 
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+			nSearch := nSearch +1;
+			IF nSearch >2 THEN
+				nState := nState + 1;
+			END_IF
+
+			
+		ELSIF NOT StepReferencePulseDetection.Busy AND (StepReferencePulseDetection.Error OR StepReferencePulseDetection.CommandAborted) THEN
+			iErrorID := StepReferencePulseDetection.ErrorID; 					(* functional/calibration error *) (* HKP *)
+			
+			StepReferencePulseDetection(	
+				Execute					:= FALSE, 
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+
+			nState 	:= 20;
+		END_IF
+	2:	(* Jog 2 degrees *)
+		nSearch := 0;
+		IF Direction = MC_Home_Direction.mcPositiveDirection THEN
+			MoveAxis.JogForward := TRUE;
+		ELSIF Direction = MC_Home_Direction.mcNegativeDirection THEN
+			MoveAxis.JogBackwards := TRUE;
+		ELSE
+			iErrorID := 1;
+			nState := 20;
+		END_IF
+		MoveAxis(
+			Axis				:= Axis,	
+			Mode 				:= E_JogMode.MC_JOGMODE_INCHING,
+			JogForward			:=,
+			JogBackwards		:=,
+			Position			:= 2,
+			Velocity 			:= Velocity,
+			Acceleration 		:= Acceleration,
+			Deceleration 		:= Deceleration,
+			Jerk				:= Jerk);
+		IF NOT MoveAxis.Busy AND MoveAxis.Done THEN
+			MoveAxis(	
+				Axis				:= Axis,
+				JogForward			:= FALSE,
+				JogBackwards		:= FALSE);
+			nState := nState + 1;
+
+			
+		ELSIF NOT MoveAxis.Busy AND (MoveAxis.Error OR MoveAxis.CommandAborted) THEN
+			iErrorID := MoveAxis.ErrorID; 					(* functional/calibration error *) (* HKP *)
+			
+			MoveAxis(	
+				Axis				:= Axis,
+				JogForward			:= FALSE,
+				JogBackwards		:= FALSE);
+
+			nState 	:= 20;
+		END_IF
+		
+	3:	(* Search two Block *)
+		// Change Direction to move backwards
+		IF Direction = MC_Home_Direction.mcPositiveDirection THEN
+			StepReferencePulseDetection.Direction := MC_Home_Direction.mcNegativeDirection;
+		ELSIF Direction = MC_Home_Direction.mcNegativeDirection THEN
+			StepReferencePulseDetection.Direction := MC_Home_Direction.mcPositiveDirection;
+		ELSE
+			iErrorID := 1;
+			nState := 20;
+		END_IF
+		StepReferencePulseDetection(
+			Execute 			:= TRUE,
+			Direction 			:=,
+			ReferenceSignal 	:= RefSignal,
+			Velocity 			:= Velocity,
+			Acceleration 		:= Acceleration,
+			Deceleration 		:= Deceleration,
+			Jerk				:= Jerk,
+			TimeLimit 			:= TimeLimit,
+			TorqueLimit			:= TorqueLimit,
+			DistanceLimit 		:= DistanceLimit,
+			Axis				:= Axis,
+			Parameter			:= Parameter,
+			BufferMode			:= BufferMode, 
+			Options				:= Options, 
+			RecordedPosition	=> RecordedPositions_back[nSearch]);
+			
+		IF NOT StepReferencePulseDetection.Busy AND StepReferencePulseDetection.Done THEN
+			StepReferencePulseDetection(	
+				Execute					:= FALSE, 
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+			nSearch := nSearch +1;
+			IF nSearch >2 THEN
+				nState := nState + 1;
+			END_IF
+
+			
+		ELSIF NOT StepReferencePulseDetection.Busy AND (StepReferencePulseDetection.Error OR StepReferencePulseDetection.CommandAborted) THEN
+			iErrorID := StepReferencePulseDetection.ErrorID; 					(* functional/calibration error *) (* HKP *)
+			
+			StepReferencePulseDetection(	
+				Execute					:= FALSE, 
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+
+			nState 	:= 20;
+		END_IF
+	4: (* Calculate Distances*)
+		nSearch:=0;
+		FOR nSearch:=0 TO 1 BY 1 DO
+			RecordedDistances_to[nSearch] := F_RoundLREAL(ABS(RecordedPositions_to[nSearch] - RecordedPositions_to[nSearch+1]), 2);
+			RecordedDistances_back[nSearch] := F_RoundLREAL(ABS(RecordedPositions_back[nSearch] - RecordedPositions_back[nSearch+1]), 2);
+		END_FOR
+		IF RecordedDistances_to[0] = RecordedDistances_back[1] AND RecordedDistances_to[1] = RecordedDistances_back[0] THEN
+			nState := nState +1;
+		ELSE
+			(*if distances changed -> something is truely wrong*)
+			iErrorID:=1;
+			nState := 20;
+		END_IF
+	
+	5: (* look up distance gaps and then set position and reference flag *)
+		SetPos.Options.ClearPositionLag := TRUE;
+		
+		IF RefDistance > 5.0 THEN
+			IF MoveIsCountDirection THEN
+				IF RecordedDistances_to[0] > 5 THEN
+					PositionOffset := (RecordedDistances_to[0] - RefDistance)*1000 + RefPosition - RecordedPositions_to[0];
+				ELSE
+					PositionOffset := (RecordedDistances_to[1] - RefDistance)*1000 + RefPosition - RecordedPositions_to[1];
+				END_IF
+			ELSE
+				IF RecordedDistances_to[0] > 5 THEN
+					PositionOffset := -(RecordedDistances_to[0] - RefDistance)*1000 + RefPosition - RecordedPositions_to[0];
+				ELSE
+					PositionOffset := -(RecordedDistances_to[1] - RefDistance)*1000 + RefPosition - RecordedPositions_to[1];
+				END_IF
+			END_IF
+		ELSE
+			iErrorID := 1;
+			nState := 20;
+		END_IF
+		
+		
+		SetPos(
+			Axis				:= Axis, 
+			Execute				:= TRUE, 
+			Position			:= PositionOffset, 
+			Mode				:= TRUE, // relative postion change
+			Options				:= );
+
+		IF NOT SetPos.Busy AND SetPos.Done THEN
+			SetPos(	
+				Execute					:= FALSE, 
+				Axis					:= Axis);
+
+			nState := nState + 1;
+		ELSIF NOT SetPos.Busy AND SetPos.Error THEN
+			iErrorID := SetPos.ErrorID; (* functional/calibration error *)
+
+			SetPos(	
+				Execute					:= FALSE, 
+				Axis					:= Axis);
+
+			nState 	:= 20;
+		END_IF
+	
+	6:
+		StepFinishHoming.Options.DisableDriveAccess := Options.DisableDriveAccess;
+		
+		StepFinishHoming(	
+			Execute				:= TRUE, 
+			Distance			:= , 
+			Velocity			:= Velocity, 
+			Acceleration		:= Acceleration, 
+			Deceleration		:= Acceleration, 
+			Jerk				:= Jerk, 
+			BufferMode			:= BufferMode, 
+			Options				:= , 
+			Axis				:= Axis, 
+			Parameter			:= Parameter); 
+
+		IF NOT StepFinishHoming.Busy AND StepFinishHoming.Done THEN
+			Busy 				:= FALSE;
+			Done	 			:= TRUE;
+
+			StepFinishHoming(	
+				Execute					:= FALSE, 
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+
+			nState := 0; 
+		ELSIF NOT StepFinishHoming.Busy AND (StepFinishHoming.Error OR StepFinishHoming.CommandAborted) THEN
+			iErrorID 		:= StepFinishHoming.ErrorID;
+
+			StepFinishHoming(
+				Execute					:= FALSE, 
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+
+			nState := 20;
+		END_IF
+
+	20:	(*Abort Homing*)
+		StepAbortHoming.Options.DisableDriveAccess := Options.DisableDriveAccess;
+
+		StepAbortHoming(
+			Axis				:= Axis, 
+			Parameter			:= Parameter, 
+			Execute				:= TRUE, 
+			Options				:= ); 
+
+		IF NOT StepAbortHoming.Busy AND StepAbortHoming.Done THEN
+			Busy 				:= FALSE;
+			IF iErrorId <> 0 THEN
+				Error	 			:= TRUE;
+				ErrorId				:= iErrorId;
+			ELSE
+				CommandAborted		:= TRUE;
+			END_IF
+		
+			StepAbortHoming(	
+				Execute					:= FALSE, 
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+
+			nState := 0; 
+		ELSIF NOT StepAbortHoming.Busy AND StepAbortHoming.Error THEN
+			Busy := FALSE;
+			Error := TRUE;
+			ErrorID 		:= StepAbortHoming.ErrorID;
+
+			StepAbortHoming(
+				Execute					:= FALSE, 
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+
+			nState := 0;
+		END_IF		
+
+END_CASE]]></ST>
+    </Implementation>
+    <LineIds Name="FB_LatchHome">
+      <LineId Id="97" Count="0" />
+      <LineId Id="452" Count="0" />
+      <LineId Id="98" Count="0" />
+      <LineId Id="405" Count="0" />
+      <LineId Id="100" Count="9" />
+      <LineId Id="462" Count="1" />
+      <LineId Id="490" Count="1" />
+      <LineId Id="482" Count="1" />
+      <LineId Id="464" Count="0" />
+      <LineId Id="480" Count="1" />
+      <LineId Id="465" Count="0" />
+      <LineId Id="110" Count="12" />
+      <LineId Id="435" Count="0" />
+      <LineId Id="461" Count="0" />
+      <LineId Id="484" Count="0" />
+      <LineId Id="123" Count="2" />
+      <LineId Id="460" Count="0" />
+      <LineId Id="534" Count="36" />
+      <LineId Id="138" Count="0" />
+      <LineId Id="492" Count="0" />
+      <LineId Id="532" Count="0" />
+      <LineId Id="635" Count="1" />
+      <LineId Id="638" Count="4" />
+      <LineId Id="637" Count="0" />
+      <LineId Id="495" Count="0" />
+      <LineId Id="504" Count="0" />
+      <LineId Id="497" Count="0" />
+      <LineId Id="645" Count="1" />
+      <LineId Id="498" Count="0" />
+      <LineId Id="501" Count="2" />
+      <LineId Id="499" Count="0" />
+      <LineId Id="509" Count="1" />
+      <LineId Id="513" Count="0" />
+      <LineId Id="529" Count="0" />
+      <LineId Id="643" Count="0" />
+      <LineId Id="514" Count="0" />
+      <LineId Id="518" Count="4" />
+      <LineId Id="530" Count="1" />
+      <LineId Id="526" Count="0" />
+      <LineId Id="644" Count="0" />
+      <LineId Id="527" Count="1" />
+      <LineId Id="508" Count="0" />
+      <LineId Id="493" Count="0" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="656" Count="0" />
+      <LineId Id="649" Count="6" />
+      <LineId Id="648" Count="0" />
+      <LineId Id="571" Count="36" />
+      <LineId Id="157" Count="0" />
+      <LineId Id="609" Count="0" />
+      <LineId Id="611" Count="2" />
+      <LineId Id="616" Count="0" />
+      <LineId Id="614" Count="0" />
+      <LineId Id="617" Count="1" />
+      <LineId Id="620" Count="0" />
+      <LineId Id="623" Count="0" />
+      <LineId Id="622" Count="0" />
+      <LineId Id="621" Count="0" />
+      <LineId Id="619" Count="0" />
+      <LineId Id="610" Count="0" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="630" Count="1" />
+      <LineId Id="608" Count="0" />
+      <LineId Id="657" Count="0" />
+      <LineId Id="625" Count="0" />
+      <LineId Id="627" Count="0" />
+      <LineId Id="659" Count="1" />
+      <LineId Id="628" Count="0" />
+      <LineId Id="661" Count="0" />
+      <LineId Id="663" Count="3" />
+      <LineId Id="662" Count="0" />
+      <LineId Id="658" Count="0" />
+      <LineId Id="667" Count="1" />
+      <LineId Id="681" Count="0" />
+      <LineId Id="626" Count="0" />
+      <LineId Id="195" Count="4" />
+      <LineId Id="202" Count="18" />
+      <LineId Id="193" Count="0" />
+      <LineId Id="221" Count="0" />
+      <LineId Id="228" Count="0" />
+      <LineId Id="231" Count="32" />
+      <LineId Id="341" Count="35" />
+      <LineId Id="222" Count="0" />
+      <LineId Id="127" Count="0" />
+      <LineId Id="126" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -58,11 +58,13 @@ END_VAR
 		Stage:=1;
 	1:
 		//Baader measures azimuth as West of South, so we need to convert it. This works both ways.
+		
 		IF pDome^._Position  >= 180.0 THEN
 			fAzi := pDome^._Position - 180.0;
 		ELSE
 			fAzi := pDome^._Position + 180.0;
 		END_IF
+
 		pDome^.fbSend(	SendString:= CONCAT('d#azi', INT_TO_STRING(LREAL_TO_INT(fAzi*10))),
 					TXbuffer:= TxBufferDome,
 					Busy=>,
@@ -142,7 +144,10 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="9" Count="1" />
       <LineId Id="83" Count="1" />
       <LineId Id="184" Count="1" />
-      <LineId Id="47" Count="13" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="47" Count="4" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="52" Count="8" />
       <LineId Id="116" Count="0" />
       <LineId Id="61" Count="4" />
       <LineId Id="98" Count="0" />

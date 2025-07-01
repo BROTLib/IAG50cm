@@ -1,0 +1,285 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PendantSetHAState" Id="{e6010ec0-4aec-446a-ba2e-9d1ae68ed2e8}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PendantSetHAState EXTENDS FB_PendantState
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+		Stage 					: UINT;
+	tonCount 				: TON:= (PT:=T#1S);
+	fSmallStep				: LREAL := 10;
+	fBigStep				: LREAL := 100;
+	
+	fCurrentHaOffset		: LREAL;
+	fSetHaOffset			: LREAL;
+	sSetHaOffset			: STRING;
+	
+	bBlockChange			: BOOL := FALSE;
+	bToIdle					: BOOL := FALSE;
+	//Hex stuff
+	aTxHexData				: ARRAY[0..2] OF BYTE;
+	tonDelay				: TON:= (PT:=T#20MS);
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FoundError" Id="{3c363dcf-4912-489d-adc2-4f75b55a21ed}">
+      <Declaration><![CDATA[METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage := 0;
+tonDelay(IN:=FALSE);
+tonCount(IN:=FALSE);
+pPendant^.SetState(pPendant^.fbPendantErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{4b914d10-60a7-4f18-a521-61d4ee3e8e8a}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE Stage OF
+	0:
+		fCurrentHaOffset := F_RoundLREAL(pPendant^.ipTelescope.HourAngleOffset*3600,0);
+		IF pPendant^._FastMove THEN
+			IF pPendant^._MovePositive THEN
+				fSetHaOffset := fCurrentHaOffset + fBigStep;
+			ELSE
+				fSetHaOffset := fCurrentHaOffset - fBigStep;
+			END_IF
+		ELSE
+			IF pPendant^._MovePositive THEN
+				fSetHaOffset := fCurrentHaOffset + fSmallStep;
+			ELSE
+				fSetHaOffset := fCurrentHaOffset - fSmallStep;
+			END_IF
+		END_IF
+		pPendant^.ipTelescope.HourAngleOffset := fSetHaOffset/3600;
+		Stage := Stage +1;
+	1:
+		// Block State Change while full text is send -> to not run into issues with commands
+		// Does not include Error State
+		bBlockChange := TRUE;
+		IF NOT pPendant^.fbSendHex.Busy OR pPendant^.fbSendString.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	2: 
+		// send sequence for two line text. For first line: fe, 01, 00, 0c, first 8 char, second 8 char
+		HEXSTR_TO_DATA('fe', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	3: 
+		HEXSTR_TO_DATA('01', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	4: 
+		HEXSTR_TO_DATA('00', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	5:	
+		HEXSTR_TO_DATA('0c', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	6:
+		// send first 8 characters
+		pPendant^.fbSendString(SendString:= 'Ha Offse',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	7: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	8:
+		// send second characters (8 max)
+		pPendant^.fbSendString(SendString:= 't:      ',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	9: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	10: 
+		// second line: fe, c0, 00, 0b, first 8 char, second 8 char
+		HEXSTR_TO_DATA('fe', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	11: 
+		HEXSTR_TO_DATA('c0', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	12: 
+		HEXSTR_TO_DATA('00', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	13:	
+		HEXSTR_TO_DATA('0b', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	14:
+		IF fSetHaOffset >= 0 THEN
+			sSetHaOffset := CONCAT(CONCAT('+',INT_TO_STRING(LREAL_TO_INT(fSetHaOffset))),'        ');
+		ELSE
+			sSetHaOffset := CONCAT(INT_TO_STRING(LREAL_TO_INT(fSetHaOffset)),'        ');
+		END_IF
+		
+		// send first 8 characters
+		pPendant^.fbSendString(SendString:= MID(sSetHaOffset,8,1),
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	15: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	16:
+		pPendant^.fbSendString(SendString:= '"       ',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			// unblock State change
+			bBlockChange := FALSE;
+			Stage := Stage +1;
+		END_IF
+	17:
+		tonCount(IN:=TRUE);
+		IF tonCount.Q THEN
+			tonCount(IN:=FALSE);
+			//restart
+			Stage:=0;
+		END_IF
+END_CASE
+
+IF bToIdle THEN
+	THIS^.ToIdle();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{c9d792e5-4adf-487e-9548-e96a4f568082}">
+      <Declaration><![CDATA[PROPERTY StateID : STRING]]></Declaration>
+      <Get Name="Get" Id="{3f46f520-55d0-41f5-b290-d3453098b8ac}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Set Ha Offset State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="ToIdle" Id="{dc550e73-965f-46bc-b5fc-f1338f826acc}">
+      <Declaration><![CDATA[METHOD ToIdle : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBlockChange THEN
+	Stage := 0;
+	tonDelay(IN:=FALSE);
+	tonCount(IN:=FALSE);
+	bToIdle := FALSE;
+	pPendant^.SetState(pPendant^.fbPendantIdleState);
+ELSE
+	bToIdle := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_PendantSetHAState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantSetHAState.FoundError">
+      <LineId Id="5" Count="2" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantSetHAState.RunState">
+      <LineId Id="5" Count="145" />
+      <LineId Id="187" Count="0" />
+      <LineId Id="191" Count="0" />
+      <LineId Id="190" Count="0" />
+      <LineId Id="188" Count="1" />
+      <LineId Id="151" Count="35" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantSetHAState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantSetHAState.ToIdle">
+      <LineId Id="5" Count="3" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="9" Count="2" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

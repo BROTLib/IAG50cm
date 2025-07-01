@@ -1,0 +1,149 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PendantState" Id="{4ca28e58-094a-444e-8b9c-2a876dbabf16}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PendantState IMPLEMENTS I_PendantState
+VAR
+	TxBuffer	: ComBuffer;
+	RxBuffer	: ComBuffer;
+	pPendant : POINTER TO FB_PendantControl;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="DecCommand" Id="{5b2faf71-9741-463b-83a8-3063229cc9ff}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD DecCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{fbf1ccc4-aa4d-4835-962d-1069f0a71de5}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	pPendant : POINTER TO FB_PendantControl;
+
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.pPendant := pPendant;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FocusCommand" Id="{81666930-4619-4197-a86b-ac77eb31ce1e}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD FocusCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FoundError" Id="{35b9bb04-fbd7-46bb-ac85-34445fbee5e1}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HaCommand" Id="{9a83f246-765c-4cbd-9f40-7b8d8c39291a}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD HaCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="InitCommand" Id="{978c8311-d3eb-4e7f-ac97-a2d3aeaf08e4}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD InitCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ResetCommand" Id="{9ad5f9a4-aa1c-4b5c-a9c0-c33b96b650cb}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD ResetCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{f0180414-0077-4cfb-b665-58b806ee4a9b}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD RunState : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{d361953c-6f62-4e53-98ce-e0644fb0ff64}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY StateID : STRING
+]]></Declaration>
+      <Get Name="Get" Id="{2c15184f-f972-4d7c-a748-8085ac44079d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Timeout" Id="{537e26eb-05b6-4336-83f1-89c2b678563c}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD Timeout : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ToIdle" Id="{9100f539-d4ca-4611-8ce4-9948515f758a}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD ToIdle : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_PendantState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.DecCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.FB_init">
+      <LineId Id="7" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.FocusCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.FoundError">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.HaCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.InitCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.ResetCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.RunState">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.Timeout">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantState.ToIdle">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,580 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PendantIdleState" Id="{32a259a6-bd2e-45d9-ba7d-08227f4d31b0}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PendantIdleState EXTENDS FB_PendantState
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	Stage			: UINT:= 0;
+	bBlockChange	: BOOL := FALSE;
+	tonSleep		: TON := (PT:=T#10S);
+	
+	fHaOffset		: LREAL;
+	sHaOffset		: STRING;
+	sHaOffsetLeft	: STRING;
+	sHaOffsetRight	: STRING;
+	nHaOffsetLength	: INT;
+	nHaOffsetRightLength :INT;
+	
+	fDecOffset		: LREAL;
+	sDecOffset		: STRING;
+	sDecOffsetLeft	: STRING;
+	sDecOffsetRight	: STRING;
+	nDecOffsetLength: INT;
+	nDecOffsetRightLength :INT;
+	
+	fFocusPosition	: LREAL;
+	sFocusPosition	: STRING;
+	nFocusRightLength :INT;
+	
+	
+	//Hex stuff
+	aTxHexData		: ARRAY[0..2] OF BYTE;
+	tonDelay		: TON:= (PT:=T#20MS);
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="DecCommand" Id="{b488b6c9-e595-43b7-9793-eee01d6f1f6c}">
+      <Declaration><![CDATA[METHOD DecCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBlockChange THEN
+	Stage := 0;
+	tonDelay(IN:=FALSE);
+	tonSleep(IN:=FALSE);
+	pPendant^.SetState(pPendant^.fbPendantSetDecState);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FocusCommand" Id="{f6caced7-c55a-495f-b2b0-e676f0201ac6}">
+      <Declaration><![CDATA[METHOD FocusCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBlockChange THEN
+	Stage := 0;
+	tonDelay(IN:=FALSE);
+	tonSleep(IN:=FALSE);
+	pPendant^.SetState(pPendant^.fbPendantSetFocusState);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FoundError" Id="{dc51ce85-e97a-44dc-b854-b6bb8a8b7e41}">
+      <Declaration><![CDATA[METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage := 0;
+tonDelay(IN:=FALSE);
+tonSleep(IN:=FALSE);
+bBlockChange:= FALSE;
+pPendant^.SetState(pPendant^.fbPendantErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HaCommand" Id="{ad418bce-2dff-4498-be8e-919cffc63a70}">
+      <Declaration><![CDATA[METHOD HaCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBlockChange THEN
+	Stage := 0;
+	tonDelay(IN:=FALSE);
+	tonSleep(IN:=FALSE);
+	pPendant^.SetState(pPendant^.fbPendantSetHaState);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="InitCommand" Id="{6e82dd47-5bc3-4de9-8b21-8e0f2c2877f0}">
+      <Declaration><![CDATA[METHOD InitCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBlockChange THEN
+	Stage := 0;
+	tonDelay(IN:=FALSE);
+	tonSleep(IN:=FALSE);
+	pPendant^.SetState(pPendant^.fbPendantInitState);
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{6da21f43-2830-4b37-9beb-ebcdafbc9b5e}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(*---- IDLE----
+	Show:	Ha :**** "
+			Dec:**** "
+	Sleep
+	
+	Show:	Fokus (1-17mm)
+			******** mm
+	Sleep
+	-> repeat
+*)
+CASE Stage OF
+	0:
+		tonSleep(IN:=TRUE);
+		IF tonSleep.Q THEN
+			tonSleep(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	1:
+		// Block State Change while full text is send -> to not run into issues with commands
+		// Does not include Error State
+		bBlockChange := TRUE;
+		IF NOT pPendant^.fbSendHex.Busy OR pPendant^.fbSendString.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	2: 
+		// send sequence for two line text. For first line: fe, 01, 00, 0c, first 8 char, second 8 char
+		HEXSTR_TO_DATA('fe', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	3: 
+		HEXSTR_TO_DATA('01', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	4: 
+		HEXSTR_TO_DATA('00', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	5:	
+		HEXSTR_TO_DATA('0c', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	6:
+		// Get Offset
+		fHaOffset := F_RoundLREAL(pPendant^.ipTelescope.HourAngleOffset*3600,0);
+		sHaOffset := INT_TO_STRING(LREAL_TO_INT(fHaOffset));
+		nHaOffsetLength := LEN(sHaOffset);
+		// needs to be devided into 8 + rest characters
+		IF nHaOffsetLength < 4 THEN
+			sHaOffsetLeft := sHaOffset;
+			IF nHaOffsetLength < 3 THEN
+				sHaOffsetLeft := CONCAT(sHaOffsetLeft, '"');
+				sHaOffsetRight:='       .';
+			ELSE
+				sHaOffsetRight:='"       ';
+			END_IF
+		ELSE
+			sHaOffsetLeft := Left(sHaOffset,3);
+			sHaOffsetRight := CONCAT(CONCAT(Right(sHaOffset, nHaOffsetLength-3), '"'),'        ');
+		END_IF
+		IF fHaOffset >= 0 THEN
+			sHaOffsetLeft := CONCAT('+', sHaOffsetLeft);
+		END_IF
+		// send first 8 characters
+		pPendant^.fbSendString(SendString:= CONCAT('HA :',sHaOffsetLeft ),
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	7: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	8:
+		// send second 8 characters
+		pPendant^.fbSendString(SendString:= MID(sHaOffsetRight,8,1),
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	9: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	10:
+		// second line: fe, c0, 00, 0b, first 8 char, second 8 char
+		HEXSTR_TO_DATA('fe', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	11: 
+		HEXSTR_TO_DATA('c0', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	12: 
+		HEXSTR_TO_DATA('00', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	13:	
+		HEXSTR_TO_DATA('0b', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	14:
+		fDecOffset := F_RoundLREAL(pPendant^.ipTelescope.DeclinationOffset*3600,0);
+		sDecOffset := INT_TO_STRING(LREAL_TO_INT(fDecOffset));
+		nDecOffsetLength := LEN(sDecOffset);
+		IF nDecOffsetLength < 4 THEN
+			sDecOffsetLeft := sDecOffset;
+			IF nDecOffsetLength < 3 THEN
+				sDecOffsetLeft := CONCAT(sDecOffsetLeft, '"');
+				sDecOffsetRight:='       .';
+			ELSE
+				sDecOffsetRight:='"      .';
+			END_IF
+		ELSE
+			sDecOffsetLeft := Left(sDecOffset,3);
+			sDecOffsetRight := CONCAT(CONCAT(Right(sDecOffset, nDecOffsetLength-3), '"'),'        ');
+		END_IF
+		IF fDecOffset >= 0 THEN
+			sDecOffsetLeft := CONCAT('+', sDecOffsetLeft);
+		END_IF
+		
+		pPendant^.fbSendString(SendString:= CONCAT('Dec:',sDecOffsetLeft ),
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	15: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	16:
+		pPendant^.fbSendString(SendString:=MID(sDecOffsetRight,8,1),
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			// unblock State change
+			bBlockChange := FALSE;
+			Stage := Stage +1;
+		END_IF
+	17:
+		// Sleep for some time
+		tonSleep(IN:=TRUE);
+		IF tonSleep.Q THEN
+			tonSleep(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	18:
+		// Block State Change while full text is send -> to not run into issues with commands
+		// Does not include Error State
+		bBlockChange := TRUE;
+		IF NOT pPendant^.fbSendHex.Busy OR pPendant^.fbSendString.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	19: 
+		// send sequence for two line text. For first line: fe, 01, 00, 0c, first 8 char, second 8 char
+		HEXSTR_TO_DATA('fe', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	20: 
+		HEXSTR_TO_DATA('01', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	21: 
+		HEXSTR_TO_DATA('00', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	22:	
+		HEXSTR_TO_DATA('0c', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	23:
+		// send first 8 characters
+		pPendant^.fbSendString(SendString:= 'Focus 1-',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	24: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	25:
+		// send second characters (8 max)
+		pPendant^.fbSendString(SendString:= '17mm    ',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	26: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	27: 
+		// second line: fe, c0, 00, 0b, first 8 char, second 8 char
+		HEXSTR_TO_DATA('fe', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	28: 
+		HEXSTR_TO_DATA('c0', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	29: 
+		HEXSTR_TO_DATA('00', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	30:	
+		HEXSTR_TO_DATA('0b', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	31:
+		// Get Focus Position
+		fFocusPosition := F_RoundLREAL(pPendant^.ipFocus.Position,3);
+		sFocusPosition := CONCAT(LREAL_TO_STRING(fFocusPosition),'        ');
+		// send first 8 characters
+		pPendant^.fbSendString(SendString:= MID(sFocusPosition,8,1),
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	32: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	33:
+		pPendant^.fbSendString(SendString:= 'mm      ',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			// unblock State change
+			bBlockChange := FALSE;
+			// restart
+			Stage := 0;
+		END_IF
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{7a2025b8-94ea-430e-b591-69bb3f88347f}">
+      <Declaration><![CDATA[PROPERTY StateID : STRING]]></Declaration>
+      <Get Name="Get" Id="{5737b1b2-51e7-426b-b820-8e5e64921877}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Idle State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="FB_PendantIdleState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantIdleState.DecCommand">
+      <LineId Id="5" Count="4" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantIdleState.FocusCommand">
+      <LineId Id="5" Count="4" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantIdleState.FoundError">
+      <LineId Id="4" Count="1" />
+      <LineId Id="7" Count="1" />
+      <LineId Id="6" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantIdleState.HaCommand">
+      <LineId Id="5" Count="4" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantIdleState.InitCommand">
+      <LineId Id="4" Count="0" />
+      <LineId Id="8" Count="2" />
+      <LineId Id="6" Count="1" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantIdleState.RunState">
+      <LineId Id="224" Count="0" />
+      <LineId Id="226" Count="7" />
+      <LineId Id="225" Count="0" />
+      <LineId Id="4" Count="1" />
+      <LineId Id="8" Count="3" />
+      <LineId Id="7" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="214" Count="0" />
+      <LineId Id="222" Count="0" />
+      <LineId Id="215" Count="0" />
+      <LineId Id="16" Count="2" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="216" Count="0" />
+      <LineId Id="32" Count="10" />
+      <LineId Id="44" Count="10" />
+      <LineId Id="56" Count="21" />
+      <LineId Id="217" Count="0" />
+      <LineId Id="98" Count="0" />
+      <LineId Id="100" Count="1" />
+      <LineId Id="218" Count="0" />
+      <LineId Id="102" Count="1" />
+      <LineId Id="107" Count="1" />
+      <LineId Id="110" Count="2" />
+      <LineId Id="109" Count="0" />
+      <LineId Id="105" Count="1" />
+      <LineId Id="113" Count="0" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="114" Count="0" />
+      <LineId Id="118" Count="0" />
+      <LineId Id="116" Count="0" />
+      <LineId Id="119" Count="0" />
+      <LineId Id="78" Count="13" />
+      <LineId Id="219" Count="0" />
+      <LineId Id="92" Count="5" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="121" Count="0" />
+      <LineId Id="435" Count="4" />
+      <LineId Id="433" Count="0" />
+      <LineId Id="220" Count="0" />
+      <LineId Id="122" Count="59" />
+      <LineId Id="184" Count="21" />
+      <LineId Id="221" Count="0" />
+      <LineId Id="213" Count="0" />
+      <LineId Id="206" Count="0" />
+      <LineId Id="120" Count="0" />
+      <LineId Id="207" Count="0" />
+      <LineId Id="223" Count="0" />
+      <LineId Id="209" Count="3" />
+      <LineId Id="208" Count="0" />
+      <LineId Id="235" Count="52" />
+      <LineId Id="310" Count="22" />
+      <LineId Id="440" Count="5" />
+      <LineId Id="333" Count="45" />
+      <LineId Id="422" Count="9" />
+      <LineId Id="406" Count="14" />
+      <LineId Id="432" Count="0" />
+      <LineId Id="421" Count="0" />
+      <LineId Id="234" Count="0" />
+      <LineId Id="6" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantIdleState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

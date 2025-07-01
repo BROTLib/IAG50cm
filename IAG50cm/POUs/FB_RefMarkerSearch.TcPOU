@@ -1,0 +1,109 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_RefMarkerSearch" Id="{55946a12-3aba-4836-8e63-10bca96d8d7c}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_RefMarkerSearch
+VAR_INPUT
+	Enable					: BOOL;
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	Axis						: AXIS_REF;
+	Trigger						: TRIGGER_REF;
+	bReady	: BOOL;
+	btest : Bool;
+	Axis_Status:	MC_ReadStatus;
+	Axis_Home:		MC_Home;
+	Axis_Power:		MC_Power;
+	TouchProbe:		MC_TouchProbe;
+	
+	aRefPoints  : ARRAY [0..100] OF LREAL;
+	aDistance	: ARRAY [1..100] OF LREAL;
+	nIndx : UINT := 0;
+	nState : UINT := 0;
+	
+	iErrorId					: UDINT;
+	iCommandAborted				: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// query the status of the axis at the beginning of the cycle
+Axis_Status(Enable := TRUE,
+			Axis := Axis);
+
+// Enable the axis (power signal or manual enable)
+Axis_Power(
+	Axis := Axis,
+	Enable := Enable,
+	Enable_Positive := Enable,
+	Enable_Negative := Enable,
+	Override := 100.0,
+	Status => bReady);
+
+Trigger.EncoderID := 2;
+Trigger.Edge := E_SignalEdge.RisingEdge;
+Trigger.Mode := E_TouchProbeMode.TOUCHPROBEMODE_SINGLE_COMPATIBILITYMODE;
+Trigger.TouchProbe := E_TouchProbe.TouchProbe1;
+CASE nState OF
+	0 :	(* init *)
+		IF bReady AND btest THEN
+			nIndx := 0; // reset index
+			nState := nState + 1;
+		END_IF
+		
+	1:
+		TouchProbe(
+			Execute 		:= TRUE,
+			Axis 			:= Axis,
+			TriggerInput 	:= Trigger,
+			RecordedPosition => aRefPoints[nIndx]);
+			
+		IF NOT TouchProbe.Busy AND TouchProbe.Done THEN
+			TouchProbe(	
+				Execute			:= FALSE,
+				TriggerInput 	:= Trigger, 
+				Axis			:= Axis);
+			IF nIndx > 0 THEN
+				aDistance[nIndx] := F_RoundLREAL(ABS(aRefPoints[nIndx] - aRefPoints[nIndx-1]), 2);
+			END_IF
+			nIndx := nIndx + 1;
+			nState :=  1; 	(* search for next position *)
+		ELSIF NOT TouchProbe.Busy AND (TouchProbe.Error OR TouchProbe.CommandAborted) THEN
+			iErrorID := TouchProbe.ErrorID;
+			
+			TouchProbe(	
+				Execute			:= FALSE, 
+				TriggerInput 	:= Trigger,
+				Axis			:= Axis);
+
+			nState 	:= 20;
+		END_IF
+END_CASE]]></ST>
+    </Implementation>
+    <LineIds Name="FB_RefMarkerSearch">
+      <LineId Id="17" Count="10" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="49" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="93" Count="2" />
+      <LineId Id="40" Count="0" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="52" Count="0" />
+      <LineId Id="58" Count="0" />
+      <LineId Id="54" Count="1" />
+      <LineId Id="59" Count="0" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="56" Count="0" />
+      <LineId Id="61" Count="3" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="68" Count="2" />
+      <LineId Id="72" Count="0" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="90" Count="2" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="75" Count="9" />
+      <LineId Id="74" Count="0" />
+      <LineId Id="44" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

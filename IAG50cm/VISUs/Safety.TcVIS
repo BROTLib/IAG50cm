@@ -1,11 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
-  <Visu Name="Visualization" Id="{e4c18a57-4875-4f76-96ba-a974204b1731}">
+  <Visu Name="Safety" Id="{e4c18a57-4875-4f76-96ba-a974204b1731}">
     <XmlArchive>
       <Data>
         <o xml:space="preserve" t="VisualObject">
           <n n="LastVisuLanguageModelEntry" />
-          <v n="UniqueIdGenerator">"3"</v>
+          <v n="UniqueIdGenerator">"5"</v>
           <o n="VisualElemList" t="VisualElemList">
             <l n="VisualElementList" t="VisualElemCollection" cet="GenericVisualElem">
               <o>
@@ -803,12 +803,12 @@
           <o n="TextDocument" t="TextDocument">
             <a n="TextLines" cet="TextLine">
               <o>
-                <v n="Id">2L</v>
+                <v n="Id">4L</v>
                 <n n="Tag" />
                 <v n="Text">"VAR_IN_OUT"</v>
               </o>
               <o>
-                <v n="Id">3L</v>
+                <v n="Id">5L</v>
                 <n n="Tag" />
                 <v n="Text">"	"</v>
               </o>

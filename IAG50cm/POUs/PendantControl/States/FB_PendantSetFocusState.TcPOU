@@ -1,0 +1,294 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PendantSetFocusState" Id="{a4eff9c0-f8b9-4f55-9af3-e35d7167e3b3}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PendantSetFocusState EXTENDS FB_PendantState
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	Stage 					: UINT;
+	tonCount 				: TON:= (PT:=T#1S);
+	fCurrentFocusPosition 	: LREAL;
+	fSmallStep				: LREAL := 0.005;
+	fBigStep				: LREAL := 1.0;
+	fSetFocusPosition		: LREAL;
+	sSetFocusPosition		: STRING;
+	nFocusRightLength 		: UINT;
+	
+	bBlockChange			: BOOL := FALSE;
+	bToIdle					: BOOL := FALSE;
+	//Hex stuff
+	aTxHexData				: ARRAY[0..2] OF BYTE;
+	tonDelay				: TON:= (PT:=T#20MS);
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FoundError" Id="{3e229a2b-14ec-43de-87cb-0decc0ba98b4}">
+      <Declaration><![CDATA[METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage := 0;
+tonDelay(IN:=FALSE);
+tonCount(IN:=FALSE);
+pPendant^.SetState(pPendant^.fbPendantErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{4d5849c6-edcd-4a06-a85d-95b4e4592d6a}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE Stage OF
+	0:
+		fCurrentFocusPosition := F_RoundLREAL(pPendant^.ipFocus.Position,3);
+		IF pPendant^._FastMove THEN
+			IF pPendant^._MovePositive THEN
+				fSetFocusPosition := fCurrentFocusPosition + fBigStep;
+			ELSE
+				fSetFocusPosition := fCurrentFocusPosition - fBigStep;
+			END_IF
+		ELSE
+			IF pPendant^._MovePositive THEN
+				fSetFocusPosition := fCurrentFocusPosition + fSmallStep;
+			ELSE
+				fSetFocusPosition := fCurrentFocusPosition - fSmallStep;
+			END_IF
+		END_IF
+		pPendant^.ipFocus.Position := fSetFocusPosition;
+		Stage := Stage +1;
+	1:
+		// Block State Change while full text is send -> to not run into issues with commands
+		// Does not include Error State
+		bBlockChange := TRUE;
+		IF NOT pPendant^.fbSendHex.Busy OR pPendant^.fbSendString.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	2: 
+		// send sequence for two line text. For first line: fe, 01, 00, 0c, first 8 char, second 8 char
+		HEXSTR_TO_DATA('fe', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	3: 
+		HEXSTR_TO_DATA('01', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	4: 
+		HEXSTR_TO_DATA('00', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	5:	
+		HEXSTR_TO_DATA('0c', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	6:
+		// send first 8 characters
+		pPendant^.fbSendString(SendString:= 'Focus 1-',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	7: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	8:
+		// send second characters (8 max)
+		pPendant^.fbSendString(SendString:= '17mm    ',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	9: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	10: 
+		// second line: fe, c0, 00, 0b, first 8 char, second 8 char
+		HEXSTR_TO_DATA('fe', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	11: 
+		HEXSTR_TO_DATA('c0', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	12: 
+		HEXSTR_TO_DATA('00', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	13:	
+		HEXSTR_TO_DATA('0b', ADR(aTxHexData), SIZEOF(aTxHexData));
+		pPendant^.fbSendHex(
+				pSendData:= ADR(aTxHexData),
+				Length	:= 1,
+				TXbuffer:= TxBufferPendant,
+				Busy=>,
+				Error=> );
+		IF NOT pPendant^.fbSendHex.Busy THEN
+			Stage := Stage +1;
+		END_IF
+	14:
+		sSetFocusPosition := CONCAT(LREAL_TO_STRING(fSetFocusPosition),'        ');
+		// send first 8 characters
+		pPendant^.fbSendString(SendString:= MID(sSetFocusPosition,8,1),
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			Stage := Stage +1;
+		END_IF
+	15: 
+		tonDelay(IN:=TRUE);
+		IF tonDelay.Q THEN
+			tonDelay(IN:=FALSE);
+			Stage:=Stage +1;
+		END_IF
+	16:
+		pPendant^.fbSendString(SendString:= 'mm      ',
+					TXbuffer:= TxBufferPendant,
+					Busy=>,
+					Error=> );
+		IF NOT pPendant^.fbSendString.Busy  THEN
+			// unblock State change
+			bBlockChange := FALSE;
+			Stage := Stage +1;
+		END_IF
+	17:
+		tonCount(IN:=TRUE);
+		IF tonCount.Q THEN
+			tonCount(IN:=FALSE);
+			//restart
+			Stage:=0;
+		END_IF
+END_CASE
+
+IF bToIdle THEN
+	THIS^.ToIdle();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{82c35322-db03-46b5-a0d2-1deb70d03bdc}">
+      <Declaration><![CDATA[PROPERTY StateID : STRING]]></Declaration>
+      <Get Name="Get" Id="{382729b0-d969-4bc1-bc38-e737cc38c7e2}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Set Focus State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="ToIdle" Id="{de27c716-97b2-47e9-ad59-25d6dee11c9f}">
+      <Declaration><![CDATA[METHOD ToIdle : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bBlockChange THEN
+	Stage := 0;
+	tonDelay(IN:=FALSE);
+	tonCount(IN:=FALSE);
+	bToIdle := FALSE;
+	pPendant^.SetState(pPendant^.fbPendantIdleState);
+ELSE
+	bToIdle := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_PendantSetFocusState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantSetFocusState.FoundError">
+      <LineId Id="5" Count="2" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantSetFocusState.RunState">
+      <LineId Id="4" Count="1" />
+      <LineId Id="7" Count="1" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="12" Count="3" />
+      <LineId Id="17" Count="3" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="22" Count="2" />
+      <LineId Id="27" Count="126" />
+      <LineId Id="156" Count="22" />
+      <LineId Id="180" Count="0" />
+      <LineId Id="25" Count="0" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="186" Count="2" />
+      <LineId Id="190" Count="0" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="185" Count="0" />
+      <LineId Id="6" Count="0" />
+      <LineId Id="192" Count="2" />
+      <LineId Id="191" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantSetFocusState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantSetFocusState.ToIdle">
+      <LineId Id="5" Count="3" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="9" Count="2" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

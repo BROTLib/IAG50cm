@@ -1,20 +1,20 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TargetSystemConfig Crc="4155855022" Version="1.5">
+<TargetSystemConfig Crc="3316002673" Version="1.5">
   <TargetSystemType>HSafetyPLC</TargetSystemType>
   <TargetSystemSubType>ELM891x</TargetSystemSubType>
   <IsExternalDevice>false</IsExternalDevice>
   <TargetSystemObjectId>50462724</TargetSystemObjectId>
-  <TargetSystemObjectName>Term 4 (ELM7212-9016)</TargetSystemObjectName>
-  <SoftwareVersion />
-  <SerialNumber />
+  <TargetSystemObjectName>HA DEC (ELM7212-9016)</TargetSystemObjectName>
+  <SoftwareVersion>01 (V01.02)</SoftwareVersion>
+  <SerialNumber>4160734</SerialNumber>
   <ProjectCRC>34112</ProjectCRC>
   <MapProjectCRC>false</MapProjectCRC>
   <MapSerialNumber>false</MapSerialNumber>
   <VersionNumber>1</VersionNumber>
   <FSOEAddress>2</FSOEAddress>
-  <DipSwitch />
+  <DipSwitch>2</DipSwitch>
   <AmsNetID>5.146.183.126.2.1</AmsNetID>
-  <AmsPort>1003</AmsPort>
+  <AmsPort>1004</AmsPort>
   <ConnectionInfoDataConfigOld>false</ConnectionInfoDataConfigOld>
   <TakeOverSafetyAliasDeviceNamesInProcessImage>false</TakeOverSafetyAliasDeviceNamesInProcessImage>
   <TakeOverStandardAliasDeviceNamesInProcessImage>false</TakeOverStandardAliasDeviceNamesInProcessImage>

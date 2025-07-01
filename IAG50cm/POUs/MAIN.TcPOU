@@ -10,7 +10,10 @@ VAR
 	decControl		: FB_DeclinationControl(comm:=comm);
 	telescopeControl: FB_TelescopeControl(comm := comm);
 	domeControl		: FB_DomeControl(comm := comm);
-	pendant_Test : FB_PendantControl;
+	pendantControl 	: FB_PendantControl(comm:=comm);
+	latch_test	:FB_RefMarkerSearch;
+	home_test : FB_LatchHome;
+	Axis : AXIS_REF;
 	
 END_VAR
 VAR CONSTANT
@@ -20,9 +23,14 @@ VAR CONSTANT
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[GVL_Safety.Run := TRUE;
+latch_test();
 
-domeControl(TxBuffer:=TxBufferDome, RxBuffer:=RxBufferDome);
-pendant_Test(TxBuffer:=TxBufferPendant, RxBuffer:=RxBufferPendant);
+
+domeControl(ipTelescope	:= telescopeControl);
+
+pendantControl(
+	ipTelescope	:= telescopeControl,
+	ipFocus		:= focusControl);
 
 coverControl(delta_t:= T#5s);
 focusControl(fVelocity:=1);
@@ -52,9 +60,13 @@ comm(
     </Implementation>
     <LineIds Name="MAIN">
       <LineId Id="2" Count="0" />
+      <LineId Id="187" Count="0" />
+      <LineId Id="200" Count="0" />
       <LineId Id="99" Count="0" />
       <LineId Id="53" Count="0" />
+      <LineId Id="223" Count="0" />
       <LineId Id="116" Count="0" />
+      <LineId Id="226" Count="1" />
       <LineId Id="133" Count="0" />
       <LineId Id="54" Count="2" />
       <LineId Id="41" Count="0" />

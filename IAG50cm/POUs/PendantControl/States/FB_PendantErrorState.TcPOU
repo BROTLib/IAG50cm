@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PendantErrorState" Id="{b58925e1-a00e-4433-a211-7c74b6d09ad0}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PendantErrorState EXTENDS FB_PendantState
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="ResetCommand" Id="{d4a76690-9e3b-4a78-8d7d-85736c716d0c}">
+      <Declaration><![CDATA[METHOD ResetCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pPendant^._Error := FALSE;
+pPendant^.SetState(pPendant^.fbPendantPreInitState);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{85f67b1d-627d-4ee1-8811-980e6bac68d4}">
+      <Declaration><![CDATA[PROPERTY StateID : STRING]]></Declaration>
+      <Get Name="Get" Id="{c08cbac7-562a-4d90-89bf-3396f2fdc2f4}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Error State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <LineIds Name="FB_PendantErrorState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantErrorState.ResetCommand">
+      <LineId Id="4" Count="2" />
+    </LineIds>
+    <LineIds Name="FB_PendantErrorState.StateID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="F_RoundLREAL" Id="{b80a4884-b660-468c-ae4a-abf18fc59271}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION F_RoundLREAL : LREAL
+VAR_INPUT
+  rInput : LREAL;
+  iDecimalPlaces : INT;
+END_VAR
+VAR
+  rOutput : LREAL;
+  rLeftPart : LREAL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(*
+Source: https://medium.com/@hristo.iliev.ganchev/how-to-round-a-real-lreal-in-twincat-d551172555f3
+Date: 2023–29–08
+Author: Hristo Ganchev (https://github.com/hganchev)
+
+Adapted from REAL to LREAL
+*)
+
+
+rOutput := rInput * EXPT(10,iDecimalPlaces);
+rLeftPart := rOutput - LTRUNC(rOutput);
+
+IF rLeftPart >= 0.5 THEN
+  rOutput := rOutput + 1;
+ELSIF rLeftPart <= -0.5 THEN
+  rOutput := rOutput - 1;
+ELSE
+  rOutput := rOutput;
+END_IF
+
+rOutput :=  LTRUNC(rOutput) / EXPT(10,iDecimalPlaces);
+F_RoundLREAL := rOutput;]]></ST>
+    </Implementation>
+    <LineIds Name="F_RoundLREAL">
+      <LineId Id="35" Count="0" />
+      <LineId Id="39" Count="2" />
+      <LineId Id="43" Count="0" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="36" Count="1" />
+      <LineId Id="17" Count="11" />
+      <LineId Id="7" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

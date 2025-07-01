@@ -1,0 +1,424 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PendantControl" Id="{31943a3c-0e0b-4aa2-80e9-dadb4d86be37}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PendantControl
+VAR_INPUT
+	ipTelescope	: I_RaDecTelescope;
+	ipFocus		: I_Focus;
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	fbComm			: I_Comm;
+	tonComm 		: TON := (PT:=T#5S);
+	(*  State Definitions *)
+	ipState			: I_PendantState := fbPendantPreInitState;
+	ipStateOld		: I_PendantState := fbPendantPreInitState;
+	
+	fbPendantPreInitState	: FB_PendantPreInitState(THIS);
+	fbPendantIdleState 		: FB_PendantIdleState(THIS);
+	fbPendantInitState 		: FB_PendantInitState(THIS);
+	fbPendantSetHAState		: FB_PendantSetHAState(THIS);
+	fbPendantSetDECState	: FB_PendantSetDECState(THIS);
+	fbPendantSetFocusState	: FB_PendantSetFocusState(THIS);
+	fbPendantErrorState		: FB_PendantErrorState(THIS);
+	
+	bReady			: BOOL;
+	bError			: BOOL;
+	bReset			: BOOL;
+	nErrorID		: UINT;
+	
+	(* Set Logic:
+		bFastMove:	TRUE (move big step)
+					FALSE (move small step)
+		bMovePositive:	TRUE +
+						FALSE -*)
+	bFastMove		: BOOL;
+	bMovePositive	: BOOL;
+	
+	rtrigReset		: R_TRIG;
+	rtrigError		: R_TRIG;
+	
+	(*SEND*)
+	fbSendString	: SendString;
+	fbSendHex		: SendData;
+	eSendErrorID	: ComError_t;
+	
+	
+	(* RECEIVE*)
+	fbReceive		: ReceiveString;
+	rtrigReceive	: R_TRIG;
+	sReceivedString	: STRING;
+	sLastReceivedString: STRING;
+	bStringReceived	: BOOL;
+	bReceiveBusy	: BOOL;
+	bReceiveError	: BOOL;
+	eReceiveErrorID	: ComError_t;
+	bReceiveTimeout	: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[//	Receive string data:	
+fbReceive(
+	Prefix:='',
+	Suffix:= '',
+	Timeout:= T#1MS,
+	ReceivedString:= sReceivedString,
+	RXbuffer:= RxBufferPendant,
+	StringReceived=> bStringReceived,
+	Busy=> bReceiveBusy,
+	Error=> ,
+	RxTimeout=> bReceiveTimeout );
+
+(*Send / Receive Errors? *)
+IF fbReceive.Error <> COMERROR_NOERROR THEN
+	bError:=TRUE;
+	nErrorID		:= fbReceive.Error;
+	eReceiveErrorID := fbReceive.Error;
+END_IF
+IF fbSendString.Error <> COMERROR_NOERROR THEN
+	bError:=TRUE;
+	nErrorID	:= fbSendString.Error;
+	eSendErrorID := fbSendString.Error;
+ELSIF fbSendHex.Error <> COMERROR_NOERROR THEN
+	bError:=TRUE;
+	nErrorID := fbSendHex.Error;
+	eSendErrorID := fbSendHex.Error;
+END_IF
+
+(* Triggers*)
+rtrigReceive(CLK:=bStringReceived);
+rtrigReset(CLK:=bReset);
+rtrigError(CLK:=bError);
+
+IF rtrigError.Q THEN
+	bFastMove := FALSE;
+	ipState.FoundError();
+ELSIF rtrigReset.Q THEN
+	ipState.ResetCommand();
+	bReset:=FALSE;
+ELSIF rtrigReceive.Q AND NOT bError THEN
+	(* INIT *)
+	IF sReceivedString = '#' THEN
+		ipState.InitCommand();
+		
+	(* HA *)
+	ELSIF sReceivedString = 'û' AND bReady THEN
+		(* -, slow*)
+		bFastMove := FALSE;
+		bMovePositive := FALSE;
+		ipState.HaCommand();
+	ELSIF sReceivedString = '{' AND bReady THEN
+		(* -, fast*)
+		bFastMove := TRUE;
+		bMovePositive := FALSE;
+		ipState.HaCommand();
+	ELSIF sReceivedString = 'ý' AND bReady THEN
+		(* +, slow*)
+		bFastMove := FALSE;
+		bMovePositive := TRUE;
+		ipState.HaCommand();
+	ELSIF sReceivedString = '}' AND bReady THEN
+		(* +, fast*)
+		bFastMove := TRUE;
+		bMovePositive := TRUE;
+		ipState.HaCommand();
+	
+	(* DEC *)
+	ELSIF sReceivedString = 'ï' AND bReady THEN
+		(* -, slow*)
+		bFastMove := FALSE;
+		bMovePositive := FALSE;
+		ipState.DecCommand();
+	ELSIF sReceivedString = 'o' AND bReady THEN
+		(* -, fast*)
+		bFastMove := TRUE;
+		bMovePositive := FALSE;
+		ipState.DecCommand();
+	ELSIF sReceivedString = '÷' AND bReady THEN
+		(* +, slow*)
+		bFastMove := FALSE;
+		bMovePositive := TRUE;
+		ipState.DecCommand();
+	ELSIF sReceivedString = 'w' AND bReady THEN
+		(* +, fast*)
+		bFastMove := TRUE;
+		bMovePositive := TRUE;
+		ipState.DecCommand();
+	
+	(* Focus *)
+	ELSIF sReceivedString = '¿' AND bReady THEN
+		(* -, slow*)
+		bFastMove := FALSE;
+		bMovePositive := FALSE;
+		ipState.FocusCommand();
+	ELSIF sReceivedString = '?' AND bReady THEN
+		(* -, fast*)
+		bFastMove := TRUE;
+		bMovePositive := FALSE;
+		ipState.FocusCommand();
+	ELSIF sReceivedString = 'ß' AND bReady THEN
+		(* +, slow*)
+		bFastMove := FALSE;
+		bMovePositive := TRUE;
+		ipState.FocusCommand();
+	ELSIF sReceivedString = '_' AND bReady THEN
+		(* +, fast*)
+		bFastMove := TRUE;
+		bMovePositive := TRUE;
+		ipState.FocusCommand();
+	ELSE
+		bFastMove := FALSE;
+		ipState.ToIdle();
+	END_IF
+	
+END_IF
+
+ipState.RunState();]]></ST>
+    </Implementation>
+    <Folder Name="internal properties" Id="{a18665bc-e169-47b9-b965-9f2788e06ac9}" />
+    <Folder Name="properties" Id="{6850b61c-eda9-481c-9524-cd9390cb72ba}" />
+    <Property Name="_Error" Id="{6593edff-d0b5-41b7-8bc7-58065f448086}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Error : BOOL]]></Declaration>
+      <Get Name="Get" Id="{bc020154-760d-4825-8f14-c128881c7e22}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Error := bError;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{b51dbe17-9c90-44df-adea-ccf9759c05f0}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bError:=_Error;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_FastMove" Id="{72cafdb3-ddbc-4b3b-a697-7c53ab685688}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _FastMove : BOOL]]></Declaration>
+      <Get Name="Get" Id="{87f3b4e0-9c85-49db-8e48-ba78643e2e06}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_FastMove := THIS^.bFastMove;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="_MovePositive" Id="{ae64d179-d51b-49a0-810e-4bdae9921153}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _MovePositive : BOOL]]></Declaration>
+      <Get Name="Get" Id="{8ee045b6-d5ee-4db5-b9dc-cb8d6dc97da2}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MovePositive := THIS^.bMovePositive;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="_Ready" Id="{6219a3da-e3d8-44a9-b851-742f91d2d543}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Ready : BOOL]]></Declaration>
+      <Get Name="Get" Id="{35c150dd-44cc-45f8-b83d-10d48a514af0}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Ready := bReady;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{ac77bf06-0f7e-48a8-a327-c7d65024c7ea}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bReady := _Ready;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Error" Id="{8bfc8674-e993-417b-9a6d-81cdaeebc0e0}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY Error : BOOL]]></Declaration>
+      <Get Name="Get" Id="{40fb6eb4-7078-4cd9-9b43-da41422a828f}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Error := bError;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ErrorID" Id="{2176f647-c267-4999-83ee-92a6d6d1ebd3}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY ErrorID : UINT]]></Declaration>
+      <Get Name="Get" Id="{3fecda0a-f327-4f18-9714-138ac84670e7}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ErrorID := nErrorID;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_Init" Id="{7299abf0-bea5-41f3-9d4e-3091c390ab64}">
+      <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
+//The return value is not evaluated. For a specific influence, you can also declare the
+//methods explicitly and provide additional code there with the standard initialization
+//code. You can evaluate the return value.
+METHOD FB_Init: BOOL
+VAR_INPUT
+    bInitRetains	: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
+    bInCopyCode		: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)
+	comm			: I_Comm;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.fbComm 				:= comm;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Reset" Id="{45d22cd5-17ee-46bf-9f0b-8a5cb1bbc7ed}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY Reset : BOOL]]></Declaration>
+      <Set Name="Set" Id="{3432f7db-0aa8-4e51-b308-169338550f01}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bReset := Reset;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="SetState" Id="{a8389db5-f741-4ceb-b61b-f12dece5de1d}">
+      <Declaration><![CDATA[METHOD SetState : BOOL
+VAR_INPUT
+	newState :I_PendantState;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.ipState := newState;]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_PendantControl">
+      <LineId Id="23" Count="0" />
+      <LineId Id="25" Count="9" />
+      <LineId Id="160" Count="0" />
+      <LineId Id="148" Count="0" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="161" Count="0" />
+      <LineId Id="157" Count="0" />
+      <LineId Id="36" Count="1" />
+      <LineId Id="150" Count="0" />
+      <LineId Id="162" Count="0" />
+      <LineId Id="158" Count="0" />
+      <LineId Id="151" Count="0" />
+      <LineId Id="153" Count="0" />
+      <LineId Id="163" Count="0" />
+      <LineId Id="159" Count="0" />
+      <LineId Id="154" Count="0" />
+      <LineId Id="149" Count="0" />
+      <LineId Id="181" Count="0" />
+      <LineId Id="180" Count="0" />
+      <LineId Id="63" Count="0" />
+      <LineId Id="178" Count="0" />
+      <LineId Id="183" Count="0" />
+      <LineId Id="164" Count="0" />
+      <LineId Id="64" Count="0" />
+      <LineId Id="186" Count="0" />
+      <LineId Id="165" Count="1" />
+      <LineId Id="175" Count="0" />
+      <LineId Id="179" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="223" Count="0" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="222" Count="0" />
+      <LineId Id="78" Count="0" />
+      <LineId Id="69" Count="1" />
+      <LineId Id="188" Count="0" />
+      <LineId Id="200" Count="0" />
+      <LineId Id="224" Count="0" />
+      <LineId Id="71" Count="1" />
+      <LineId Id="189" Count="0" />
+      <LineId Id="201" Count="0" />
+      <LineId Id="225" Count="0" />
+      <LineId Id="74" Count="1" />
+      <LineId Id="190" Count="0" />
+      <LineId Id="202" Count="0" />
+      <LineId Id="226" Count="0" />
+      <LineId Id="77" Count="0" />
+      <LineId Id="76" Count="0" />
+      <LineId Id="191" Count="0" />
+      <LineId Id="203" Count="0" />
+      <LineId Id="227" Count="0" />
+      <LineId Id="88" Count="0" />
+      <LineId Id="80" Count="2" />
+      <LineId Id="192" Count="0" />
+      <LineId Id="204" Count="0" />
+      <LineId Id="228" Count="0" />
+      <LineId Id="83" Count="1" />
+      <LineId Id="193" Count="0" />
+      <LineId Id="205" Count="0" />
+      <LineId Id="229" Count="0" />
+      <LineId Id="85" Count="1" />
+      <LineId Id="206" Count="1" />
+      <LineId Id="230" Count="0" />
+      <LineId Id="87" Count="0" />
+      <LineId Id="79" Count="0" />
+      <LineId Id="208" Count="1" />
+      <LineId Id="231" Count="0" />
+      <LineId Id="90" Count="0" />
+      <LineId Id="92" Count="2" />
+      <LineId Id="210" Count="1" />
+      <LineId Id="218" Count="0" />
+      <LineId Id="95" Count="1" />
+      <LineId Id="212" Count="1" />
+      <LineId Id="219" Count="0" />
+      <LineId Id="97" Count="1" />
+      <LineId Id="214" Count="1" />
+      <LineId Id="220" Count="0" />
+      <LineId Id="99" Count="1" />
+      <LineId Id="216" Count="1" />
+      <LineId Id="221" Count="0" />
+      <LineId Id="102" Count="0" />
+      <LineId Id="187" Count="0" />
+      <LineId Id="103" Count="0" />
+      <LineId Id="91" Count="0" />
+      <LineId Id="89" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="171" Count="0" />
+      <LineId Id="170" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl._Error.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl._Error.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl._FastMove.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl._MovePositive.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl._Ready.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl._Ready.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl.Error.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl.ErrorID.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl.FB_Init">
+      <LineId Id="7" Count="1" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl.Reset.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_PendantControl.SetState">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
