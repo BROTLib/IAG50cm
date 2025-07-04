@@ -11,6 +11,7 @@ VAR
 	telescopeControl: FB_TelescopeControl(comm := comm);
 	domeControl		: FB_DomeControl(comm := comm);
 	pendantControl 	: FB_PendantControl(comm:=comm);
+	safetyHandling	: FB_SafetyHandling(comm:=comm);
 	latch_test	:FB_RefMarkerSearch;
 	home_test : FB_LatchHome;
 	Axis : AXIS_REF;
@@ -22,8 +23,7 @@ VAR CONSTANT
 													hourangleHome := 0.0, declinationHome := -23.0);
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[GVL_Safety.Run := TRUE;
-latch_test();
+      <ST><![CDATA[latch_test();
 
 
 domeControl(ipTelescope	:= telescopeControl);
@@ -45,6 +45,10 @@ telescopeControl(
 	telescopeConfig	:= telescopeConfig,
 );
 
+//Safety
+safetyHandling();
+
+// Comm
 comm(	
 	sHostName			:= '169.254.149.100',
     nHostPort  			:= 1883,
@@ -56,10 +60,10 @@ comm(
 	Focus				:= focusControl,
 	Dome				:= domeControl
 );
+
 ]]></ST>
     </Implementation>
     <LineIds Name="MAIN">
-      <LineId Id="2" Count="0" />
       <LineId Id="187" Count="0" />
       <LineId Id="200" Count="0" />
       <LineId Id="99" Count="0" />
@@ -76,11 +80,15 @@ comm(
       <LineId Id="46" Count="0" />
       <LineId Id="50" Count="0" />
       <LineId Id="42" Count="0" />
+      <LineId Id="249" Count="1" />
       <LineId Id="39" Count="0" />
+      <LineId Id="252" Count="0" />
+      <LineId Id="251" Count="0" />
       <LineId Id="22" Count="6" />
       <LineId Id="84" Count="1" />
       <LineId Id="168" Count="0" />
       <LineId Id="20" Count="0" />
+      <LineId Id="248" Count="0" />
       <LineId Id="151" Count="0" />
     </LineIds>
   </POU>

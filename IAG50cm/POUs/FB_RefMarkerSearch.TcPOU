@@ -40,7 +40,7 @@ Axis_Power(
 	Override := 100.0,
 	Status => bReady);
 
-Trigger.EncoderID := 2;
+Trigger.EncoderID := 1;
 Trigger.Edge := E_SignalEdge.RisingEdge;
 Trigger.Mode := E_TouchProbeMode.TOUCHPROBEMODE_SINGLE_COMPATIBILITYMODE;
 Trigger.TouchProbe := E_TouchProbe.TouchProbe1;

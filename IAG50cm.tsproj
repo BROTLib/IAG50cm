@@ -1474,6 +1474,66 @@ External Setpoint Generation:
 			</SubItem>
 		</DataType>
 		<DataType>
+			<Name GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib" AutoDeleteType="true">ST_InfoDataGroup</Name>
+			<BitSize>16</BitSize>
+			<SubItem>
+				<Name>usiMapState</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>0</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>usiMapDiag</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>8</BitOffs>
+			</SubItem>
+		</DataType>
+		<DataType>
+			<Name GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib" AutoDeleteType="true">ST_InfoDataFB</Name>
+			<BitSize>24</BitSize>
+			<SubItem>
+				<Name>usiMapState</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>0</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>uiMapDiag</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>8</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>usiDummy</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>16</BitOffs>
+			</SubItem>
+		</DataType>
+		<DataType>
+			<Name GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib" AutoDeleteType="true">ST_InfoDataConnection</Name>
+			<BitSize>24</BitSize>
+			<SubItem>
+				<Name>usiMapState</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>0</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>usiMapDiag</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>8</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>bySignal</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000001}">BYTE</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>16</BitOffs>
+			</SubItem>
+		</DataType>
+		<DataType>
 			<Name GUID="{0994ABA9-6F32-EEB9-4362-7774F7A1F4F4}" AutoDeleteType="true">FSOE_11</Name>
 			<BitSize>88</BitSize>
 			<SubItem>
@@ -1754,8 +1814,10 @@ External Setpoint Generation:
 						<Velo RefSearch="0.10384" RefSync="0.10384" SlowManual="0.5192" FastManual="3.1152" Fast="10.384" Maximum="10.384"/>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
-					<Encoder Name="Enc" EncType="19">
-						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="3271557120" Offset="-22.9999998899607" MaxCount="#xffffffff"/>
+					<Encoder Name="Enc" EncType="4">
+						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="36864000" Offset="-22.9999998899607" Inverse="true" MaxCount="#xffffffff">
+							<Inc RefMode="2"/>
+						</EncPara>
 						<Vars VarGrpType="1">
 							<Name>Inputs</Name>
 							<Var>
@@ -1813,8 +1875,8 @@ External Setpoint Generation:
 						</Vars>
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
-						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020100">
-							<Analog VeloReferenz="11.4224" VeloScale="32" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
+						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020000">
+							<Analog VeloReferenz="11.4224" VeloScale="312" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
 						<Vars VarGrpType="1">
@@ -1893,7 +1955,7 @@ External Setpoint Generation:
 					<Name>HourAngle</Name>
 					<AxisPara>
 						<General UnitName="°"/>
-						<Dynamic Acceleration="4.92632" Deceleration="4.92632" Jerk="3.29172"/>
+						<Dynamic Acceleration="5.5025" Deceleration="5.5025" Jerk="3.20416"/>
 						<Velo RefSearch="0.10384" RefSync="0.10384" SlowManual="0.5192" FastManual="3.1152" Fast="10.384" Maximum="10.384"/>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
@@ -1959,7 +2021,7 @@ External Setpoint Generation:
 						</Vars>
 					</Encoder>
 					<Drive Name="Drive" DrvType="16">
-						<DrvPara MaxCount="#xffffffff">
+						<DrvPara MaxCount="#xffffffff" DriveControlDWord="#x00020000">
 							<Analog VeloReferenz="11.4224" VeloScale="312" TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
 							<TimeComp TaskDelayCycles="1"/>
 						</DrvPara>
@@ -2338,7 +2400,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{28A91C75-885A-C3DA-8599-8160262A40B2}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{8E30930D-CC7E-D987-C337-3B1ED9C98257}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -2369,6 +2431,27 @@ External Setpoint Generation:
 					</Vars>
 					<Vars VarGrpType="1" ContextId="1" AreaNo="16">
 						<Name>PlcTask Inputs</Name>
+						<Var>
+							<Name>MAIN.safetyHandling.inError</Name>
+							<Comment><![CDATA[ Safety Error Condition]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoGroup1</Name>
+							<Type GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib">ST_InfoDataGroup</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoEStop1</Name>
+							<Type GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib">ST_InfoDataFB</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoSafetyIn</Name>
+							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoSafetyOut</Name>
+							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
+						</Var>
 						<Var>
 							<Name>MAIN.haControl.axisRef.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
@@ -2452,6 +2535,21 @@ External Setpoint Generation:
 						</Var>
 						<Var>
 							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.outRun</Name>
+							<Comment><![CDATA[ Run/Stop Safety]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.outRestart</Name>
+							<Comment><![CDATA[ Restart Safety]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.outErrAck</Name>
+							<Comment><![CDATA[ Error Acknowledgement ]]></Comment>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
@@ -4022,7 +4120,7 @@ External Setpoint Generation:
 							<SyncMan>001000012600010001000000800000010001001026010000</SyncMan>
 							<SyncMan>001100012200010002000000800000010001001122010000</SyncMan>
 							<SyncMan>00120c002400010003000000000000000c00001224010000</SyncMan>
-							<SyncMan>001614002000010004000000000000001400001620010000</SyncMan>
+							<SyncMan>00160c002000010004000000000000001400001620010000</SyncMan>
 							<SyncMan>001a00002400000003000000000000000000001a24000000</SyncMan>
 							<SyncMan>001c00002000000004000000000000000000001c20000000</SyncMan>
 							<SyncMan>001e0e002400010003000000000000000a00001e24010000</SyncMan>
@@ -4085,7 +4183,7 @@ External Setpoint Generation:
 							<MBoxUserCmdData>020003000c0000003000000000000000000000000000000000000000000000002011811b0400000010270000445256204d6f746f722053657474696e67732043682e32202f204d6f746f72207370656564206c696d69746174696f6e00</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000a00000037000000000000000000000000000000000000000000000020128113020000000000445256204272616b652053657474696e67732043682e32202f20456d657267656e6379206170706c69636174696f6e2074696d656f757400</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000a00000030000000000000000000000000000000000000000000000020108133020000000a0044525620416d706c69666965722053657474696e67732043682e32202f205374616e64207374696c6c2077696e646f7700</MBoxUserCmdData>
-							<MBoxUserCmdData>02000300090000001200000003000000000000000000000000000000000000002010710301000000084d6f646573206f66206f7065726174696f6e00</MBoxUserCmdData>
+							<MBoxUserCmdData>02000300090000001200000003000000000000000000000000000000000000002010710301000000094d6f646573206f66206f7065726174696f6e00</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000a0000002e00000000000000000000000000000000000000000000002010711002000000ff7f445256204f7574707574732043682e32202f20506f73697469766520746f72717565206c696d69742076616c756500</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000a0000002e00000000000000000000000000000000000000000000002010711102000000ff7f445256204f7574707574732043682e32202f204e6567617469766520746f72717565206c696d69742076616c756500</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000900000046000000000000000000000000000000000000000000000020108157010000006444525620416d706c69666965722053657474696e67732043682e32202f20506f736974696f6e206c6f6f702076656c6f63697479206665656420666f7277617264206761696e00</MBoxUserCmdData>
@@ -4095,7 +4193,7 @@ External Setpoint Generation:
 							<MBoxUserCmdData>020003000a0000003800000000000000000000000000000000000000000000002010811202000000060044525620416d706c69666965722053657474696e67732043682e32202f2043757272656e74206c6f6f7020696e74656772616c2074696d6500</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000c0000003d000000000000000000000000000000000000000000000020108115040000004200000044525620416d706c69666965722053657474696e67732043682e32202f2056656c6f63697479206c6f6f702070726f706f7274696f6e616c206761696e00</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000c00000039000000000000000000000000000000000000000000000020108114040000009600000044525620416d706c69666965722053657474696e67732043682e32202f2056656c6f63697479206c6f6f7020696e74656772616c2074696d6500</MBoxUserCmdData>
-							<MBoxUserCmdData>02000300090000001200000003000000000000000000000000000000000000002010700301000000084d6f646573206f66206f7065726174696f6e00</MBoxUserCmdData>
+							<MBoxUserCmdData>02000300090000001200000003000000000000000000000000000000000000002010700301000000094d6f646573206f66206f7065726174696f6e00</MBoxUserCmdData>
 							<Pdo Name="FB Position Channel 1" Index="#x1a00" Flags="#x0010" SyncMan="3">
 								<Entry Name="Position" BitLen="32" Index="#x6000" Sub="#x11">
 									<Type>UDINT</Type>
@@ -4203,7 +4301,7 @@ Bit 13 : Input cycle counter
 Bit 14 - 15 : reserved]]></Comment>
 								</Entry>
 							</Pdo>
-							<Pdo Name="DRV Following error actual value Channel 1" Index="#x1a11" Flags="#x0010" SyncMan="3">
+							<Pdo Name="DRV Following error actual value Channel 1" Index="#x1a11" Flags="#x0010">
 								<Entry Name="Following error actual value" BitLen="32" Index="#x6010" Sub="#x06">
 									<Type>DINT</Type>
 								</Entry>
@@ -4600,7 +4698,7 @@ Bit 13 : Input cycle counter
 Bit 14 - 15 : reserved]]></Comment>
 								</Entry>
 							</Pdo>
-							<Pdo Name="DRV Following error actual value Channel 2" Index="#x1a51" Flags="#x0010" SyncMan="3">
+							<Pdo Name="DRV Following error actual value Channel 2" Index="#x1a51" Flags="#x0010">
 								<Entry Name="Following error actual value" BitLen="32" Index="#x6110" Sub="#x06">
 									<Type>DINT</Type>
 								</Entry>
@@ -4963,12 +5061,12 @@ Bit 7 : Fault reset
 Bit 8 - 15 : reserved]]></Comment>
 								</Entry>
 							</Pdo>
-							<Pdo Name="DRV Target position Channel 1" Index="#x1611" InOut="1" Flags="#x0010" SyncMan="2">
+							<Pdo Name="DRV Target position Channel 1" Index="#x1611" InOut="1" Flags="#x0010">
 								<Entry Name="Target position" BitLen="32" Index="#x7010" Sub="#x05">
 									<Type>UDINT</Type>
 								</Entry>
 							</Pdo>
-							<Pdo Name="DRV Target velocity Channel 1" Index="#x1612" InOut="1" Flags="#x0010">
+							<Pdo Name="DRV Target velocity Channel 1" Index="#x1612" InOut="1" Flags="#x0010" SyncMan="2">
 								<Entry Name="Target velocity" BitLen="32" Index="#x7010" Sub="#x06">
 									<Type>DINT</Type>
 								</Entry>
@@ -5193,12 +5291,12 @@ Bit 7 : Fault reset
 Bit 8 - 15 : reserved]]></Comment>
 								</Entry>
 							</Pdo>
-							<Pdo Name="DRV Target position Channel 2" Index="#x1651" InOut="1" Flags="#x0010" SyncMan="2">
+							<Pdo Name="DRV Target position Channel 2" Index="#x1651" InOut="1" Flags="#x0010">
 								<Entry Name="Target position" BitLen="32" Index="#x7110" Sub="#x05">
 									<Type>UDINT</Type>
 								</Entry>
 							</Pdo>
-							<Pdo Name="DRV Target velocity Channel 2" Index="#x1652" InOut="1" Flags="#x0010">
+							<Pdo Name="DRV Target velocity Channel 2" Index="#x1652" InOut="1" Flags="#x0010" SyncMan="2">
 								<Entry Name="Target velocity" BitLen="32" Index="#x7110" Sub="#x06">
 									<Type>DINT</Type>
 								</Entry>
@@ -7129,7 +7227,6 @@ Bit 8 - 15 : reserved]]></Comment>
 							<Fmmu>0000000000000000801100010100000002000000000000000000000000000000</Fmmu>
 							<Fmmu>00000000000000000d0800010100000003000000000000000000000000000000</Fmmu>
 							<BootStrapData>0010f400f410f400</BootStrapData>
-							<DcData>0000030300000000000000000000000001000000000000000000000000000000</DcData>
 							<DcMode>53796e6368726f6e00000000000000004672656552756e2f534d2d53796e6368726f6e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000</DcMode>
 							<DcMode>4443000000000000000000000000000044432d53796e6368726f6e000000000000000000000000000000000000000000000000007888ffffa8610000000000070100000000000000000000000000000000000000000000000000000000000000</DcMode>
 							<DcMode>4443494e00000000000000000000000044432d53796e6368726f6e2028696e7075742062617365642900000000000000000000007888ffffa8610000000000070100000000000000000001000000000000000000000000000000000000000000</DcMode>
@@ -7221,38 +7318,38 @@ Bit 8 - 15 : reserved]]></Comment>
 							<DcMode>4443000000000000000000000000000044432d53796e6368726f6e000000000000000000000000000000000000000000000000007888ffffa8610000000000070100000000000000000000000000000000000000000000000000000000000000</DcMode>
 							<DcMode>4443494e00000000000000000000000044432d53796e6368726f6e2028696e7075742062617365642900000000000000000000007888ffffa8610000000000070100000000000000000001000000000000000000000000000000000000000000</DcMode>
 							<MBoxUserCmdData>02000300090000000000000003000000000000000000000000000000000000002082f001010000000000</MBoxUserCmdData>
-							<Pdo Name="ENC Status" Index="#x1a00" Flags="#x0011" SyncMan="3">
-								<Entry Name="Status__Latch C valid" Index="#x6000" Sub="#x01">
+							<Pdo Name="ENC Status" Index="#x1a00" Flags="#x0010" SyncMan="3">
+								<Entry Name="Latch C valid" Index="#x6000" Sub="#x01">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__">
+								<Entry>
 									<Type GUID="{18071995-0000-0000-0000-002000000001}">ARRAY [0..0] OF BIT</Type>
 								</Entry>
-								<Entry Name="Status__Set counter done" Index="#x6000" Sub="#x03">
+								<Entry Name="Set counter done" Index="#x6000" Sub="#x03">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Frequency error" Index="#x6001" Sub="#x04">
+								<Entry Name="Frequency error" Index="#x6001" Sub="#x04">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__Amplitude error" Index="#x6001" Sub="#x05">
+								<Entry Name="Amplitude error" Index="#x6001" Sub="#x05">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__">
+								<Entry>
 									<Type GUID="{18071995-0000-0000-0000-002000000005}">ARRAY [0..4] OF BIT</Type>
 								</Entry>
-								<Entry Name="Status__Status of input C" Index="#x6000" Sub="#x0b">
+								<Entry Name="Status of input C" Index="#x6000" Sub="#x0b">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__">
+								<Entry>
 									<Type GUID="{18071995-0000-0000-0000-002000000002}">ARRAY [0..1] OF BIT</Type>
 								</Entry>
-								<Entry Name="Status__Sync error" Index="#x6000" Sub="#x0e">
+								<Entry Name="Sync error" Index="#x6000" Sub="#x0e">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__TxPDO State" Index="#x6000" Sub="#x0f">
+								<Entry Name="TxPDO State" Index="#x6000" Sub="#x0f">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Status__TxPDO Toggle" Index="#x6000" Sub="#x10">
+								<Entry Name="TxPDO Toggle" Index="#x6000" Sub="#x10">
 									<Type>BIT</Type>
 								</Entry>
 								<Entry Name="Counter value" Index="#x6000" Sub="#x11">
@@ -7272,17 +7369,17 @@ Bit 8 - 15 : reserved]]></Comment>
 									<Type>UDINT</Type>
 								</Entry>
 							</Pdo>
-							<Pdo Name="ENC Control" Index="#x1600" InOut="1" Flags="#x0011" SyncMan="2">
-								<Entry Name="Control__Enable latch C" Index="#x7000" Sub="#x01">
+							<Pdo Name="ENC Control" Index="#x1600" InOut="1" Flags="#x0010" SyncMan="2">
+								<Entry Name="Enable latch C" Index="#x7000" Sub="#x01">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Control__">
+								<Entry>
 									<Type GUID="{18071995-0000-0000-0000-002000000001}">ARRAY [0..0] OF BIT</Type>
 								</Entry>
-								<Entry Name="Control__Set counter" Index="#x7000" Sub="#x03">
+								<Entry Name="Set counter" Index="#x7000" Sub="#x03">
 									<Type>BIT</Type>
 								</Entry>
-								<Entry Name="Control__">
+								<Entry>
 									<Type GUID="{18071995-0000-0000-0000-00200000000D}">ARRAY [0..12] OF BIT</Type>
 								</Entry>
 								<Entry Name="Set counter value" Index="#x7000" Sub="#x11">
@@ -8005,8 +8102,24 @@ Bit 8 - 15 : reserved]]></Comment>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Declination">
+			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Encoder DEC (EL5021)">
+				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="ENC Status^Counter value"/>
+				<Link VarA="Enc^Inputs^In^nDataIn2" VarB="ENC Status^Latch value"/>
+				<Link VarA="Enc^Inputs^In^nState1" VarB="ENC Status^Latch C valid"/>
+				<Link VarA="Enc^Inputs^In^nState1" VarB="ENC Status^Set counter done" Size="1" OffsA="2"/>
+				<Link VarA="Enc^Inputs^In^nState2" VarB="ENC Status^Status of input C" Size="1" OffsA="2"/>
+				<Link VarA="Enc^Inputs^In^nState2" VarB="ENC Status^Sync error" Size="1" OffsA="5"/>
+				<Link VarA="Enc^Inputs^In^nState2" VarB="ENC Status^TxPDO State" Size="1" OffsA="6"/>
+				<Link VarA="Enc^Inputs^In^nState2" VarB="ENC Status^TxPDO Toggle" Size="1" OffsA="7"/>
+				<Link VarA="Enc^Inputs^In^nState3" VarB="ENC Status^Amplitude error" Size="1" OffsA="4"/>
+				<Link VarA="Enc^Inputs^In^nState3" VarB="ENC Status^Frequency error" Size="1" OffsA="3"/>
+				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^InputToggle" Size="1" OffsA="1"/>
+				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState"/>
+				<Link VarA="Enc^Outputs^Out^nCtrl1" VarB="ENC Control^Enable latch C" Size="1" OffsA="1"/>
+				<Link VarA="Enc^Outputs^Out^nCtrl1" VarB="ENC Control^Set counter" Size="1" OffsA="2"/>
+				<Link VarA="Enc^Outputs^Out^nDataOut1" VarB="ENC Control^Set counter value"/>
+			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
-				<Link VarA="Drive^Inputs^In^nDataIn1" VarB="DRV Following error actual value Channel 1^Following error actual value"/>
 				<Link VarA="Drive^Inputs^In^nDcOutputTime" VarB="InfoData^DcOutputShift"/>
 				<Link VarA="Drive^Inputs^In^nState1" VarB="DRV Statusword Channel 1^Statusword"/>
 				<Link VarA="Drive^Inputs^In^nState2" VarB="DRV Statusword Channel 1^Statusword" Size="8" OffsB="8"/>
@@ -8014,11 +8127,7 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^WcState0"/>
 				<Link VarA="Drive^Outputs^Out^nCtrl1" VarB="DRV Controlword Channel 1^Controlword"/>
 				<Link VarA="Drive^Outputs^Out^nCtrl2" VarB="DRV Controlword Channel 1^Controlword" Size="8" OffsB="8"/>
-				<Link VarA="Drive^Outputs^Out^nDataOut1" VarB="DRV Target position Channel 1^Target position"/>
-				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="FB Position Channel 1^Position"/>
-				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
-				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
-				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState0"/>
+				<Link VarA="Drive^Outputs^Out^nDataOut2" VarB="DRV Target velocity Channel 1^Target velocity"/>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Focus">
@@ -8065,6 +8174,7 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="Drive^Inputs^In^nState4" VarB="WcState^WcState0"/>
 				<Link VarA="Drive^Outputs^Out^nCtrl1" VarB="DRV Controlword Channel 2^Controlword"/>
 				<Link VarA="Drive^Outputs^Out^nCtrl2" VarB="DRV Controlword Channel 2^Controlword" Size="8" OffsB="8"/>
+				<Link VarA="Drive^Outputs^Out^nDataOut2" VarB="DRV Target velocity Channel 2^Target velocity"/>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TIPC^IAG50cm^IAG50cm Instance">
@@ -8191,9 +8301,17 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Restart" VarB="StandardOutputs^TwinSafeGroup1.Restart_6"/>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="StandardOutputs^TwinSafeGroup1.Run_1"/>
 			</OwnerB>
+			<OwnerB Name="TINC^NC-Task 1 SAF^Axes^Declination">
+				<Link VarA="PlcTask Inputs^MAIN.latch_test.Axis.NcToPlc" VarB="Outputs^ToPlc"/>
+				<Link VarA="PlcTask Outputs^MAIN.latch_test.Axis.PlcToNc" VarB="Inputs^FromPlc"/>
+			</OwnerB>
 			<OwnerB Name="TINC^NC-Task 1 SAF^Axes^Focus">
 				<Link VarA="PlcTask Inputs^MAIN.focusControl.axisRef.NcToPlc" VarB="Outputs^ToPlc"/>
 				<Link VarA="PlcTask Outputs^MAIN.focusControl.axisRef.PlcToNc" VarB="Inputs^FromPlc"/>
+			</OwnerB>
+			<OwnerB Name="TINC^NC-Task 1 SAF^Axes^HourAngle">
+				<Link VarA="PlcTask Inputs^MAIN.haControl.axisRef.NcToPlc" VarB="Outputs^ToPlc"/>
+				<Link VarA="PlcTask Outputs^MAIN.haControl.axisRef.PlcToNc" VarB="Inputs^FromPlc"/>
 			</OwnerB>
 		</OwnerA>
 	</Mappings>
