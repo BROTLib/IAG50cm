@@ -945,9 +945,7 @@ fbCovers.Open();
 // enable elevation, enable azimuth
 IF bMainReady AND fbCovers.Opened THEN 
 	fbHourAngle.Enable := TRUE;
-	IF fbHourAngle.Calibrated THEN
-		fbDeclination.Enable := TRUE;
-	END_IF
+	fbDeclination.Enable := TRUE;
 END_IF
 
 
@@ -1676,7 +1674,7 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="63" Count="0" />
       <LineId Id="65" Count="0" />
       <LineId Id="13" Count="4" />
-      <LineId Id="84" Count="2" />
+      <LineId Id="84" Count="0" />
       <LineId Id="20" Count="0" />
       <LineId Id="28" Count="1" />
       <LineId Id="33" Count="9" />
