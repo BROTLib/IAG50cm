@@ -1815,7 +1815,7 @@ External Setpoint Generation:
 						<OtherSettings AllowMotionCmdToSlave="true"/>
 					</AxisPara>
 					<Encoder Name="Enc" EncType="4">
-						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="36864000" Offset="-22.9999998899607" Inverse="true" MaxCount="#xffffffff">
+						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="36864000" Offset="-23.0000030811016" Inverse="true" MaxCount="#xffffffff">
 							<Inc RefMode="2"/>
 						</EncPara>
 						<Vars VarGrpType="1">
@@ -2400,7 +2400,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{DCF7661A-492F-0EFA-8678-04B2FE59B262}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{5913B821-94C8-0995-892D-227FD5D61464}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -2432,32 +2432,11 @@ External Setpoint Generation:
 					<Vars VarGrpType="1" ContextId="1" AreaNo="16">
 						<Name>PlcTask Inputs</Name>
 						<Var>
-							<Name>MAIN.safetyHandling.inError</Name>
-							<Comment><![CDATA[ Safety Error Condition]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoGroup1</Name>
-							<Type GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib">ST_InfoDataGroup</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoEStop1</Name>
-							<Type GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib">ST_InfoDataFB</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoSafetyIn</Name>
-							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoSafetyOut</Name>
-							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.haControl.axisRef.NcToPlc</Name>
+							<Name>MAIN.focusControl.axisRef.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.decControl.axisRef.NcToPlc</Name>
+							<Name>MAIN.haControl.axisRef.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
@@ -2490,6 +2469,27 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
+							<Name>MAIN.safetyHandling.inError</Name>
+							<Comment><![CDATA[ Safety Error Condition]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoGroup1</Name>
+							<Type GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib">ST_InfoDataGroup</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoEStop1</Name>
+							<Type GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib">ST_InfoDataFB</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoSafetyIn</Name>
+							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoSafetyOut</Name>
+							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
+						</Var>
+						<Var>
 							<Name>MAIN.latch_test.Axis.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
@@ -2498,7 +2498,7 @@ External Setpoint Generation:
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.focusControl.axisRef.NcToPlc</Name>
+							<Name>MAIN.decControl.axisRef.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 					</Vars>
@@ -2538,6 +2538,14 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
+							<Name>MAIN.focusControl.axisRef.PlcToNc</Name>
+							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.haControl.axisRef.PlcToNc</Name>
+							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
+						</Var>
+						<Var>
 							<Name>MAIN.safetyHandling.outRun</Name>
 							<Comment><![CDATA[ Run/Stop Safety]]></Comment>
 							<Type>BOOL</Type>
@@ -2553,14 +2561,6 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.haControl.axisRef.PlcToNc</Name>
-							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.decControl.axisRef.PlcToNc</Name>
-							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
-						</Var>
-						<Var>
 							<Name>MAIN.latch_test.Axis.PlcToNc</Name>
 							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
 						</Var>
@@ -2569,7 +2569,7 @@ External Setpoint Generation:
 							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.focusControl.axisRef.PlcToNc</Name>
+							<Name>MAIN.decControl.axisRef.PlcToNc</Name>
 							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
 						</Var>
 					</Vars>
@@ -7216,7 +7216,7 @@ Bit 8 - 15 : reserved]]></Comment>
 						</EtherCAT>
 					</Box>
 					<Box Id="11" BoxType="9099" BoxFlags="#x00000020">
-						<Name>Encoder HA (EL5021)</Name>
+						<Name>Encoder DEC (EL5021)</Name>
 						<ImageId>1006</ImageId>
 						<EtherCAT SlaveType="2" PdiType="#x0405" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="47" FoeType="1" VendorId="#x00000002" ProductCode="#x139d3052" RevisionNo="#x00160000" InfoDataAddr="true" InfoDataDcTimes="true" RepeatSupport="true" SetFrameRepeatTime="true" TimeoutMailbox2="2000" CheckRevisionNoType="3" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL5021 1Ch. Sin/Cos Encoder" Desc="EL5021" PortABoxInfo="#x0100000c">
 							<SyncMan>001080002600010001000000400080008000001026010000</SyncMan>
@@ -7303,7 +7303,7 @@ Bit 8 - 15 : reserved]]></Comment>
 						</EtherCAT>
 					</Box>
 					<Box Id="14" BoxType="9099" BoxFlags="#x00000020">
-						<Name>Encoder DEC (EL5021)</Name>
+						<Name>Encoder HA (EL5021)</Name>
 						<ImageId>1006</ImageId>
 						<EtherCAT SlaveType="2" PdiType="#x0405" MboxDataLinkLayer="true" StateMBoxPolling="true" CycleMBoxPollingTime="0" CoeType="39" FoeType="1" VendorId="#x00000002" ProductCode="#x139d3052" RevisionNo="#x00160000" InfoDataAddr="true" RepeatSupport="true" SetFrameRepeatTime="true" TimeoutMailbox2="2000" CheckRevisionNoType="3" PortPhys="51" MaxSlotCount="256" MaxSlotGroupCount="1" SlotPdoIncrement="1" SlotIndexIncrement="16" Type="EL5021 1Ch. Sin/Cos Encoder" Desc="EL5021" PortABoxInfo="#x0100000b">
 							<SyncMan>001080002600010001000000400080008000001026010000</SyncMan>
@@ -8105,6 +8105,7 @@ Bit 8 - 15 : reserved]]></Comment>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Encoder DEC (EL5021)">
 				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="ENC Status^Counter value"/>
 				<Link VarA="Enc^Inputs^In^nDataIn2" VarB="ENC Status^Latch value"/>
+				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
 				<Link VarA="Enc^Inputs^In^nState1" VarB="ENC Status^Latch C valid"/>
 				<Link VarA="Enc^Inputs^In^nState1" VarB="ENC Status^Set counter done" Size="1" OffsA="2"/>
 				<Link VarA="Enc^Inputs^In^nState2" VarB="ENC Status^Status of input C" Size="1" OffsA="2"/>
@@ -8151,7 +8152,6 @@ Bit 8 - 15 : reserved]]></Comment>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Encoder HA (EL5021)">
 				<Link VarA="Enc^Inputs^In^nDataIn1" VarB="ENC Status^Counter value"/>
 				<Link VarA="Enc^Inputs^In^nDataIn2" VarB="ENC Status^Latch value"/>
-				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
 				<Link VarA="Enc^Inputs^In^nState1" VarB="ENC Status^Latch C valid"/>
 				<Link VarA="Enc^Inputs^In^nState1" VarB="ENC Status^Set counter done" Size="1" OffsA="2"/>
 				<Link VarA="Enc^Inputs^In^nState2" VarB="ENC Status^Status of input C" Size="1" OffsA="2"/>
@@ -8302,8 +8302,8 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="StandardOutputs^TwinSafeGroup1.Run_1"/>
 			</OwnerB>
 			<OwnerB Name="TINC^NC-Task 1 SAF^Axes^Declination">
-				<Link VarA="PlcTask Inputs^MAIN.latch_test.Axis.NcToPlc" VarB="Outputs^ToPlc"/>
-				<Link VarA="PlcTask Outputs^MAIN.latch_test.Axis.PlcToNc" VarB="Inputs^FromPlc"/>
+				<Link VarA="PlcTask Inputs^MAIN.decControl.axisRef.NcToPlc" VarB="Outputs^ToPlc"/>
+				<Link VarA="PlcTask Outputs^MAIN.decControl.axisRef.PlcToNc" VarB="Inputs^FromPlc"/>
 			</OwnerB>
 			<OwnerB Name="TINC^NC-Task 1 SAF^Axes^Focus">
 				<Link VarA="PlcTask Inputs^MAIN.focusControl.axisRef.NcToPlc" VarB="Outputs^ToPlc"/>

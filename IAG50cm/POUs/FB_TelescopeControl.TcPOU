@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_TelescopeControl" Id="{10c2c294-efcf-424f-afd3-75ac57a5e8bc}" SpecialFunc="None">
-    <Declaration><![CDATA[FUNCTION_BLOCK FB_TelescopeControl IMPLEMENTS I_RaDecTelescope
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_TelescopeControl IMPLEMENTS I_RaDecTelescope, I_Telescope
 VAR_INPUT
 (*
 TCS interface section
@@ -945,16 +945,11 @@ fbCovers.Open();
 // enable elevation, enable azimuth
 IF bMainReady AND fbCovers.Opened THEN 
 	fbHourAngle.Enable := TRUE;
-	fbDeclination.Enable := TRUE;
+	IF fbHourAngle.Calibrated THEN
+		fbDeclination.Enable := TRUE;
+	END_IF
 END_IF
 
-IF fbHourAngle.Ready AND NOT fbHourAngle.Calibrated THEN
-	fbHourAngle.HomeAxis := TRUE;
-END_IF
-
-IF fbDeclination.Ready AND NOT fbDeclination.Calibrated THEN
-	fbDeclination.HomeAxis := TRUE;
-END_IF
 
 
 
@@ -1001,6 +996,7 @@ IF command_timeout.Q THEN
 	errorid := 16#40;
 	bSlew := FALSE;
 	Stage := 0;
+	RETURN;
 END_IF
 IF fElevation < fHorizon THEN
 	bHorizonError := TRUE;
@@ -1166,12 +1162,12 @@ IF NOT fbHourAngle.Tracking THEN
 	IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 		fbHourAngle.MoveAxis := FALSE;
 		IF fbHourAngle.isTracking THEN
-			fbHourAngle.Velocity := 0.5*0.004;
+			fbHourAngle.Velocity := 0.5;//*0.004;
 		END_IF
 		fbHourAngle.Tracking := TRUE;
 	END_IF
 ELSE
-	fbHourAngle.Velocity := 0.5*0.004;
+	fbHourAngle.Velocity := 0.5;//*0.004;
 END_IF
 
 // Declination (should not move while tracking)
@@ -1317,30 +1313,6 @@ END_VAR
         <ST><![CDATA[bPower := TRUE;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="MoveAltAz" Id="{c6c43861-5da1-4194-b463-81c0490ebb78}" FolderPath="command methods\">
-      <Declaration><![CDATA[METHOD MoveAltAz : BOOL
-VAR_INPUT
-	AltAz	: BROTLib.ST_AltAzCoordinate;
-END_VAR
-]]></Declaration>
-      <Implementation>
-        <ST><![CDATA[fElevation 	:= AltAz.Altitude;
-fAzimuth 	:= AltAz.Azimuth;
-bSlew		:= TRUE;]]></ST>
-      </Implementation>
-    </Method>
-    <Method Name="MoveRaDec" Id="{f860f1af-1ff9-4d1a-a407-9f1e7e899f51}" FolderPath="command methods\">
-      <Declaration><![CDATA[METHOD MoveRaDec : BOOL
-VAR_INPUT
-	RaDec	: BROTLib.ST_RaDecCoordinate;
-END_VAR
-]]></Declaration>
-      <Implementation>
-        <ST><![CDATA[fRightAscension	:= RaDec.RightAscension;
-fDeclination	:= RaDec.Declination;
-bGoto			:= TRUE;]]></ST>
-      </Implementation>
-    </Method>
     <Method Name="Park" Id="{d8a2b837-9b51-4592-a9b7-5ddb1b1403bd}" FolderPath="command methods\">
       <Declaration><![CDATA[METHOD Park : BOOL
 ]]></Declaration>
@@ -1441,7 +1413,9 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
+        <ST><![CDATA[THIS^.fElevation 	:= fAltitude;
+THIS^.fAzimuth 	:= fAzimuth;
+bSlew		:= TRUE;]]></ST>
       </Implementation>
     </Method>
     <Method Name="Stop" Id="{e66d844d-991d-4af1-8b55-fe6740342385}" FolderPath="command methods\">
@@ -1460,20 +1434,9 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
-      </Implementation>
-    </Method>
-    <Method Name="TrackRaDec" Id="{30315973-ed3d-4ebf-826f-7c2c721d63f9}" FolderPath="command methods\">
-      <Declaration><![CDATA[METHOD TrackRaDec : BOOL
-VAR_INPUT
-	RaDec	: BROTLib.ST_RaDecCoordinate;
-END_VAR
-]]></Declaration>
-      <Implementation>
-        <ST><![CDATA[fRightAscension	:= RaDec.RightAscension;
-fDeclination	:= RaDec.Declination;
-bTrack			:= TRUE;
-]]></ST>
+        <ST><![CDATA[THIS^.fRightAscension	:= fRightAscension;
+THIS^.fDeclination	:= fDeclination;
+bGoto			:= TRUE;]]></ST>
       </Implementation>
     </Method>
     <LineIds Name="FB_TelescopeControl">
@@ -1712,8 +1675,10 @@ bTrack			:= TRUE;
       <LineId Id="69" Count="0" />
       <LineId Id="63" Count="0" />
       <LineId Id="65" Count="0" />
-      <LineId Id="13" Count="5" />
-      <LineId Id="20" Count="9" />
+      <LineId Id="13" Count="4" />
+      <LineId Id="84" Count="2" />
+      <LineId Id="20" Count="0" />
+      <LineId Id="28" Count="1" />
       <LineId Id="33" Count="9" />
       <LineId Id="44" Count="0" />
       <LineId Id="80" Count="0" />
@@ -1723,7 +1688,9 @@ bTrack			:= TRUE;
       <LineId Id="48" Count="7" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._SlewTelescope">
-      <LineId Id="1" Count="7" />
+      <LineId Id="1" Count="6" />
+      <LineId Id="199" Count="0" />
+      <LineId Id="8" Count="0" />
       <LineId Id="71" Count="5" />
       <LineId Id="70" Count="0" />
       <LineId Id="9" Count="1" />
@@ -1802,12 +1769,6 @@ bTrack			:= TRUE;
     <LineIds Name="FB_TelescopeControl.Init">
       <LineId Id="1" Count="0" />
     </LineIds>
-    <LineIds Name="FB_TelescopeControl.MoveAltAz">
-      <LineId Id="1" Count="2" />
-    </LineIds>
-    <LineIds Name="FB_TelescopeControl.MoveRaDec">
-      <LineId Id="1" Count="2" />
-    </LineIds>
     <LineIds Name="FB_TelescopeControl.Park">
       <LineId Id="1" Count="0" />
       <LineId Id="9" Count="0" />
@@ -1837,17 +1798,15 @@ bTrack			:= TRUE;
       <LineId Id="1" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Slew">
+      <LineId Id="15" Count="1" />
       <LineId Id="8" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Stop">
       <LineId Id="1" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.Track">
+      <LineId Id="15" Count="1" />
       <LineId Id="8" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_TelescopeControl.TrackRaDec">
-      <LineId Id="1" Count="2" />
-      <LineId Id="13" Count="0" />
     </LineIds>
   </POU>
 </TcPlcObject>

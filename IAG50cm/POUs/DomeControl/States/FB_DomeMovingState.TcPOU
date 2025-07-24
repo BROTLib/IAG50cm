@@ -11,6 +11,7 @@ VAR
 	tonMoveDelay: TON:= (PT:=T#10M); // only move the Dome every PT minutes
 	
 	sSeperator		: STRING := 'd#azi';
+	sSend			: STRING := 'd#azi';
 	sLeft			: STRING;
 	sAzi			: STRING;
 	fAzi		: LREAL;
@@ -64,8 +65,16 @@ END_VAR
 		ELSE
 			fAzi := pDome^._Position + 180.0;
 		END_IF
-
-		pDome^.fbSend(	SendString:= CONCAT('d#azi', INT_TO_STRING(LREAL_TO_INT(fAzi*10))),
+		IF LREAL_TO_INT(fAzi*10) < 10 THEN
+			sSend := CONCAT('d#azi000',  INT_TO_STRING(LREAL_TO_INT(fAzi*10)));
+		ELSIF LREAL_TO_INT(fAzi*10) < 100 THEN
+			sSend := CONCAT('d#azi00',  INT_TO_STRING(LREAL_TO_INT(fAzi*10)));
+		ELSIF LREAL_TO_INT(fAzi*10) < 1000 THEN
+			sSend := CONCAT('d#azi0',  INT_TO_STRING(LREAL_TO_INT(fAzi*10)));
+		ELSE
+			sSend := CONCAT('d#azi', INT_TO_STRING(LREAL_TO_INT(fAzi*10)));
+		END_IF
+		pDome^.fbSend(	SendString:= sSend,
 					TXbuffer:= TxBufferDome,
 					Busy=>,
 					Error=> );
@@ -147,6 +156,9 @@ pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       <LineId Id="188" Count="0" />
       <LineId Id="47" Count="4" />
       <LineId Id="189" Count="0" />
+      <LineId Id="193" Count="0" />
+      <LineId Id="195" Count="5" />
+      <LineId Id="194" Count="0" />
       <LineId Id="52" Count="8" />
       <LineId Id="116" Count="0" />
       <LineId Id="61" Count="4" />

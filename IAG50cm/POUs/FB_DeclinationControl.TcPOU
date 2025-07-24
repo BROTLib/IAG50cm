@@ -1,14 +1,19 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_DeclinationControl" Id="{6080c426-7a5e-4f1a-af47-78007455d126}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_DeclinationControl EXTENDS FB_AxisControl
 VAR_INPUT
-	fMinPosition : LREAL := -90.0;
-	fMaxPosition : LREAL := 90.0;
+	fMinPosition : LREAL := -25.0;
+	fMaxPosition : LREAL := 135.0;
 END_VAR
 VAR_OUTPUT
 END_VAR
 VAR
+	bAxisError : BOOL;
+	bLatchHomeError	: BOOL;
+	nAxisErrorID : UDINT;
+	nLatchHomeErrorID: UDINT;
+	fbLatchHome : FB_LatchHome;
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -33,7 +38,7 @@ fbAxis(
 	enable 			:= bEnable,
 	Reset 			:= bReset,
 	MoveAxis 		:= bMoveAxis,
-	HomeAxis 		:= bHomeAxis,
+	HomeAxis 		:= FALSE,
 	StopAxis 		:= bStopAxis,
 	Tracking 		:= bTracking,
 	HomingMode 		:= MC_ForceCalibration,
@@ -48,11 +53,35 @@ fbAxis(
 	ErrorID 		=> nErrorID,
 	AxisRef 		:= axisRef);
 	
+fbLatchHome(
+	Axis				:= AxisRef,
+	Execute				:= bHomeAxis,
+	Direction 			:= MC_Home_Direction.mcPositiveDirection,
+	Velocity 			:= 1.0,
+	Acceleration		:= 3.6,
+	Deceleration		:= 3.6,
+	Jerk				:= 3.6,
+	RefPosition			:= -20.94,
+	RefDistance			:= 5.22,
+	TimeLimit 			:= T#1M,
+	DistanceLimit 		:= 6,
+	Error 				=> bLatchHomeError,
+	ErrorID 			=> nLatchHomeErrorID);
+	
+
+bError := bLatchHomeError OR bAxisError;
+
+IF bAxisError THEN
+	nErrorID := nAxisErrorID;
+ELSIF bLatchHomeError THEN
+	nErrorID := nLatchHomeErrorID;
+END_IF
+	
 IF fbAxis.MoveDone OR bReset OR bError THEN
 	bMoveAxis := FALSE;
 END_IF
 
-IF fbAxis.HomeDone OR bReset OR bError THEN
+IF (fbAxis.HomeDone AND fbLatchHome.Done) OR bReset OR bError THEN
 	bHomeAxis := FALSE;
 END_IF
 	
@@ -113,7 +142,14 @@ CalibrationEvent(
       <LineId Id="136" Count="0" />
       <LineId Id="33" Count="4" />
       <LineId Id="97" Count="1" />
-      <LineId Id="39" Count="46" />
+      <LineId Id="39" Count="3" />
+      <LineId Id="146" Count="0" />
+      <LineId Id="148" Count="21" />
+      <LineId Id="147" Count="0" />
+      <LineId Id="43" Count="4" />
+      <LineId Id="50" Count="0" />
+      <LineId Id="170" Count="1" />
+      <LineId Id="51" Count="34" />
       <LineId Id="99" Count="8" />
       <LineId Id="121" Count="5" />
       <LineId Id="87" Count="0" />
