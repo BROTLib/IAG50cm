@@ -16,16 +16,16 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	bStop				: BOOL;		// boolean, TRUE: Stop motion OF telescope immediately, set goto AND track TO FALSE. FALSE: Allow motion OF telescope again via track/goto).	
 	bReset				: BOOL;		// initiates reset on all axis
 	bAutoTrack			: BOOL := TRUE;	// automatic tracking after goto
-	fRightAscension		: LREAL := (4.0 + 35.0/60.0 + 54.09/3600.0) *15.0;	// apparent right ascension, degrees, double	
-	fDeclination		: LREAL := 16.0 + 30.0/60.0 + 25.4/3600.0;	// apparent declination, degrees, double
-	fElevation			: LREAL := 45.0;	// desired elevation of the telescope pointing
-	fAzimuth			: LREAL := 320.0;	// desired azimut of the telescope pointing
+	fRightAscension		: LREAL :=  0.0;	// apparent right ascension, degrees, double	
+	fDeclination		: LREAL :=  0.0;	// apparent declination, degrees, double
+	fElevation			: LREAL :=  0.0;	// desired elevation of the telescope pointing
+	fAzimuth			: LREAL :=  0.0;	// desired azimut of the telescope pointing
 	fRightAscensionOffset	: LREAL := 0.0;		// absolute offset for elevation
 	fDeclinationOffset 	: LREAL := 0.0;		// absolute offset for azimuth
 	fTimeOffset			: LREAL := 0.0;		// absolute offset for time
-	fHorizon			: LREAL := 10.0;	// ELEVATION below which value the telescope will not go
+	fHorizon			: LREAL := 1.0;	// ELEVATION below which value the telescope will not go
 	
-	fSlewVelocity		: LREAL := 2.0;		// Motor velocity for moving the telescope in degree/s
+	fSlewVelocity		: LREAL := 4.0;		// Motor velocity for moving the telescope in degree/s
 	
 	bEstopTriggered		: BOOL	:= FALSE;	// TODO: CHANGE
 	bMainReady			: BOOL	:= TRUE;
@@ -189,7 +189,9 @@ eq2hor(
 	dec := fDeclination + fDeclinationOffset,
 	lon := telescopeConfig.longitude,
 	lat := telescopeConfig.latitude,
+	altitude := telescopeConfig.altitude,
 	JD := jd + fTimeOffset,
+	refract_to_observed := TRUE,
 	alt => elevation_calc,
 	az => azimuth_calc,
 	ha => fHourAngle);
@@ -201,6 +203,7 @@ hor2eq(alt := fElevation,
 		lat := telescopeConfig.latitude,
 		lon := telescopeConfig.longitude,
 		altitude := telescopeConfig.altitude,
+		refract_to_observed := TRUE,
 		ra => rightascension_calc,
 		dec => declination_calc,
 		ha => hourangle_calc);		
@@ -222,6 +225,8 @@ eq2hor(
 	dec := declination_current,
 	lon := telescopeConfig.longitude,
 	lat := telescopeConfig.latitude,
+	altitude := telescopeConfig.altitude,
+	refract_to_observed := FALSE,
 	JD := jd + fTimeOffset,
 	alt => elevation_current,
 	az => azimuth_current);
@@ -952,16 +957,15 @@ END_IF
 
 
 // start calibration of focus after elevation has been calibrated
-// this avoids imbalance by the M2 mirror on the elvation during its calibration
 IF fbHourAngle.Calibrated AND (fbFocus <> 0 AND_THEN NOT fbFocus.Calibrated) THEN
 	fbFocus.Enable := TRUE;
 	fbFocus.HomeAxis := TRUE;
 END_IF
 
 IF fbHourAngle.Calibrated AND
-	fbDeclination.Calibrated THEN
-	//fbCovers.Opened AND 
-	//FocusControl.Calibrated THEN
+	fbDeclination.Calibrated AND
+	fbCovers.Opened AND 
+	fbFocus.Calibrated THEN
 	//PowerOn is done, set bPower to False
 	bPower := FALSE;
 	_PowerOn := TRUE;
@@ -1160,12 +1164,12 @@ IF NOT fbHourAngle.Tracking THEN
 	IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 		fbHourAngle.MoveAxis := FALSE;
 		IF fbHourAngle.isTracking THEN
-			fbHourAngle.Velocity := 0.5;//*0.004;
+			fbHourAngle.Velocity := 0.004;//*0.004;
 		END_IF
 		fbHourAngle.Tracking := TRUE;
 	END_IF
 ELSE
-	fbHourAngle.Velocity := 0.5;//*0.004;
+	fbHourAngle.Velocity := 0.004;//*0.004;
 END_IF
 
 // Declination (should not move while tracking)
@@ -1176,15 +1180,12 @@ IF NOT fbDeclination.Tracking THEN
 	IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 		fbDeclination.MoveAxis := FALSE;
 		IF fbDeclination.isTracking THEN
-			fbDeclination.Velocity := 0.5;
-		ELSE
-			fbDeclination.Velocity := 1.0;
+			fbDeclination.Velocity := 0.004;
 		END_IF
-		//fbDeclination.Velocity := 1.0;
 		fbDeclination.Tracking := TRUE;
 	END_IF
 ELSE
-	fbDeclination.Velocity := 0.5;
+	fbDeclination.Velocity := 0.004;
 END_IF
 ]]></ST>
       </Implementation>
@@ -1476,9 +1477,15 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="5466" Count="2" />
       <LineId Id="5474" Count="0" />
       <LineId Id="5910" Count="0" />
-      <LineId Id="5475" Count="9" />
+      <LineId Id="5475" Count="5" />
+      <LineId Id="7622" Count="0" />
+      <LineId Id="5481" Count="0" />
+      <LineId Id="7620" Count="0" />
+      <LineId Id="5482" Count="2" />
       <LineId Id="5900" Count="0" />
-      <LineId Id="5902" Count="7" />
+      <LineId Id="5902" Count="6" />
+      <LineId Id="7621" Count="0" />
+      <LineId Id="5909" Count="0" />
       <LineId Id="5901" Count="0" />
       <LineId Id="5911" Count="0" />
       <LineId Id="5485" Count="0" />
@@ -1487,7 +1494,9 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="6274" Count="0" />
       <LineId Id="6276" Count="4" />
       <LineId Id="5896" Count="0" />
-      <LineId Id="6025" Count="7" />
+      <LineId Id="6025" Count="4" />
+      <LineId Id="7623" Count="1" />
+      <LineId Id="6030" Count="2" />
       <LineId Id="6774" Count="0" />
       <LineId Id="6754" Count="0" />
       <LineId Id="5520" Count="0" />
@@ -1677,7 +1686,8 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="84" Count="0" />
       <LineId Id="20" Count="0" />
       <LineId Id="28" Count="1" />
-      <LineId Id="33" Count="9" />
+      <LineId Id="33" Count="2" />
+      <LineId Id="37" Count="5" />
       <LineId Id="44" Count="0" />
       <LineId Id="80" Count="0" />
       <LineId Id="46" Count="0" />
@@ -1732,7 +1742,9 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="35" Count="6" />
       <LineId Id="76" Count="0" />
       <LineId Id="45" Count="0" />
-      <LineId Id="47" Count="24" />
+      <LineId Id="47" Count="14" />
+      <LineId Id="64" Count="0" />
+      <LineId Id="66" Count="5" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl.AltAz.Get">
       <LineId Id="1" Count="1" />

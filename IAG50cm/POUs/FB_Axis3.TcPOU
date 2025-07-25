@@ -124,8 +124,8 @@ Axis_Reset(
 IF Tracking THEN
 	PositionDifference := LIMIT(-0.002, Position - ActualPosition, 0.002);
 	TrackPosition := ActualPosition + PositionDifference;
-	TrackVelocity := 0.0; // LIMIT(-1.0, 2.0 * Velocity, 1.0);
-	TrackAcceleration := 0.0;
+	TrackVelocity := ABS(LIMIT(0.005, Velocity, 0.005));
+	TrackAcceleration := 0.005;
 ELSE
 	TrackPosition := ActualPosition;
 	TrackVelocity := 0.0;
@@ -135,6 +135,8 @@ END_IF
 
 IF NOT Tracking OR ABS(PositionDifference) < 1E-5 THEN // TrackVelocity = 0 AND TrackAcceleration = 0 THEN
 	Direction := 0;
+	TrackVelocity := 0.0;
+	TrackAcceleration := 0.0;
 ELSIF PositionDifference < 0.0 THEN
 	Direction := -1;
 ELSE
@@ -154,7 +156,7 @@ Axis_SetpointEnable(Axis := AxisRef,
 	
 MC_ExtSetPointGenFeed(
 	Position :=		TrackPosition,
-	Velocity :=		TrackVelocity,
+	Velocity :=		Direction*TrackVelocity,
 	Acceleration :=	TrackAcceleration,
 	Direction :=	Direction, 
 	Axis :=			AxisRef);
@@ -344,6 +346,7 @@ Homing :=	Axis_Status.Homing;
       <LineId Id="1812" Count="0" />
       <LineId Id="2590" Count="0" />
       <LineId Id="2143" Count="0" />
+      <LineId Id="2919" Count="1" />
       <LineId Id="2142" Count="0" />
       <LineId Id="1417" Count="0" />
       <LineId Id="1419" Count="1" />

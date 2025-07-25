@@ -3,8 +3,8 @@
   <POU Name="FB_DeclinationControl" Id="{6080c426-7a5e-4f1a-af47-78007455d126}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_DeclinationControl EXTENDS FB_AxisControl
 VAR_INPUT
-	fMinPosition : LREAL := -25.0;
-	fMaxPosition : LREAL := 135.0;
+	fMinPosition : LREAL := -50.0;
+	fMaxPosition : LREAL := 180.0;
 END_VAR
 VAR_OUTPUT
 END_VAR
