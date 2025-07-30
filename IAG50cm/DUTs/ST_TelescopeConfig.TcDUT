@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <DUT Name="ST_TelescopeConfig" Id="{eb9f05db-0117-4418-8332-83c0c99dadb1}">
     <Declaration><![CDATA[TYPE ST_TelescopeConfig :
 STRUCT
@@ -16,6 +16,8 @@ STRUCT
 	// home position
 	hourangleHome		: LREAL;
 	declinationHome		: LREAL;
+	focusHome			: LREAL;
+
 END_STRUCT
 END_TYPE]]></Declaration>
   </DUT>

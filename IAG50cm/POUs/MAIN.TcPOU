@@ -19,8 +19,8 @@ VAR
 END_VAR
 VAR CONSTANT
 	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
-													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 1.0,
-													hourangleHome := 0.0, declinationHome := -23.0);
+													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 8.0,
+													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 8.0);
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[latch_test();
@@ -57,6 +57,7 @@ comm(
 	sTopicPublish		:= '50cm/Telemetry',
 	sTopicLog			:= '50cm/Log',
 	Telescope			:= telescopeControl,
+	RaDecTelescope		:= telescopeControl,
 	Focus				:= focusControl,
 	Dome				:= domeControl
 );
@@ -85,7 +86,9 @@ comm(
       <LineId Id="252" Count="0" />
       <LineId Id="251" Count="0" />
       <LineId Id="22" Count="6" />
-      <LineId Id="84" Count="1" />
+      <LineId Id="84" Count="0" />
+      <LineId Id="273" Count="0" />
+      <LineId Id="85" Count="0" />
       <LineId Id="168" Count="0" />
       <LineId Id="20" Count="0" />
       <LineId Id="248" Count="0" />

@@ -10,7 +10,7 @@ VAR
 	Stage 					: UINT;
 	tonCount 				: TON:= (PT:=T#1S);
 	fCurrentFocusPosition 	: LREAL;
-	fSmallStep				: LREAL := 0.005;
+	fSmallStep				: LREAL := 0.1;
 	fBigStep				: LREAL := 1.0;
 	fSetFocusPosition		: LREAL;
 	sSetFocusPosition		: STRING;

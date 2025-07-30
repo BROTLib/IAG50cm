@@ -197,7 +197,7 @@ CASE Stage OF
 		END_IF
 	6:
 		tonTimeout(IN:=FALSE);
-		IF ABS( pDome^.Position - pDome^._Position) > 10.0 AND pDome^._Track AND pDome^._DomeRotationState <> E_DomeRotationState.slewing THEN
+		IF ABS( pDome^.Position - pDome^._Position) > 10.0 AND pDome^._Track THEN
 			MoveCommand();
 		ELSE
 			Stage:= 7;

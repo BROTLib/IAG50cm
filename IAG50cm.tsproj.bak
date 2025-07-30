@@ -1810,7 +1810,7 @@ External Setpoint Generation:
 					<Name>Declination</Name>
 					<AxisPara>
 						<General UnitName="°"/>
-						<Dynamic Acceleration="5.58893" Deceleration="5.58893" Jerk="3.20011"/>
+						<Dynamic Acceleration="3.6" Deceleration="3.6" Jerk="3.20011"/>
 						<Velo RefSearch="0.10384" RefSync="0.10384" SlowManual="0.5192" FastManual="3.1152" Fast="10.384" Maximum="10.384"/>
 						<TargetPosControl Range="0.005"/>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
@@ -1956,7 +1956,7 @@ External Setpoint Generation:
 					<Name>HourAngle</Name>
 					<AxisPara>
 						<General UnitName="°"/>
-						<Dynamic Acceleration="5.5025" Deceleration="5.5025" Jerk="3.20416"/>
+						<Dynamic Acceleration="3.6" Deceleration="3.6" Jerk="3.19705"/>
 						<Velo RefSearch="0.10384" RefSync="0.10384" SlowManual="0.5192" FastManual="3.1152" Fast="10.384" Maximum="10.384"/>
 						<TargetPosControl Range="0.005"/>
 						<OtherSettings AllowMotionCmdToSlave="true"/>
@@ -2242,167 +2242,11 @@ External Setpoint Generation:
 						</Var>
 					</Vars>
 				</Axis>
-				<Axis Id="4" CreateSymbols="true" AxisType="5">
-					<Name>Axis 4</Name>
-					<AxisPara>
-						<General UnitName="°"/>
-						<OtherSettings AllowMotionCmdToSlave="true"/>
-					</AxisPara>
-					<Encoder Name="Enc" EncType="19">
-						<EncPara ScaleFactorNumerator="360" ScaleFactorDenominator="3271557120" MaxCount="#xffffffff" ReferenceSystem="1"/>
-						<Vars VarGrpType="1">
-							<Name>Inputs</Name>
-							<Var>
-								<Name>In</Name>
-								<Type GUID="{901C2423-655B-45CE-B7E3-21F174F0F99F}" Namespace="MC">NCENCODERSTRUCT_IN2B</Type>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn1</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn2</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn3</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn4</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn5</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn6</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn7</Name>
-									<Comment><![CDATA[Drive Velocity Actual Value
-]]></Comment>
-								</SubVar>
-							</Var>
-						</Vars>
-						<Vars VarGrpType="2">
-							<Name>Outputs</Name>
-							<Var>
-								<Name>Out</Name>
-								<Type GUID="{9CC50AB2-5D79-4869-A3C2-1FA7761BAFEA}" Namespace="MC">NCENCODERSTRUCT_OUT2</Type>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut1</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut2</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut3</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut4</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut5</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut6</Name>
-								</SubVar>
-							</Var>
-						</Vars>
-					</Encoder>
-					<Drive Name="Drive" DrvType="5">
-						<DrvPara>
-							<Analog TorqueSetpointScale="10" ScaleFactorActTorque="0.1"/>
-							<TimeComp TaskDelayCycles="1"/>
-						</DrvPara>
-						<Vars VarGrpType="1">
-							<Name>Inputs</Name>
-							<Var>
-								<Name>In</Name>
-								<Type GUID="{F95C7C69-0C87-46C4-9559-1285CCA5B23A}" Namespace="MC">NCDRIVESTRUCT_IN2</Type>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn1</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn2</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn3</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn4</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn5</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataIn6</Name>
-								</SubVar>
-							</Var>
-						</Vars>
-						<Vars VarGrpType="2">
-							<Name>Outputs</Name>
-							<Var>
-								<Name>Out</Name>
-								<Type GUID="{644DC4BD-3D15-4DCB-94C7-24F3A5D579AA}" Namespace="MC">NCDRIVESTRUCT_OUT2</Type>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut1</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut2</Name>
-								</SubVar>
-								<SubVar>
-									<Name>nCtrl2</Name>
-									<Comment><![CDATA[Digital Outputs Setpoint Generator:
-0x41 (0100 0001) = Minus (0x42 for inverse motor polarity)
-0x42 (0100 0010) = Plus (0x41 for inverse motor polarity)
-0x80 (1000 0000) = Stop
-]]></Comment>
-								</SubVar>
-								<SubVar>
-									<Name>nCtrl3</Name>
-									<Comment><![CDATA[Digital Outputs (Setpoint Generator + Position Controller):
-0x41 (0100 0001) = Minus (0x42 for inverse motor polarity)
-0x42 (0100 0010) = Plus (0x41 for inverse motor polarity)
-0x80 (1000 0000) = Stop
-]]></Comment>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut3</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut4</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut5</Name>
-								</SubVar>
-								<SubVar TypeFormatIndex="2">
-									<Name>nDataOut6</Name>
-								</SubVar>
-							</Var>
-						</Vars>
-					</Drive>
-					<Controller Name="Ctrl" CtrType="1">
-						<CtrPara PriorControlFactor="1">
-							<Observer BandWidth="20"/>
-						</CtrPara>
-					</Controller>
-					<Vars VarGrpType="1" InsertType="1">
-						<Name>Inputs</Name>
-						<Var>
-							<Name>FromPlc</Name>
-							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
-						</Var>
-					</Vars>
-					<Vars VarGrpType="2" InsertType="1">
-						<Name>Outputs</Name>
-						<Var>
-							<Name>ToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
-						</Var>
-					</Vars>
-				</Axis>
 			</NC>
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{D148F488-EE47-8821-59DF-0A8E80940F31}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{0FB13AB3-BD89-B8C0-6B05-6F7F544BD965}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -2442,35 +2286,6 @@ External Setpoint Generation:
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContact24V</Name>
-							<Comment><![CDATA[ Auxilary Contact of the 24V DC: TRUE = operational]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContact48V</Name>
-							<Comment><![CDATA[ Auxilary Contact of the 48V DC: TRUE = operational]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContactHADEC</Name>
-							<Comment><![CDATA[ Auxilary Contact of the HA DEC motor: TRUE = operational]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContactFOCUS</Name>
-							<Comment><![CDATA[ Auxilary Contact of the FOCUS motor: TRUE = operational]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.telescopeControl.fbCabinet.bCollectiveReport24VFuse</Name>
-							<Comment><![CDATA[ Collective Report of the 24V Fuse box: TRUE = operational]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.telescopeControl.fbCabinet.bState24VFuse</Name>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
 							<Name>MAIN.safetyHandling.inError</Name>
 							<Comment><![CDATA[ Safety Error Condition]]></Comment>
 							<Type>BOOL</Type>
@@ -2503,6 +2318,35 @@ External Setpoint Generation:
 							<Name>MAIN.decControl.axisRef.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContact24V</Name>
+							<Comment><![CDATA[ Auxilary Contact of the 24V DC: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContact48V</Name>
+							<Comment><![CDATA[ Auxilary Contact of the 48V DC: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContactHADEC</Name>
+							<Comment><![CDATA[ Auxilary Contact of the HA DEC motor: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContactFOCUS</Name>
+							<Comment><![CDATA[ Auxilary Contact of the FOCUS motor: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bCollectiveReport24VFuse</Name>
+							<Comment><![CDATA[ Collective Report of the 24V Fuse box: TRUE = operational]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bState24VFuse</Name>
+							<Type>BOOL</Type>
+						</Var>
 					</Vars>
 					<Vars VarGrpType="2" ContextId="1" AreaNo="17">
 						<Name>PlcTask Outputs</Name>
@@ -2522,6 +2366,10 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
+							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
 							<Name>MAIN.coverControl.coverMotors[1].Relais_Out_A</Name>
 							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
 							<Type>BOOL</Type>
@@ -2533,10 +2381,6 @@ External Setpoint Generation:
 						<Var>
 							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_A</Name>
 							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
@@ -8094,13 +7938,6 @@ Bit 8 - 15 : reserved]]></Comment>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Safety Out (EL2904)">
 				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionOutputs^TwinSafeGroup1.EL2904, 4 digital outputs_1_7 RxPDO" VarB="Module 1 (FSOES)^TxPDO^FSOE"/>
-			</OwnerB>
-		</OwnerA>
-		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Axis 4">
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
-				<Link VarA="Enc^Inputs^In^nDcInputTime" VarB="InfoData^DcInputShift"/>
-				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^InputToggle0" Size="1" OffsA="1"/>
-				<Link VarA="Enc^Inputs^In^nState4" VarB="WcState^WcState0"/>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Declination">

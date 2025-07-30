@@ -29,6 +29,10 @@
     <Compile Include="GlobalTextList.TcGTLO">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="GVLs\GVL_Pointing.TcGVL">
+      <SubType>Code</SubType>
+      <LinkAlways>true</LinkAlways>
+    </Compile>
     <Compile Include="GVLs\GVL_Safety.TcGVL">
       <SubType>Code</SubType>
       <LinkAlways>true</LinkAlways>
@@ -124,6 +128,9 @@
     <Compile Include="POUs\PendantControl\States\I_PendantState.TcIO">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\Pointing\PointingHourAngle.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\SerialBackground.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -174,6 +181,7 @@
     <Folder Include="POUs\DomeControl\States" />
     <Folder Include="POUs\Functions" />
     <Folder Include="POUs\DomeControl" />
+    <Folder Include="POUs\Pointing" />
     <Folder Include="POUs\PendantControl" />
     <Folder Include="POUs\PendantControl\States" />
     <Folder Include="VISUs" />

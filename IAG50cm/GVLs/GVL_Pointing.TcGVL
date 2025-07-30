@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <GVL Name="GVL_Pointing" Id="{8e9e0956-bbc2-49ba-acc4-8eac020b70e3}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+	(* values of the pointing model
+	Hour Angle	: tau
+	Declination	: dec
+	*)
+	C_mAl_tau	: LREAL := 0.0;
+	C_mEl_tau	: LREAL := 0.0;
+	C_Coll_tau	: LREAL := 0.0;
+	C_Refr_tau	: LREAL := 0.0;
+	C_Enc_tau	: LREAL := 0.0;
+	C_Flex_tau	: LREAL := 0.0;
+	C_NP_tau	: LREAL := 0.0;
+	C_E1_tau	: LREAL := 0.0;
+	C_E2_tau	: LREAL := 0.0;
+	
+	C_mAl_dec	: LREAL := 0.0;
+	C_mEl_dec	: LREAL := 0.0;
+	C_Coll_dec	: LREAL := 0.0;
+	C_Refr_dec	: LREAL := 0.0;
+	C_Flex_dec	: LREAL := 0.0;
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>
