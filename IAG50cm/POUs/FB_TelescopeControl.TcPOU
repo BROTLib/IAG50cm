@@ -53,10 +53,16 @@ VAR
 	rightascension_calc	: LREAL;	// right ascension calulated when azimuth and elevation are set by TCS
 	declination_calc	: LREAL;	// declination calulated when azimuth and elevation are set by TCS
 	hourangle_calc		: LREAL;	// hour angle azimuth and elevation are set by TCS
+	
+	fHourAnglePointingOffset	: LREAL;
+	fDeclinationPointingOffset	: LREAL;
+	fHourAngleVelocity			: LREAL;	// rotational velocity of the HourAngle
+	fDeclinationVelocity		: LREAL;	// rotational velocity of the Declination
 	fbTime				: FB_AstroClock;	// precise astronomical	time
 	eq2hor				: FB_EQ2HOR;
 	hor2eq				: FB_HOR2EQ;
 	ha2ra				: FB_HA2RA;
+	fbPointingForward	: FB_PointingModelForward;
 	
 	reset_trigger		: R_TRIG;
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
@@ -79,8 +85,7 @@ VAR
 	TCSCTOEvent			: FB_Eventlog;
 	MQTTTimer 			: TON := (PT:=T#5S);
 	
-	HourAngleVelocity	: LREAL;	// rotational velocity of the HourAngle
-	DeclinationVelocity	: LREAL;	// rotational velocity of the Declination
+	
 
 	StatusWord, LastStatus:	UDINT;
 END_VAR
@@ -103,23 +108,6 @@ VAR_OUTPUT
 END_VAR
 VAR CONSTANT
 	siderial_velocity: LREAL := 360.0 / 86164.099;
-END_VAR
-VAR PERSISTENT
-	
-	// azimuth axis offset/misalignment north-south
-	AN_E:	LREAL;
-	// azimuth axis offset/misalignment east-west
-	AE_E:	LREAL;
-	// gravitational flexure correction at the horizon
-	TF:		LREAL;
-	// collimation error of the electromagnetic axis
-	BNP:	LREAL;
-	// azimuth axis offset/misalignment north-south
-	AN_A:	LREAL;
-	// azimuth axis offset/misalignment east-west,
-	AE_A:	LREAL;
-	// Non-perpendicularity between the mount azimuth and elevation axes
-	NPAE:	LREAL;
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[// get the system time
@@ -207,7 +195,17 @@ hor2eq(alt := fElevation,
 		ra => rightascension_calc,
 		dec => declination_calc,
 		ha => hourangle_calc);		
-
+// caluclate pointing offsets
+fbPointingForward(
+	HourAngle	:= fHourAngle,
+	Declination	:= fDeclination,
+	Altitude	:= elevation_calc,
+	Latitude	:= telescopeConfig.latitude,
+	HourAngle_correction => fHourAnglePointingOffset,
+	Declination_correction => fDeclinationPointingOffset,
+	HourAngle_velocity => fHourAngleVelocity,
+	Declination_velocity => fDeclinationVelocity,
+);
 
 // get current coordinates (of motors)
 declination_current := fbDeclination.fActualPosition ;
@@ -594,12 +592,12 @@ CASE Stage OF
 		END_IF
 	20:	
 		// channge to -180 to 180 degree in HA
-		IF fHourAngle > 180 THEN
-			fbHourAngle.Position := fHourAngle-360.0;
+		IF fHourAngle + fHourAnglePointingOffset > 180 THEN
+			fbHourAngle.Position := fHourAngle + fHourAnglePointingOffset - 360.0;
 		ELSE
-			fbHourAngle.Position := fHourAngle;
+			fbHourAngle.Position := fHourAngle + fHourAnglePointingOffset;
 		END_IF
-		fbDeclination.Position := fDeclination;
+		fbDeclination.Position := fDeclination + fDeclinationOffset + fDeclinationPointingOffset;
 		fbHourAngle.Velocity := fSlewVelocity;
 		fbDeclination.Velocity := fSlewVelocity;
 		
@@ -1152,39 +1150,40 @@ END_VAR
       <Implementation>
         <ST><![CDATA[// HourAngle
 // channge to -180 to 180 degree in HA
-IF fHourAngle > 180 THEN
-	fbHourAngle.Position := fHourAngle-360.0;
+IF fHourAngle + fHourAnglePointingOffset > 180 THEN
+	fbHourAngle.Position := fHourAngle + fHourAnglePointingOffset - 360.0;
 ELSE
-	fbHourAngle.Position := fHourAngle;
+	fbHourAngle.Position := fHourAngle + fHourAnglePointingOffset;
 END_IF
+
 IF NOT fbHourAngle.Tracking THEN
 	fbHourAngle.Velocity := 1.0;
 	fbHourAngle.MoveAxis := TRUE;
 	IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 		fbHourAngle.MoveAxis := FALSE;
 		IF fbHourAngle.isTracking THEN
-			fbHourAngle.Velocity := 0.004;//*0.004;
+			fbHourAngle.Velocity := LIMIT(0.004, fHourAngleVelocity, 0.01);
 		END_IF
 		fbHourAngle.Tracking := TRUE;
 	END_IF
 ELSE
-	fbHourAngle.Velocity := 0.004;//*0.004;
+	fbHourAngle.Velocity := LIMIT(0.004, fHourAngleVelocity, 0.01);
 END_IF
 
-// Declination (should not move while tracking)
-fbDeclination.Position := fDeclination+fDeclinationOffset;
+// Declination (including offest and pointing model)
+fbDeclination.Position := fDeclination + fDeclinationOffset + fDeclinationPointingOffset;
 IF NOT fbDeclination.Tracking THEN
 	fbDeclination.Velocity := 1.0;
 	fbDeclination.MoveAxis := TRUE;
 	IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 		fbDeclination.MoveAxis := FALSE;
 		IF fbDeclination.isTracking THEN
-			fbDeclination.Velocity := 0.004;
+			fbDeclination.Velocity := LIMIT(0.0, fDeclinationVelocity, 0.004);
 		END_IF
 		fbDeclination.Tracking := TRUE;
 	END_IF
 ELSE
-	fbDeclination.Velocity := 0.004;
+	fbDeclination.Velocity := LIMIT(0.0, fDeclinationVelocity, 0.004);
 END_IF
 ]]></ST>
       </Implementation>
@@ -1488,6 +1487,11 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="5901" Count="0" />
       <LineId Id="5911" Count="0" />
       <LineId Id="5485" Count="0" />
+      <LineId Id="7745" Count="0" />
+      <LineId Id="7747" Count="0" />
+      <LineId Id="7749" Count="4" />
+      <LineId Id="7759" Count="1" />
+      <LineId Id="7746" Count="0" />
       <LineId Id="5506" Count="3" />
       <LineId Id="6033" Count="0" />
       <LineId Id="6274" Count="0" />
@@ -1739,8 +1743,10 @@ bGoto			:= TRUE;]]></ST>
     </LineIds>
     <LineIds Name="FB_TelescopeControl._TrackTelescope">
       <LineId Id="34" Count="0" />
-      <LineId Id="81" Count="4" />
-      <LineId Id="35" Count="6" />
+      <LineId Id="81" Count="0" />
+      <LineId Id="90" Count="4" />
+      <LineId Id="89" Count="0" />
+      <LineId Id="36" Count="5" />
       <LineId Id="76" Count="0" />
       <LineId Id="45" Count="0" />
       <LineId Id="47" Count="14" />

@@ -1,8 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <GVL Name="GVL_Pointing" Id="{8e9e0956-bbc2-49ba-acc4-8eac020b70e3}">
-    <Declaration><![CDATA[{attribute 'qualified_only'}
-VAR_GLOBAL
+    <Declaration><![CDATA[VAR_GLOBAL
 	(* values of the pointing model
 	Hour Angle	: tau
 	Declination	: dec

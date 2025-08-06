@@ -2246,7 +2246,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{0FB13AB3-BD89-B8C0-6B05-6F7F544BD965}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{0F80D699-7EAE-3921-1116-0A22C2C3E9F0}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -2315,10 +2315,6 @@ External Setpoint Generation:
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.decControl.axisRef.NcToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
-						</Var>
-						<Var>
 							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContact24V</Name>
 							<Comment><![CDATA[ Auxilary Contact of the 24V DC: TRUE = operational]]></Comment>
 							<Type>BOOL</Type>
@@ -2347,6 +2343,10 @@ External Setpoint Generation:
 							<Name>MAIN.telescopeControl.fbCabinet.bState24VFuse</Name>
 							<Type>BOOL</Type>
 						</Var>
+						<Var>
+							<Name>MAIN.decControl.axisRef.NcToPlc</Name>
+							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
+						</Var>
 					</Vars>
 					<Vars VarGrpType="2" ContextId="1" AreaNo="17">
 						<Name>PlcTask Outputs</Name>
@@ -2366,10 +2366,6 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
 							<Name>MAIN.coverControl.coverMotors[1].Relais_Out_A</Name>
 							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
 							<Type>BOOL</Type>
@@ -2381,6 +2377,10 @@ External Setpoint Generation:
 						<Var>
 							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_A</Name>
 							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
@@ -4029,7 +4029,7 @@ External Setpoint Generation:
 							<MBoxUserCmdData>020003000c0000003000000000000000000000000000000000000000000000002011811b0400000010270000445256204d6f746f722053657474696e67732043682e32202f204d6f746f72207370656564206c696d69746174696f6e00</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000a00000037000000000000000000000000000000000000000000000020128113020000000000445256204272616b652053657474696e67732043682e32202f20456d657267656e6379206170706c69636174696f6e2074696d656f757400</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000a00000030000000000000000000000000000000000000000000000020108133020000000a0044525620416d706c69666965722053657474696e67732043682e32202f205374616e64207374696c6c2077696e646f7700</MBoxUserCmdData>
-							<MBoxUserCmdData>02000300090000001200000003000000000000000000000000000000000000002010710301000000094d6f646573206f66206f7065726174696f6e00</MBoxUserCmdData>
+							<MBoxUserCmdData>02000300090000001200000000000000000000000000000000000000000000002010710301000000094d6f646573206f66206f7065726174696f6e00</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000a0000002e00000000000000000000000000000000000000000000002010711002000000ff7f445256204f7574707574732043682e32202f20506f73697469766520746f72717565206c696d69742076616c756500</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000a0000002e00000000000000000000000000000000000000000000002010711102000000ff7f445256204f7574707574732043682e32202f204e6567617469766520746f72717565206c696d69742076616c756500</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000900000046000000000000000000000000000000000000000000000020108157010000006444525620416d706c69666965722053657474696e67732043682e32202f20506f736974696f6e206c6f6f702076656c6f63697479206665656420666f7277617264206761696e00</MBoxUserCmdData>
@@ -4039,7 +4039,7 @@ External Setpoint Generation:
 							<MBoxUserCmdData>020003000a0000003800000000000000000000000000000000000000000000002010811202000000060044525620416d706c69666965722053657474696e67732043682e32202f2043757272656e74206c6f6f7020696e74656772616c2074696d6500</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000c0000003d000000000000000000000000000000000000000000000020108115040000004200000044525620416d706c69666965722053657474696e67732043682e32202f2056656c6f63697479206c6f6f702070726f706f7274696f6e616c206761696e00</MBoxUserCmdData>
 							<MBoxUserCmdData>020003000c00000039000000000000000000000000000000000000000000000020108114040000009600000044525620416d706c69666965722053657474696e67732043682e32202f2056656c6f63697479206c6f6f7020696e74656772616c2074696d6500</MBoxUserCmdData>
-							<MBoxUserCmdData>02000300090000001200000003000000000000000000000000000000000000002010700301000000094d6f646573206f66206f7065726174696f6e00</MBoxUserCmdData>
+							<MBoxUserCmdData>02000300090000001200000000000000000000000000000000000000000000002010700301000000094d6f646573206f66206f7065726174696f6e00</MBoxUserCmdData>
 							<Pdo Name="FB Position Channel 1" Index="#x1a00" Flags="#x0010" SyncMan="3">
 								<Entry Name="Position" BitLen="32" Index="#x6000" Sub="#x11">
 									<Type>UDINT</Type>
@@ -7929,11 +7929,11 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionOutputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 RxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
+				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionInputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 TxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1"/>
 				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionOutputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 RxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Safety (EL1918)">
 				<Link VarA="Term 1 (EK1200)^FOCUS (ELM7221-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1" VarB="ConnectionInputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 TxPDO"/>
-				<Link VarA="Term 1 (EK1200)^HA DEC (ELM7212-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1" VarB="ConnectionInputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 TxPDO"/>
 				<Link VarA="Term 1 (EK1200)^Safety Out (EL2904)^Module 1 (FSOES)^RxPDO^FSOE" VarB="ConnectionInputs^TwinSafeGroup1.EL2904, 4 digital outputs_1_7 TxPDO"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Safety Out (EL2904)">

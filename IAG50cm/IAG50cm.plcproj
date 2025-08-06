@@ -128,7 +128,7 @@
     <Compile Include="POUs\PendantControl\States\I_PendantState.TcIO">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\Pointing\PointingHourAngle.TcPOU">
+    <Compile Include="POUs\Pointing\FB_PointingModelForward.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\SerialBackground.TcPOU">
