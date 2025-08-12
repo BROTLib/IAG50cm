@@ -304,7 +304,7 @@ ELSIF bPark THEN
 		_SlewTelescope();
 		
 	ELSE
-		IF bReady AND bStopped THEN
+		IF bReady AND NOT bBusy THEN
 			bInterupted := FALSE;
 			TCS_command := E_TCSCommand.park;
 		END_IF
@@ -617,6 +617,9 @@ CASE Stage OF
 			Stage := 20;
 		END_IF
 	20:	
+		// clear offsets
+		THIS^.SetDeclinationOffset(0.0);
+		THIS^.SetRightAscensionOffset(0.0);
 		// channge to -180 to 180 degree in HA
 		IF MODABS(fHourAngle + fHourAnglePointingOffset, 360) > 180 THEN
 			fbHourAngle.Position := MODABS(fHourAngle + fHourAnglePointingOffset,360) - 360.0;
@@ -850,7 +853,9 @@ CASE Stage OF
 			fbCovers.Close();	
 			Stage := 80;
 		END_IF
-		Stage := 10;
+		IF NOT bBusy THEN
+			Stage := 10;
+		END_IF
 	10:
 		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
 			fbHourAngle.Tracking := FALSE;
@@ -859,6 +864,8 @@ CASE Stage OF
 			Stage := 20;
 		END_IF
 	20:
+		THIS^.SetDeclinationOffset(0.0);
+		THIS^.SetRightAscensionOffset(0.0);
 		fbHourAngle.Position := telescopeConfig.houranglePark;
 		fbHourAngle.Velocity := fSlewVelocity;
 		fbDeclination.Position := telescopeConfig.declinationPark;
@@ -975,19 +982,16 @@ fbCovers.Open();
 
 
 
-// enable elevation, enable azimuth, enable focus
+// enable hourangle, enable declination
 IF bMainReady AND fbCovers.Opened THEN 
 	fbHourAngle.Enable := TRUE;
 	fbDeclination.Enable := TRUE;
-	fbFocus.Enable := TRUE;
 END_IF
 
 
-
-
-// start calibration of focus after elevation has been calibrated
-IF fbHourAngle.Calibrated AND (fbFocus <> 0 AND_THEN NOT fbFocus.Calibrated) THEN
-	fbFocus.HomeAxis := TRUE;
+IF fbHourAngle.Calibrated AND fbFocus <> 0 THEN
+	fbFocus.Enable := TRUE;
+	fbFocus.Position := telescopeConfig.focusPark;
 END_IF
 
 IF fbHourAngle.Calibrated AND
@@ -1052,6 +1056,8 @@ CASE Stage OF
 			Stage := 25;
 		END_IF
 	25:
+		THIS^.SetDeclinationOffset(0.0);
+		THIS^.SetRightAscensionOffset(0.0);
 		// change to -180 to 180 degree in HA
 		IF hourangle_calc > 180 THEN
 			fbHourAngle.Position := hourangle_calc-360.0;
@@ -1652,6 +1658,7 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="101" Count="0" />
       <LineId Id="105" Count="1" />
       <LineId Id="29" Count="0" />
+      <LineId Id="212" Count="2" />
       <LineId Id="122" Count="0" />
       <LineId Id="203" Count="3" />
       <LineId Id="117" Count="0" />
@@ -1710,13 +1717,17 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="87" Count="0" />
       <LineId Id="15" Count="0" />
       <LineId Id="17" Count="1" />
-      <LineId Id="20" Count="3" />
+      <LineId Id="20" Count="2" />
+      <LineId Id="217" Count="1" />
+      <LineId Id="23" Count="0" />
       <LineId Id="114" Count="0" />
       <LineId Id="117" Count="0" />
       <LineId Id="115" Count="1" />
       <LineId Id="113" Count="0" />
       <LineId Id="118" Count="1" />
-      <LineId Id="24" Count="2" />
+      <LineId Id="24" Count="0" />
+      <LineId Id="215" Count="1" />
+      <LineId Id="25" Count="1" />
       <LineId Id="28" Count="1" />
       <LineId Id="38" Count="0" />
       <LineId Id="129" Count="56" />
@@ -1734,12 +1745,14 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="63" Count="0" />
       <LineId Id="65" Count="0" />
       <LineId Id="13" Count="4" />
-      <LineId Id="84" Count="1" />
+      <LineId Id="84" Count="0" />
       <LineId Id="20" Count="0" />
-      <LineId Id="28" Count="1" />
-      <LineId Id="33" Count="2" />
+      <LineId Id="28" Count="0" />
+      <LineId Id="35" Count="0" />
       <LineId Id="37" Count="0" />
-      <LineId Id="39" Count="3" />
+      <LineId Id="90" Count="0" />
+      <LineId Id="89" Count="0" />
+      <LineId Id="40" Count="2" />
       <LineId Id="44" Count="0" />
       <LineId Id="80" Count="0" />
       <LineId Id="46" Count="0" />
@@ -1761,6 +1774,7 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="87" Count="0" />
       <LineId Id="92" Count="1" />
       <LineId Id="17" Count="0" />
+      <LineId Id="210" Count="1" />
       <LineId Id="173" Count="4" />
       <LineId Id="172" Count="0" />
       <LineId Id="19" Count="0" />
