@@ -450,12 +450,12 @@ IF MQTTTimer.Q THEN // publish new payload every second
 	comm.Publish('telescope', 'dome', 'HourAngle', LREAL_TO_STRING(hourangle_current - fHourAngleInversionOffset - fRightAscensionOffset));
 	comm.Publish('telescope', 'dome', 'RightAscension', LREAL_TO_STRING(rightascension_current - fHourAngleInversionOffset - fRightAscensionOffset));
 	comm.Publish('telescope', 'dome', 'Declination', LREAL_TO_STRING(declination_current - fDeclinationInversionOffset - fDeclinationOffset));
-	comm.Publish('telescope', 'dome', 'declination_offset', LREAL_TO_STRING(fDeclinationOffset));
-	comm.Publish('telescope', 'dome', 'rightascension_offset', LREAL_TO_STRING(fRightAscensionOffset));
-	comm.Publish('telescope', 'dome', 'declinationpointing_offset', LREAL_TO_STRING(fDeclinationPointingOffset));
-	comm.Publish('telescope', 'dome', 'houranglepointing_offset', LREAL_TO_STRING(fHourAnglePointingOffset));
-	comm.Publish('telescope', 'dome', 'HourAnglePhysical', LREAL_TO_STRING(hourangle_current));
-	comm.Publish('telescope', 'dome', 'DeclinationPhysical', LREAL_TO_STRING(declination_current));
+	comm.Publish('telescope', 'dome', 'DeclinationOffset', LREAL_TO_STRING(fDeclinationOffset));
+	comm.Publish('telescope', 'dome', 'RightAscensionOffset', LREAL_TO_STRING(fRightAscensionOffset));
+	comm.Publish('telescope', 'dome', 'DeclinationPointingOffset', LREAL_TO_STRING(fDeclinationPointingOffset));
+	comm.Publish('telescope', 'dome', 'HourAnglePointingOffset', LREAL_TO_STRING(fHourAnglePointingOffset));
+	comm.Publish('telescope', 'dome', 'HourAngleInstrument', LREAL_TO_STRING(hourangle_current));
+	comm.Publish('telescope', 'dome', 'DeclinationInstrument', LREAL_TO_STRING(declination_current));
 	
 	comm.Publish('telescope', 'dome', 'errorid',	UDINT_TO_STRING(errorid));
 	comm.Publish('telescope', 'dome', 'error',		BOOL_TO_STRING(bError));
