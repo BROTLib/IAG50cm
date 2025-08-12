@@ -131,6 +131,9 @@
     <Compile Include="POUs\Pointing\FB_PointingModelForward.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\Pointing\FB_PointingModelInversion.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\SerialBackground.TcPOU">
       <SubType>Code</SubType>
     </Compile>

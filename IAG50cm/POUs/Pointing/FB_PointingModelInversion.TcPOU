@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PointingModelInversion" Id="{12b898bd-db5a-496e-8f1c-7de4951e9b09}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PointingModelInversion
+VAR_INPUT
+	HourAngle		: LREAL;
+	Declination		: LREAL;
+	Altitude		: LREAL;
+	Latitude		: LREAL;
+END_VAR
+VAR_OUTPUT
+	HourAngle_correction	: LREAL;
+	Declination_correction	: LREAL; 
+END_VAR
+VAR
+	fbpointing : FB_PointingModelForward;
+	d_ha	: LREAL := 0.0;
+	d_dec	: LREAL := 0.0;
+	d_ha2	: LREAL := 0.0;
+	d_dec2	: LREAL := 0.0;
+	i		: INT;
+	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbpointing(
+	HourAngle := HourAngle,
+	Declination:= Declination,
+	Latitude:= Latitude,
+	HourAngle_correction => d_ha,
+	Declination_correction => d_dec,
+	HourAngle_velocity =>,
+	Declination_velocity =>
+);
+FOR i:=0 TO 10 BY 1 DO
+	fbpointing(
+		HourAngle := LMOD(HourAngle+d_ha-d_ha2,360),
+		Declination:= Declination+d_dec-d_dec2,
+		Latitude:= Latitude,
+		HourAngle_correction => d_ha2,
+		Declination_correction => d_dec2,
+		HourAngle_velocity =>,
+		Declination_velocity =>
+	);
+END_FOR;
+HourAngle_correction := d_ha2;
+Declination_correction := d_dec2;]]></ST>
+    </Implementation>
+    <LineIds Name="FB_PointingModelInversion">
+      <LineId Id="23" Count="0" />
+      <LineId Id="38" Count="1" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="43" Count="3" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="53" Count="2" />
+      <LineId Id="57" Count="4" />
+      <LineId Id="50" Count="0" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="69" Count="1" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

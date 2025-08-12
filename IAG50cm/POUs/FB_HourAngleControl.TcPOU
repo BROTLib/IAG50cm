@@ -61,7 +61,7 @@ fbLatchHome(
 	Acceleration		:= 3.6,
 	Deceleration		:= 3.6,
 	Jerk				:= 3.6,
-	RefPosition			:= 1.56,
+	RefPosition			:= 1.56-0.04019852332911753,
 	RefDistance			:= 5.21,
 	TimeLimit 			:= T#1M,
 	DistanceLimit 		:= 6,

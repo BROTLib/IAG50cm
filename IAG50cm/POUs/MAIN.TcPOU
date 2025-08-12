@@ -19,8 +19,8 @@ VAR
 END_VAR
 VAR CONSTANT
 	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
-													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 8.0,
-													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 8.0);
+													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 10.1,
+													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 10.1);
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[latch_test();

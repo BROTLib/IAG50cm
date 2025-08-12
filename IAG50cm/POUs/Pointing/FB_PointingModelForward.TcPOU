@@ -5,10 +5,7 @@
 VAR_INPUT
 	HourAngle		: LREAL;
 	Declination		: LREAL;
-	Altitude		: LREAL;
 	Latitude		: LREAL;
-	
-	bBackwards		: BOOL;
 END_VAR
 VAR_OUTPUT
 	HourAngle_correction	: LREAL;
@@ -28,8 +25,7 @@ VAR
 	// trackingspeeds
 	track_tau_esti : LREAL := 0.0;
 	track_dec_esti : LREAL := 0.0;
-	// helping stuff
-	x : LREAL;
+	// Altitude
 	alt_diff : LREAL;
 	// pre calculated sin/cos
 	sin_tau	: LREAL;
@@ -50,7 +46,6 @@ END_VAR
       <ST><![CDATA[// degrees to rad
 tau := HourAngle * d2r;
 dec	:= Declination * d2r;
-alt	:= Altitude * d2r;
 lat := Latitude * d2r;
 
 
@@ -61,12 +56,12 @@ sin_DEC := SIN(dec);
 cos_DEC := COS(dec);
 sin_lat := SIN(lat);
 cos_lat := COS(lat);
-sin_alt := SIN(Altitude);
-cos_alt := COS(Altitude);
 
 // alt difference estimation (WITHOUT Nutation, Aberation, Presession)
-x := SIN(dec) * sin_lat + COS(dec) * cos_lat * cos_TAU;
-alt_diff := -omega * (1/SQRT(1 - x*x)) * COS(dec) * cos_lat * SIN(tau);
+sin_alt := SIN(dec) * sin_lat + COS(dec) * cos_lat * cos_TAU;
+alt := ASIN(sin_alt);
+cos_alt := COS(alt);
+alt_diff := -omega * (1/SQRT(1 - sin_alt*sin_alt)) * COS(dec) * cos_lat * SIN(tau);
 
 // ### TAU offset ###
 off_tau_esti := - C_mAl_tau * ((cos_TAU * sin_DEC) / cos_DEC);
@@ -103,21 +98,22 @@ track_dec_esti := track_dec_esti + c_flex_dec * alt_diff * ((cos_alt * sin_DEC) 
 
 HourAngle_correction	:= off_tau_esti;
 Declination_correction	:= off_dec_esti;
-HourAngle_velocity		:= (track_tau_esti*3600 + omega)/d2r;
-Declination_velocity 	:= track_dec_esti*3600/d2r; 
+HourAngle_velocity		:= (track_tau_esti + omega)/d2r;
+Declination_velocity 	:= track_dec_esti/d2r; 
 
             ]]></ST>
     </Implementation>
     <LineIds Name="FB_PointingModelForward">
       <LineId Id="171" Count="0" />
       <LineId Id="17" Count="0" />
-      <LineId Id="121" Count="3" />
+      <LineId Id="121" Count="0" />
+      <LineId Id="123" Count="1" />
       <LineId Id="18" Count="5" />
       <LineId Id="26" Count="1" />
-      <LineId Id="32" Count="1" />
       <LineId Id="165" Count="0" />
       <LineId Id="164" Count="0" />
       <LineId Id="166" Count="0" />
+      <LineId Id="222" Count="1" />
       <LineId Id="58" Count="3" />
       <LineId Id="138" Count="1" />
       <LineId Id="142" Count="3" />

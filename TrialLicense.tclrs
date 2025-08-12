@@ -2,9 +2,9 @@
 <TcLicenseInfo xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.beckhoff.com/schemas/2011/11/TcLicenseInfo">
 	<LicenseInfo>
 		<SystemId>{D1E86615-0B09-1A2D-2C4F-AE775A9E0C0B}</SystemId>
-		<IssueTime>2025-08-01T10:41:00</IssueTime>
-		<ExpireTime>2025-08-09T00:00:00</ExpireTime>
-		<LicenseKey>f494da0291fadd4c9e27aacd16a315da20d8cdc090017481aba4113886ca54c438cccb145de066d69d64db84b1d2b51a02900c56e76c6ea0ff248bcc8c886d3ca29e62e536d826565271c4bc13d54a6ed2a57fbd79817b08b47ed1dc104c8e4510fffa853582b4a6bbc1e13dbcda51ef3345961d54fd131c0d6cbff89917e6779b2dce87a239a7abc11a25176a83d98962abc565f7ce45b1adf441bba94d630eaabca7fbe7c0bbbed245d647e76b99e777bfd1843c128f31e65388bad825a82dbf84e39068b2397cf0902bde82a50ebab8bbf1f063db45e1ae60fcee26af3929dc63aec51f89df925318b90a760c173b2ad06d3dd94cea0573110fb2b5e8d87f</LicenseKey>
+		<IssueTime>2025-08-11T14:18:00</IssueTime>
+		<ExpireTime>2025-08-19T00:00:00</ExpireTime>
+		<LicenseKey>1f8f72ac7f263f501c5c7e3bc73df2949e1706c550d66a87ebe43315cd90636788e00ae5b972e34e47a3b27c7701ac9fb4baad7a186a15e449b5d81805689e639e9cedea4d3054e93014f23d22b17623edf30ab39e1fed292222c92220de8866cb84a82aaa60c40d1ede206e3d9aae86d2cb9eee34535812991ce554c9eac77ac011a5b0549753e85a94f3d38904807a01271a14dc3f9052a852c36bf9f5eb7feb89a12bcb04c6a0219c5d4f16d3789fcfb9b4783098ed170c41319cc26cd81a6e1f737d1fcd3f45c8d9794c517a589a3629bdae712f6adc62fbc5efe49f7a243cf22b4ecc1f14bc1a8d9f0573feac2376603caaa9e50086c7a80d5103b8e3de</LicenseKey>
 		<License>
 			<LicenseId>{973BA0B1-AADD-41C1-B518-302802473922}</LicenseId>
 			<Name>TC3 IoT MQTT Protocol</Name>
