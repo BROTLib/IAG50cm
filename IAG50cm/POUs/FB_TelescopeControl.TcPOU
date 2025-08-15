@@ -673,6 +673,7 @@ CASE Stage OF
 		IF fDeclination + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone) THEN
 			// if too close to pole -> stop
 			Stage := 0;
+			bGoto := FALSE;
 			bStop := TRUE;
 			RETURN;
 		ELSE
@@ -1118,8 +1119,23 @@ CASE Stage OF
 		ELSE
 			fbHourAngle.Position := hourangle_calc;
 		END_IF
+		// Declination (including offest and pointing model)
+		IF declination_calc + fDeclinationPointingOffset > (90.0 - fPoleZone) THEN
+			// if too close to pole -> stop
+			Stage := 0;
+			bStop := TRUE;
+			RETURN;
+		ELSE
+			fbDeclination.Position := declination_calc + fDeclinationPointingOffset;
+			// HourAngle
+			// change to -180 to 180 degree in HA
+			IF MODABS(hourangle_calc + fHourAnglePointingOffset, 360) > 180 THEN
+				fbHourAngle.Position := MODABS(hourangle_calc + fHourAnglePointingOffset,360) - 360.0;
+			ELSE
+				fbHourAngle.Position := MODABS(hourangle_calc + fHourAnglePointingOffset,360);
+			END_IF
+		END_IF
 		fbHourAngle.Velocity := fSlewVelocity;
-		fbDeclination.Position := declination_calc;
 		fbDeclination.Velocity := fSlewVelocity;
 		// make sure to never drive under Horizon
 		IF ABS(fbHourAngle.Position) < ABS(hourangle_current) THEN
@@ -1752,6 +1768,7 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="212" Count="2" />
       <LineId Id="225" Count="2" />
       <LineId Id="246" Count="0" />
+      <LineId Id="249" Count="0" />
       <LineId Id="248" Count="0" />
       <LineId Id="247" Count="0" />
       <LineId Id="237" Count="8" />
@@ -1872,8 +1889,10 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="212" Count="0" />
       <LineId Id="173" Count="4" />
       <LineId Id="172" Count="0" />
+      <LineId Id="214" Count="14" />
+      <LineId Id="213" Count="0" />
       <LineId Id="19" Count="0" />
-      <LineId Id="21" Count="1" />
+      <LineId Id="22" Count="0" />
       <LineId Id="115" Count="56" />
       <LineId Id="39" Count="0" />
       <LineId Id="43" Count="6" />
