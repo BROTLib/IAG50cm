@@ -2246,7 +2246,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{3A1028C1-7FC7-60F8-4DF3-A00E9E702632}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{6D1CCF7F-462E-0C27-F1A4-D4D14FE57627}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -2286,35 +2286,6 @@ External Setpoint Generation:
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.safetyHandling.inError</Name>
-							<Comment><![CDATA[ Safety Error Condition]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoGroup1</Name>
-							<Type GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib">ST_InfoDataGroup</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoEStop1</Name>
-							<Type GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib">ST_InfoDataFB</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoSafetyIn</Name>
-							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoSafetyOut</Name>
-							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.latch_test.Axis.NcToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.Axis.NcToPlc</Name>
-							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
-						</Var>
-						<Var>
 							<Name>MAIN.decControl.axisRef.NcToPlc</Name>
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
@@ -2347,6 +2318,27 @@ External Setpoint Generation:
 							<Name>MAIN.telescopeControl.fbCabinet.bState24VFuse</Name>
 							<Type>BOOL</Type>
 						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.inError</Name>
+							<Comment><![CDATA[ Safety Error Condition]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoGroup1</Name>
+							<Type GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib">ST_InfoDataGroup</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoEStop1</Name>
+							<Type GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib">ST_InfoDataFB</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoSafetyIn</Name>
+							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoSafetyOut</Name>
+							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
+						</Var>
 					</Vars>
 					<Vars VarGrpType="2" ContextId="1" AreaNo="17">
 						<Name>PlcTask Outputs</Name>
@@ -2366,21 +2358,20 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_B</Name>
+							<Name>MAIN.coverControl.bMotor1RelaisA</Name>
+							<Comment><![CDATA[ Motor relais]]></Comment>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.coverControl.coverMotors[1].Relais_Out_A</Name>
-							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
+							<Name>MAIN.coverControl.bMotor1RelaisB</Name>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.coverControl.coverMotors[1].Relais_Out_B</Name>
+							<Name>MAIN.coverControl.bMotor2RelaisA</Name>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.coverControl.coverMotors[2].Relais_Out_A</Name>
-							<Comment><![CDATA[ Both relais for the Motor (both TRUE -> openening, both FALSE -> Closing), initilize them in STOP]]></Comment>
+							<Name>MAIN.coverControl.bMotor2RelaisB</Name>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
@@ -2389,6 +2380,10 @@ External Setpoint Generation:
 						</Var>
 						<Var>
 							<Name>MAIN.haControl.axisRef.PlcToNc</Name>
+							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.decControl.axisRef.PlcToNc</Name>
 							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
 						</Var>
 						<Var>
@@ -2405,18 +2400,6 @@ External Setpoint Generation:
 							<Name>MAIN.safetyHandling.outErrAck</Name>
 							<Comment><![CDATA[ Error Acknowledgement ]]></Comment>
 							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.latch_test.Axis.PlcToNc</Name>
-							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.Axis.PlcToNc</Name>
-							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.decControl.axisRef.PlcToNc</Name>
-							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
 						</Var>
 					</Vars>
 					<UnrestoredVarLinks ImportTime="2024-12-02T10:58:38">
@@ -8120,12 +8103,12 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 2"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^MirrorCover1 (EL2652)">
-				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[1].Relais_Out_A" VarB="Channel 1^Output"/>
-				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[1].Relais_Out_B" VarB="Channel 2^Output"/>
+				<Link VarA="PlcTask Outputs^MAIN.coverControl.bMotor1RelaisA" VarB="Channel 1^Output"/>
+				<Link VarA="PlcTask Outputs^MAIN.coverControl.bMotor1RelaisB" VarB="Channel 2^Output"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^MirrorCover2 (EL2652)">
-				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[2].Relais_Out_A" VarB="Channel 1^Output"/>
-				<Link VarA="PlcTask Outputs^MAIN.coverControl.coverMotors[2].Relais_Out_B" VarB="Channel 2^Output"/>
+				<Link VarA="PlcTask Outputs^MAIN.coverControl.bMotor2RelaisA" VarB="Channel 1^Output"/>
+				<Link VarA="PlcTask Outputs^MAIN.coverControl.bMotor2RelaisB" VarB="Channel 2^Output"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Power Status (EL1808)">
 				<Link VarA="PlcTask Inputs^MAIN.telescopeControl.fbCabinet.bAuxiliaryContact24V" VarB="Channel 1^Input"/>

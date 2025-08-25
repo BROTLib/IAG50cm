@@ -47,6 +47,27 @@
     <Compile Include="PlcTask_Fast.TcTTO">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\CoverControl\FB_CoverControl.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\CoverControl\States\FB_CoverClosingState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\CoverControl\States\FB_CoverIdleState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\CoverControl\States\FB_CoverOpeningState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\CoverControl\States\FB_CoverState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\CoverControl\States\FB_CoverStoppingState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\CoverControl\States\I_CoverState.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\DomeControl\FB_DomeControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -83,16 +104,10 @@
     <Compile Include="POUs\FB_LatchHome.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_RefMarkerSearch.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_SafetyHandling.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_SerialBackground.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\FB_TelescopeControlNEW.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\Functions\F_RoundLREAL.TcPOU">
@@ -149,12 +164,6 @@
     <Compile Include="POUs\FB_FocusControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_MirrorCoverControl.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\FB_MirrorCoverMotor.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_HourAngleControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -170,6 +179,9 @@
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\Testing\FB_RefMarkerSearch.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Visualization Manager.TcVMO">
       <SubType>Code</SubType>
     </Compile>
@@ -181,9 +193,12 @@
   <ItemGroup>
     <Folder Include="DUTs" />
     <Folder Include="GVLs" />
+    <Folder Include="POUs\CoverControl\States" />
     <Folder Include="POUs\DomeControl\States" />
     <Folder Include="POUs\Functions" />
     <Folder Include="POUs\DomeControl" />
+    <Folder Include="POUs\CoverControl" />
+    <Folder Include="POUs\Testing" />
     <Folder Include="POUs\Pointing" />
     <Folder Include="POUs\PendantControl" />
     <Folder Include="POUs\PendantControl\States" />

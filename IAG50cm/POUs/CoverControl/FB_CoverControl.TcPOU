@@ -1,0 +1,317 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_CoverControl" Id="{d3621f5c-b414-4287-a5b0-c413b9f4d1e9}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CoverControl IMPLEMENTS I_MirrorCovers
+VAR_INPUT
+	Delta		: TIME := T#5S;		// Time difference between both covers opening (and closing)
+	TimeToCycle	: TIME := T#15S;	// Time for one motor to fully open/close
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	bOpen		: BOOL;
+	bClose		: BOOL;
+	bStop		: BOOL;
+	bEmergency	: BOOL;
+	// State
+	fbCoverIdleState : FB_CoverIdleState(THIS);
+	fbCoverOpeningState : FB_CoverOpeningState(THIS);
+	fbCoverStoppingState : FB_CoverStoppingState(THIS);
+	fbCoverClosingState : FB_CoverClosingState(THIS);
+	
+	ipState		: I_CoverState := fbCoverIdleState;
+	eCoverState	: E_MirrorCoverState := E_MirrorCoverState.closed;
+	// Trigger
+	rtrigOpen		: R_TRIG;
+	rtrigClose		: R_TRIG;
+	rtrigStop		: R_TRIG;
+	// Comm
+	fbComm			: I_Comm;
+	tonComm 		: TON := (PT:=T#5S);
+	fbCoverOpenEvent:	FB_EventLog;
+	fbCoverClosedEvent: FB_EventLog;
+	// Motor relais
+	bMotor1RelaisA	AT%Q*	: BOOL := FALSE;
+	bMotor1RelaisB	AT%Q*	: BOOL := FALSE;
+	
+	bMotor2RelaisA	AT%Q*	: BOOL := FALSE;
+	bMotor2RelaisB	AT%Q*	: BOOL := FALSE;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[rtrigOpen(CLK := bOpen);
+rtrigClose(CLK := bClose);
+rtrigStop(CLK := bStop);
+
+IF (rtrigStop.Q) OR bEmergency THEN
+	bStop := FALSE;
+	ipState.StopCommand();
+END_IF
+
+IF (rtrigClose.Q) AND NOT bEmergency THEN
+	bClose := FALSE;
+	ipState.CloseCommand();
+END_IF
+
+IF (rtrigOpen.Q) AND NOT bEmergency THEN
+	bOpen := FALSE;
+	ipState.OpenCommand();
+END_IF
+
+ipState.RunState();
+
+// send telemetry
+tonComm(IN:=TRUE);
+IF tonComm.Q THEN
+	tonComm(IN:=FALSE);
+	fbComm.Publish('telescope', 'dome', 'MirrorCover', TO_STRING(eCoverState));
+END_IF
+
+
+fbCoverOpenEvent(
+	Trigger := eCoverState = E_MirrorCoverState.open,
+	Level := ADSLOG_MSGTYPE_HINT,
+	OnMessage := 'Mirror cover is open.',
+	comm:= fbComm);
+fbCoverClosedEvent(
+	Trigger := eCoverState = E_MirrorCoverState.closed,
+	Level := ADSLOG_MSGTYPE_HINT,
+	OnMessage := 'Mirror cover is closed.',
+	comm:= fbComm);
+]]></ST>
+    </Implementation>
+    <Folder Name="internal properties" Id="{d7d68b3e-5318-439e-87f9-1ef435c0c5d1}" />
+    <Folder Name="properties" Id="{aaac3f27-dfda-472e-bc85-10fb56c84bfd}" />
+    <Property Name="_CoverState" Id="{c85b32fd-9415-4791-974c-4ca08103afd7}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _CoverState : E_MirrorCoverState]]></Declaration>
+      <Set Name="Set" Id="{f51f43d2-3fdd-457e-81b4-6e2279702ecb}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[eCoverState := _CoverState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_Motor1RelaisA" Id="{a8604255-4e83-4e3e-bb1b-8fa1f8af3270}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Motor1RelaisA : BOOL]]></Declaration>
+      <Set Name="Set" Id="{f7b1a4d7-2ab8-4214-9701-469cce4c1746}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bMotor1RelaisA := _Motor1RelaisA;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_Motor1RelaisB" Id="{c75eed28-e932-4804-a2fa-76dad7b24886}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Motor1RelaisB : BOOL]]></Declaration>
+      <Set Name="Set" Id="{c28745b5-4222-499c-a64f-4847f3da5bd5}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bMotor1RelaisB := _Motor1RelaisB;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_Motor2RelaisA" Id="{c44f1da8-f693-4b7b-9269-3c0e57eaede2}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Motor2RelaisA : BOOL]]></Declaration>
+      <Set Name="Set" Id="{a5d54a7c-47dd-415c-bf54-8e1d77599bd1}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bMotor2RelaisA := _Motor2RelaisA;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="_Motor2RelaisB" Id="{b776bd98-83fd-4b81-b3ec-6d518283dd14}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _Motor2RelaisB : BOOL]]></Declaration>
+      <Set Name="Set" Id="{99aa748e-7bd2-4d38-9d81-f8812add68c4}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bMotor2RelaisB := _Motor2RelaisB;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Close" Id="{0a475567-f0d9-4b8f-a207-512f31f9b819}">
+      <Declaration><![CDATA[METHOD Close : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bClose := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Closed" Id="{fe324a82-ce87-4c62-a8bf-44fbeb3a3228}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY Closed : BOOL]]></Declaration>
+      <Get Name="Get" Id="{7e2dccd8-daa7-43a8-bdab-75dce67348c4}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF THIS^.CoverState = E_MirrorCoverState.closed THEN
+	Closed := TRUE;
+ELSE
+	Closed := FALSE;
+END_IF]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="CoverState" Id="{9900c09a-8af5-4aa1-819a-8a64815ba24c}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY CoverState : E_MirrorCoverState]]></Declaration>
+      <Get Name="Get" Id="{b1274ca8-7d60-4a57-b23e-6e172401778c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[CoverState := eCoverState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Error" Id="{d53107c8-e453-4e05-bc9a-229014b7917d}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY Error : BOOL]]></Declaration>
+      <Get Name="Get" Id="{a72e4b0a-3a23-4243-9719-6e644c76db05}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Error := FALSE;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_Init" Id="{29f2f728-7391-4fd0-b6a5-8535dccce95b}">
+      <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
+//The return value is not evaluated. For a specific influence, you can also declare the
+//methods explicitly and provide additional code there with the standard initialization
+//code. You can evaluate the return value.
+METHOD FB_Init: BOOL
+VAR_INPUT
+    bInitRetains	: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
+    bInCopyCode		: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)
+	fbComm			: I_Comm;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.fbComm 				:= fbComm;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Open" Id="{ab86d33d-a775-4eaa-8b2e-bcc3ba9a3c80}">
+      <Declaration><![CDATA[METHOD Open : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bOpen := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Opened" Id="{5f095883-e244-4fba-b20f-8b0ae1386b52}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY Opened : BOOL]]></Declaration>
+      <Get Name="Get" Id="{3e705fa8-212a-4465-a041-b00481831e3c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF THIS^.CoverState = E_MirrorCoverState.open THEN
+	Opened := TRUE;
+ELSE
+	Opened := FALSE;
+END_IF]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Reset" Id="{ab37cc4b-70b9-4d04-96df-5f7175bb7ce3}">
+      <Declaration><![CDATA[METHOD Reset : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetState" Id="{1dc7bcb9-616a-44a2-977b-f8fb97eb2447}">
+      <Declaration><![CDATA[METHOD SetState : BOOL
+VAR_INPUT
+	newState :I_CoverState;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.ipState := newState;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop" Id="{a261d6e5-60ee-4a27-9286-882b77ec4095}">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bStop := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_CoverControl">
+      <LineId Id="40" Count="2" />
+      <LineId Id="45" Count="13" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="60" Count="0" />
+      <LineId Id="59" Count="0" />
+      <LineId Id="62" Count="4" />
+      <LineId Id="68" Count="0" />
+      <LineId Id="73" Count="7" />
+      <LineId Id="88" Count="3" />
+      <LineId Id="87" Count="0" />
+      <LineId Id="61" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl._CoverState.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl._Motor1RelaisA.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl._Motor1RelaisB.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl._Motor2RelaisA.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl._Motor2RelaisB.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.Close">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.Closed.Get">
+      <LineId Id="5" Count="3" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.CoverState.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.Error.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.FB_Init">
+      <LineId Id="7" Count="1" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.Open">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.Opened.Get">
+      <LineId Id="2" Count="0" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="7" Count="1" />
+      <LineId Id="6" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.Reset">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.SetState">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl.Stop">
+      <LineId Id="5" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

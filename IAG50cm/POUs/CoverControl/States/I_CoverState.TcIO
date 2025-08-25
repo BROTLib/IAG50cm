@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <Itf Name="I_CoverState" Id="{c317b290-0871-446b-945b-a87c63a57de9}">
+    <Declaration><![CDATA[INTERFACE I_CoverState
+]]></Declaration>
+    <Method Name="CloseCommand" Id="{865f94c7-6c92-4892-a6a4-fe0ec6720f64}">
+      <Declaration><![CDATA[METHOD CloseCommand : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="OpenCommand" Id="{ab3f11be-d9ee-46fd-bda9-a65c1e611ca1}">
+      <Declaration><![CDATA[METHOD OpenCommand : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="RunState" Id="{4738b1da-e131-4f8a-9dff-6d4bd4b35c2a}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="StopCommand" Id="{fbe05262-7bd0-49b3-973f-ed2b5ab7a544}">
+      <Declaration><![CDATA[METHOD StopCommand : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="SuccessfulFinished" Id="{40b8cd3b-7ebd-4a9a-9ffc-802528f3077b}">
+      <Declaration><![CDATA[METHOD SuccessfulFinished : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

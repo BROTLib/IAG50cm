@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_CoverState" Id="{ca7d5149-bdab-48ed-9905-85ea4e750734}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CoverState IMPLEMENTS I_CoverState
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+	pCover : POINTER TO FB_CoverControl;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="CloseCommand" Id="{195a36c7-9415-4524-9a5c-92ace990b07a}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FB_init" Id="{23c9b3ea-154f-4df6-949c-573bcf58c403}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+	bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+	bInCopyCode : BOOL;  // if TRUE, the instance afterwards gets moved into the copy code (online change)
+	pCover : POINTER TO FB_CoverControl;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.pCover := pCover;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OpenCommand" Id="{93a49747-2f23-4c26-96ad-cf4c3a310ea8}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD OpenCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{a75daf41-ae92-4270-96c0-c0e432dac00e}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD RunState : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StopCommand" Id="{74a48edf-d297-4f18-80dd-9a1ebdef05c5}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD StopCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SuccessfulFinished" Id="{4605a4e0-f930-436f-87ef-999f307c9f93}">
+      <Declaration><![CDATA[{warning 'add method implementation '}
+METHOD SuccessfulFinished : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_CoverState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverState.CloseCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverState.FB_init">
+      <LineId Id="7" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverState.OpenCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverState.RunState">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverState.StopCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverState.SuccessfulFinished">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

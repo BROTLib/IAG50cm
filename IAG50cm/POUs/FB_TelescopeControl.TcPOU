@@ -41,19 +41,19 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	telescopeConfig		: ST_TelescopeConfig;
 END_VAR
 VAR
-	comm 				: I_Comm;
+	fbComm 				: I_Comm;
 	fbCabinet			: FB_CabinetControl;
 	
 	TCS_command			: E_TCSCommand;	// actual command from the TCS
-	jd					: LREAL;	// current Julian Date calculated from system time
-	lst					: LREAL;	// local siderial time calculated from Julian date in hours
-	elevation_calc		: LREAL;	// elevation calulated when ra and dec are set by TCS 
-	azimuth_calc		: LREAL;	// azimuth calulated when ra and dec are set by TCS
+	fJd					: LREAL;	// current Julian Date calculated from system time
+	fLst				: LREAL;	// local siderial time calculated from Julian date in hours
+	fElevationCalc		: LREAL;	// elevation calulated when ra and dec are set by TCS 
+	fAzimuthCalc		: LREAL;	// azimuth calulated when ra and dec are set by TCS
 	fHourAngle			: LREAL;	// hourangle when ra and dec are set by TCS
 	
-	rightascension_calc	: LREAL;	// right ascension calulated when azimuth and elevation are set by TCS
-	declination_calc	: LREAL;	// declination calulated when azimuth and elevation are set by TCS
-	hourangle_calc		: LREAL;	// hour angle azimuth and elevation are set by TCS
+	fRightAscensionCalc	: LREAL;	// right ascension calulated when azimuth and elevation are set by TCS
+	fDeclinationCalc	: LREAL;	// declination calulated when azimuth and elevation are set by TCS
+	fHourAngleCalc		: LREAL;	// hour angle azimuth and elevation are set by TCS
 	
 	fHourAnglePointingOffset	: LREAL; // pointing offset to sky
 	fDeclinationPointingOffset	: LREAL; // pointing offset to sky
@@ -62,21 +62,21 @@ VAR
 	fHourAngleVelocity			: LREAL;	// rotational velocity of the HourAngle
 	fDeclinationVelocity		: LREAL;	// rotational velocity of the Declination
 	fbTime				: FB_AstroClock;	// precise astronomical	time
-	eq2hor				: FB_EQ2HOR;
-	hor2eq				: FB_HOR2EQ;
-	ha2ra				: FB_HA2RA;
+	fbEq2Hor				: FB_EQ2HOR;
+	fbHor2Eq				: FB_HOR2EQ;
+	fbHa2Ra				: FB_HA2RA;
 	fbPointingForward	: FB_PointingModelForward;
 	fbPointingInversion : FB_PointingModelInversion;
 	
-	reset_trigger		: R_TRIG;
+	rtrigReset		: R_TRIG;
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	
-	powerfailure		: BOOL;		// triggers power-failure event
-	poweronwarning		: TP;		// triggers power warning
-	power_timeout		: TON;		// power on timeout
-	command_timeout		: TON;		// command timeout
-	tracking_delay		: TON;		// tracking delay
-	isparked			: BOOL;		// telescope is parked
+	bPowerFailure		: BOOL;		// triggers power-failure event
+	tpPowerOnWarning		: TP;		// triggers power warning
+	tonPowerTimeout		: TON;		// power on timeout
+	tonCommandTimeout		: TON;		// command timeout
+	tonTrackingDelay		: TON;		// tracking delay
+	
 	TCSpowerEvent,
 	TCSgohomeEvent,
 	TCSparkEvent,
@@ -88,40 +88,43 @@ VAR
 	TCSnearPoleEvent,
 	TCSreadyEvent,
 	TCSCTOEvent			: FB_Eventlog;
-	MQTTTimer 			: TON := (PT:=T#5S);
+	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
 	
-
-	StatusWord, LastStatus:	UDINT;
+	nStatusWord, nLastStatus:	UDINT;
 END_VAR
 VAR_OUTPUT
 	bReady				: BOOL;		// TRUE, IF telescope can be operated 
+	fReadyState 		: LREAL := 0.0; // 0: Shut down, 1 powered on, -1 Error
+	bIsParked			: BOOL;		// telescope is parked
+	bIsPowered			: BOOL;		// telescope is powered on
 	bError				: BOOL;		// indicates an error on one of the components
 	bHorizonError		: BOOL;		// if TRUE, the set Coordinate is below the Horizon threshold fHorizon
-	errorid				: UDINT;	//error id of axis	
+	nErrorID				: UDINT;	//error id of axis
+	nMotionState		: INT	:= 0;
 	bSliding			: BOOL;		//TRUE, IF telescope is in fast-MOVE phase (includes pole-swap)	
 	bTracking			: BOOL;		//TRUE, IF telescope is on tracking position AND currently tracking.	
 	bStopped			: BOOL;		//TRUE, IF telescope is AT rest.	
-	hourangle_current	: LREAL;	// true position of the hour angle (without pointing and offset correction)
-	declination_current	: LREAL;	// true position of the declination (without pointing and offset correction)
-	rightascension_current: LREAL;	// true position of the right ascension (without pointing and offset correction)
-	elevation_current	: LREAL;	// current position in elevation (calculated) (without pointing and offset correction)
-	azimuth_current		: LREAL;	// current position in azimuth (calculated) (without pointing and offset correction)
-	elevation_current_sky	: LREAL;	// current position in elevation (calculated)
-	azimuth_current_sky		: LREAL;	// current position in azimuth (calculated)
-	slewtime			: LREAL;	//	(time in sec. to reach the goto/track position) 
+	fHourAngleCurrent	: LREAL;	// true position of the hour angle (without pointing and offset correction)
+	fDeclinationCurrent	: LREAL;	// true position of the declination (without pointing and offset correction)
+	fRightAscensionCurrent: LREAL;	// true position of the right ascension (without pointing and offset correction)
+	fElevationCurrent	: LREAL;	// current position in elevation (calculated) (without pointing and offset correction)
+	fAzimuthCurrent		: LREAL;	// current position in azimuth (calculated) (without pointing and offset correction)
+	fElevationCurrentSky	: LREAL;	// current position in elevation (calculated)
+	fAzimuthCurrentSky		: LREAL;	// current position in azimuth (calculated)
+	fSlewTime			: LREAL;	//	(time in sec. to reach the goto/track position) 
 	bHomed				: BOOL;		// True: telescope is calibrated
 	bBusy				: BOOL;		// telescope does not accept further commands
 END_VAR
 VAR CONSTANT
 	d2r		: LREAL := PI/180.0;
-	siderial_velocity: LREAL := 360.0 / 86164.099;
+	fSiderialVelocity: LREAL := 360.0 / 86164.099;
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[// get the system time
 fbTime();
-jd := DateTime2JD(fbTime.time_RTCEX2);
-lst := CT2LST(telescopeConfig.longitude, jd);
+fJd := DateTime2JD(fbTime.time_RTCEX2);
+fLst := CT2LST(telescopeConfig.longitude, fJd);
 
 // State of the Cabinet
 fbCabinet();
@@ -129,7 +132,7 @@ fbCabinet();
 // set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
 
 
-reset_trigger(CLK := bReset);
+rtrigReset(CLK := bReset);
 
 IF bReset THEN
 	bHorizonError := FALSE; // if reset, the bHorizonError can be switched off
@@ -145,24 +148,24 @@ END_IF
 
 // get error ID, reset if bReset command is set
 IF fbHourAngle.Error THEN
-	errorid := fbHourAngle.nErrorID;
+	nErrorID := fbHourAngle.nErrorID;
 	IF bReset THEN
 		fbHourAngle.Reset();
 	END_IF
 ELSIF fbDeclination.bError THEN
-	errorid := fbDeclination.nErrorID;
+	nErrorID := fbDeclination.nErrorID;
 	IF bReset THEN
 		fbDeclination.Reset();
 	END_IF
 ELSIF fbFocus <> 0 AND_THEN fbFocus.Error THEN
-	errorid := fbFocus.ErrorID;
+	nErrorID := fbFocus.ErrorID;
 	IF bReset THEN
 		fbFocus.Reset();
 	END_IF
 END_IF
 
-// slewtime
-slewtime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
+// fSlewTime
+fSlewTime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
 
 // ERROR (either one of the Axis or below safe Horizon (fHorizon))
 bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR bHorizonError OR fbCabinet.Error;
@@ -175,35 +178,35 @@ IF bError THEN
 	fbHourAngle.Enable := FALSE;
 	fbDeclination.Enable := FALSE;
 ELSE
-	errorid := 0;
+	nErrorID := 0;
 END_IF
 
 
 // calculate fHourAngle (and also horizontal coord. -> used for checking if target is on sky or in ground)
 
-eq2hor(
+fbEq2Hor(
 	ra := fRightAscension,
 	dec := fDeclination,
 	lon := telescopeConfig.longitude,
 	lat := telescopeConfig.latitude,
 	altitude := telescopeConfig.altitude,
-	JD := jd + fTimeOffset,
+	JD := fJd + fTimeOffset,
 	refract_to_observed := TRUE,
-	alt => elevation_calc,
-	az => azimuth_calc,
+	alt => fElevationCalc,
+	az => fAzimuthCalc,
 	ha => fHourAngle);
 	
 // calculate equatorial coordinates (used by Slew command, takes Alt/Az -> moves telescope)
-hor2eq(alt := fElevation, 
+fbHor2Eq(alt := fElevation, 
 		az := fAzimuth,
-		jd := jd+fTimeOffset,
+		jd := fJd+fTimeOffset,
 		lat := telescopeConfig.latitude,
 		lon := telescopeConfig.longitude,
 		altitude := telescopeConfig.altitude,
 		refract_to_observed := TRUE,
-		ra => rightascension_calc,
-		dec => declination_calc,
-		ha => hourangle_calc);		
+		ra => fRightAscensionCalc,
+		dec => fDeclinationCalc,
+		ha => fHourAngleCalc);		
 // caluclate pointing offsets
 fbPointingForward(
 	HourAngle	:= fHourAngle,
@@ -216,48 +219,48 @@ fbPointingForward(
 );
 
 // get current coordinates (of motors)
-declination_current := fbDeclination.fActualPosition ;
-hourangle_current := fbHourAngle.fActualPosition ;
+fDeclinationCurrent := fbDeclination.fActualPosition ;
+fHourAngleCurrent := fbHourAngle.fActualPosition ;
 fbPointingInversion(
-	HourAngle:= hourangle_current,
-	Declination:= declination_current,
+	HourAngle:= fHourAngleCurrent,
+	Declination:= fDeclinationCurrent,
 	Latitude:=telescopeConfig.latitude,
 	HourAngle_correction => fHourAngleInversionOffset,
 	Declination_correction => fDeclinationInversionOffset
 );
 
 // transform into needed coordinates
-ha2ra(
-	ha := hourangle_current,
-	dec := declination_current,
-	jd := jd+fTimeOffset,
+fbHa2Ra(
+	ha := fHourAngleCurrent,
+	dec := fDeclinationCurrent,
+	jd := fJd+fTimeOffset,
 	lon := telescopeConfig.longitude,
-	ra => rightascension_current);
+	ra => fRightAscensionCurrent);
 
-eq2hor(
-	ra := rightascension_current,
-	dec := declination_current,
+fbEq2Hor(
+	ra := fRightAscensionCurrent,
+	dec := fDeclinationCurrent,
 	lon := telescopeConfig.longitude,
 	lat := telescopeConfig.latitude,
 	altitude := telescopeConfig.altitude,
 	refract_to_observed := FALSE,
-	JD := jd + fTimeOffset,
-	alt => elevation_current,
-	az => azimuth_current);
+	JD := fJd + fTimeOffset,
+	alt => fElevationCurrent,
+	az => fAzimuthCurrent);
 	
-eq2hor(
-	ra := MODABS(rightascension_current +fHourAngleInversionOffset, 360),
-	dec := declination_current - fDeclinationInversionOffset,
+fbEq2Hor(
+	ra := MODABS(fRightAscensionCurrent +fHourAngleInversionOffset, 360),
+	dec := fDeclinationCurrent - fDeclinationInversionOffset,
 	lon := telescopeConfig.longitude,
 	lat := telescopeConfig.latitude,
 	altitude := telescopeConfig.altitude,
 	refract_to_observed := FALSE,
-	JD := jd + fTimeOffset,
-	alt => elevation_current_sky,
-	az => azimuth_current_sky);
+	JD := fJd + fTimeOffset,
+	alt => fElevationCurrentSky,
+	az => fAzimuthCurrentSky);
 	
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
-IF elevation_current < (fHorizon+0.2) THEN
+IF fElevationCurrent < (fHorizon+0.2) THEN
 	IF NOT bStopped AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSE
@@ -265,11 +268,11 @@ IF elevation_current < (fHorizon+0.2) THEN
 	END_IF
 END_IF
 	
-poweronwarning(IN := bPower OR (NOT fbHourAngle.bEnable), PT := T#250MS);
+tpPowerOnWarning(IN := bPower OR (NOT fbHourAngle.bEnable), PT := T#250MS);
 
-power_timeout(IN := TCS_command = E_TCSCommand.no_command AND NOT isparked, PT := T#12H);
-command_timeout();
-IF power_timeout.Q AND NOT isparked THEN
+tonPowerTimeout(IN := TCS_command = E_TCSCommand.no_command AND NOT bIsParked, PT := T#12H);
+tonCommandTimeout();
+IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
 END_IF
 		
@@ -368,44 +371,45 @@ ELSE
 END_IF
 
 IF TCS_command = E_TCSCommand.poweron THEN
-	_PowerOn();
-	command_timeout(IN := TCS_command = E_TCSCommand.poweron, PT := T#12H);
+	fReadyState := _PowerOn();
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.poweron, PT := T#12H);
 	TCSCTOEvent.OnMessage := 'POWER';
 ELSIF TCS_command = E_TCSCommand.stop THEN
 	_StopTelescope();
-	command_timeout(IN := TCS_command = E_TCSCommand.stop, PT := T#2S);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.stop, PT := T#2S);
 	TCSCTOEvent.OnMessage := 'STOP';
 ELSIF TCS_command = E_TCSCommand.park THEN
-	_ParkTelescope();
-	command_timeout(IN := TCS_command = E_TCSCommand.park, PT := T#2M);
+	fReadyState :=_ParkTelescope();
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.park, PT := T#2M);
 	TCSCTOEvent.OnMessage := 'PARK';
 ELSIF TCS_command = E_TCSCommand.gohome THEN
 	_HomeTelescope();
-	command_timeout(IN := TCS_command = E_TCSCommand.gohome, PT := T#2M);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.gohome, PT := T#2M);
 	TCSCTOEvent.OnMessage := 'GOHOME';
 ELSIF TCS_command = E_TCSCommand.goto THEN
 	_GotoTelescope();
-	command_timeout(IN := TCS_command = E_TCSCommand.goto, PT := T#2M);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.goto, PT := T#2M);
 	TCSCTOEvent.OnMessage := 'GOTO';
 ELSIF TCS_command = E_TCSCommand.slew THEN
 	_SlewTelescope();
-	command_timeout(IN := TCS_command = E_TCSCommand.slew, PT := T#2M);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.slew, PT := T#2M);
 	TCSCTOEvent.OnMessage := 'SLEW';
 ELSIF TCS_command = E_TCSCommand.track THEN
 	_TrackTelescope();
-	command_timeout(IN := TCS_command = E_TCSCommand.track, PT := T#12H);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.track, PT := T#12H);
 	TCSCTOEvent.OnMessage := 'TRACK';
 ELSE
 	// disable command timeout
-	command_timeout(IN := FALSE);
+	tonCommandTimeout(IN := FALSE);
 	TCSCTOEvent.OnMessage := 'NOCOMMAND';
 END_IF
- 
+
+(* STATUS BOOLS*)
 bSliding := NOT bTracking AND (fbHourAngle.fbAxis.InMotion OR fbHourAngle.fbAxis.InRamp OR
 			fbDeclination.fbAxis.InMotion OR fbDeclination.fbAxis.InRamp );
 
 // signal must be stable for 5500MS
-tracking_delay(in := fbHourAngle.fbAxis.isTracking AND 
+tonTrackingDelay(in := fbHourAngle.fbAxis.isTracking AND 
 			fbDeclination.fbAxis.isTracking ,PT :=T#5500MS, Q => bTracking);
 
 bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
@@ -414,12 +418,31 @@ bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND
 bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated AND (fbFocus <> 0 AND_THEN fbFocus.Calibrated);
 			
 bReady := bHomed AND 
-	fbCovers.Opened AND 
+	bIsPowered AND 
 	fbHourAngle.bEnable AND
 	fbDeclination.bEnable AND
+	(fbFocus <> 0 AND_THEN fbFocus.Enable) AND
     NOT bError;
 
 bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy OR (fbFocus <> 0 AND_THEN fbFocus.Busy);
+
+(* STATUS STATES*)
+//fReadyState (see also _PowerOn and _ParkTelescope calls above)
+IF bReady THEN
+	fReadyState := 1.0;
+ELSIF bError THEN
+	fReadyState := -1.0;
+ELSIF bIsParked THEN
+	fReadyState := 0.0;
+END_IF
+//nMotionState
+IF bStopped THEN
+	nMotionState := 0;
+ELSIF bSliding OR bBusy THEN
+	nMotionState := 1;
+ELSIF bTracking THEN
+	nMotionState := 8;
+END_IF
 	
 
 // unset the STOP command if telescope is already stopped
@@ -440,32 +463,32 @@ END_IF
 // send telemetry
 
 IF bSliding OR bTrack OR bTracking THEN
-	MQTTTimer.PT := T#1000MS; // during movement every second
+	tonMQTTTimer.PT := T#1000MS; // during movement every second
 ELSE
-	MQTTTimer.PT := T#5000MS; // otherwise every five seconds
+	tonMQTTTimer.PT := T#5000MS; // otherwise every five seconds
 END_IF
-MQTTTimer(IN:=TRUE);
-IF MQTTTimer.Q THEN // publish new payload every second
-	MQTTTimer(IN:=FALSE);
+tonMQTTTimer(IN:=TRUE);
+IF tonMQTTTimer.Q THEN // publish new payload every second
+	tonMQTTTimer(IN:=FALSE);
 
-	comm.Publish('telescope', 'dome', 'JulianDate', LREAL_TO_STRING(jd));
-	comm.Publish('telescope', 'dome', 'LocalSiderialTime', LREAL_TO_STRING(lst));
+	fbComm.Publish('telescope', 'dome', 'JulianDate', LREAL_TO_STRING(fJd));
+	fbComm.Publish('telescope', 'dome', 'LocalSiderialTime', LREAL_TO_STRING(fLst));
 	(*
 		ON SKY COORDS (with offsets but without pointing offsets)
 		ALT AZ HA RA DEC
 	*)
-	comm.Publish('telescope', 'dome', 'Azimuth', LREAL_TO_STRING(azimuth_current_sky));
-	comm.Publish('telescope', 'dome', 'Elevation', LREAL_TO_STRING(elevation_current_sky));
-	comm.Publish('telescope', 'dome', 'Declination', LREAL_TO_STRING( declination_current - fDeclinationInversionOffset));
+	fbComm.Publish('telescope', 'dome', 'Azimuth', LREAL_TO_STRING(fAzimuthCurrentSky));
+	fbComm.Publish('telescope', 'dome', 'Elevation', LREAL_TO_STRING(fElevationCurrentSky));
+	fbComm.Publish('telescope', 'dome', 'Declination', LREAL_TO_STRING( fDeclinationCurrent - fDeclinationInversionOffset));
 	// change to -180 to 180 degree in HA
-	IF hourangle_current - fHourAngleInversionOffset < -180 THEN
-		comm.Publish('telescope', 'dome', 'HourAngle', LREAL_TO_STRING(180 + LMOD(180+hourangle_current - fHourAngleInversionOffset, 360)));
-	ELSIF hourangle_current - fHourAngleInversionOffset > 180 THEN
-		comm.Publish('telescope', 'dome', 'HourAngle', LREAL_TO_STRING(-180 + LMOD(-180+hourangle_current - fHourAngleInversionOffset, 360)));
+	IF fHourAngleCurrent - fHourAngleInversionOffset < -180 THEN
+		fbComm.Publish('telescope', 'dome', 'HourAngle', LREAL_TO_STRING(180 + LMOD(180+fHourAngleCurrent - fHourAngleInversionOffset, 360)));
+	ELSIF fHourAngleCurrent - fHourAngleInversionOffset > 180 THEN
+		fbComm.Publish('telescope', 'dome', 'HourAngle', LREAL_TO_STRING(-180 + LMOD(-180+fHourAngleCurrent - fHourAngleInversionOffset, 360)));
 	ELSE
-		comm.Publish('telescope', 'dome', 'HourAngle', LREAL_TO_STRING(hourangle_current - fHourAngleInversionOffset));
+		fbComm.Publish('telescope', 'dome', 'HourAngle', LREAL_TO_STRING(fHourAngleCurrent - fHourAngleInversionOffset));
 	END_IF
-	comm.Publish('telescope', 'dome', 'RightAscension', LREAL_TO_STRING(MODABS(rightascension_current +fHourAngleInversionOffset, 360)));
+	fbComm.Publish('telescope', 'dome', 'RightAscension', LREAL_TO_STRING(MODABS(fRightAscensionCurrent +fHourAngleInversionOffset, 360)));
 	
 
 	
@@ -474,14 +497,14 @@ IF MQTTTimer.Q THEN // publish new payload every second
 		RAW ON SKY COORDS (with out any offsets) -> used for creating pointing model
 		HA DEC
 	*)
-	comm.Publish('telescope', 'dome', 'DeclinationRaw', LREAL_TO_STRING( declination_current - fDeclinationInversionOffset - fDeclinationOffset));
+	fbComm.Publish('telescope', 'dome', 'DeclinationRaw', LREAL_TO_STRING( fDeclinationCurrent - fDeclinationInversionOffset - fDeclinationOffset));
 	// change to -180 to 180 degree in HA
-	IF hourangle_current - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r) < -180 THEN
-		comm.Publish('telescope', 'dome', 'HourAngleRaw', LREAL_TO_STRING(180 + LMOD(180+hourangle_current - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r), 360)));
-	ELSIF hourangle_current - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r) > 180 THEN
-		comm.Publish('telescope', 'dome', 'HourAngleRaw', LREAL_TO_STRING(-180 + LMOD(-180+hourangle_current - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r), 360)));
+	IF fHourAngleCurrent - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r) < -180 THEN
+		fbComm.Publish('telescope', 'dome', 'HourAngleRaw', LREAL_TO_STRING(180 + LMOD(180+fHourAngleCurrent - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r), 360)));
+	ELSIF fHourAngleCurrent - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r) > 180 THEN
+		fbComm.Publish('telescope', 'dome', 'HourAngleRaw', LREAL_TO_STRING(-180 + LMOD(-180+fHourAngleCurrent - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r), 360)));
 	ELSE
-		comm.Publish('telescope', 'dome', 'HourAngleRaw', LREAL_TO_STRING(hourangle_current - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r)));
+		fbComm.Publish('telescope', 'dome', 'HourAngleRaw', LREAL_TO_STRING(fHourAngleCurrent - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclination*d2r)));
 	END_IF
 
 	
@@ -490,128 +513,114 @@ IF MQTTTimer.Q THEN // publish new payload every second
 		Instrument COORDS (with all offsets) -> actual motor/encoder positions of both axis
 		HA DEC
 	*)
-	comm.Publish('telescope', 'dome', 'HourAngleInstrument', LREAL_TO_STRING(hourangle_current));
-	comm.Publish('telescope', 'dome', 'DeclinationInstrument', LREAL_TO_STRING(declination_current));
+	fbComm.Publish('telescope', 'dome', 'HourAngleInstrument', LREAL_TO_STRING(fHourAngleCurrent));
+	fbComm.Publish('telescope', 'dome', 'DeclinationInstrument', LREAL_TO_STRING(fDeclinationCurrent));
 	(*
 		Offsets both in Ha Dec system, not actual sky distance
 	*)
-	comm.Publish('telescope', 'dome', 'DeclinationOffset', LREAL_TO_STRING(fDeclinationOffset));
-	comm.Publish('telescope', 'dome', 'HourAngleOffset', LREAL_TO_STRING(fHourAngleOffset));
-	comm.Publish('telescope', 'dome', 'DeclinationPointingOffset', LREAL_TO_STRING(fDeclinationPointingOffset));
-	comm.Publish('telescope', 'dome', 'HourAnglePointingOffset', LREAL_TO_STRING(fHourAnglePointingOffset));
+	fbComm.Publish('telescope', 'dome', 'DeclinationOffset', LREAL_TO_STRING(fDeclinationOffset));
+	fbComm.Publish('telescope', 'dome', 'HourAngleOffset', LREAL_TO_STRING(fHourAngleOffset));
+	fbComm.Publish('telescope', 'dome', 'DeclinationPointingOffset', LREAL_TO_STRING(fDeclinationPointingOffset));
+	fbComm.Publish('telescope', 'dome', 'HourAnglePointingOffset', LREAL_TO_STRING(fHourAnglePointingOffset));
 	
-	comm.Publish('telescope', 'dome', 'errorid',	UDINT_TO_STRING(errorid));
-	comm.Publish('telescope', 'dome', 'error',		BOOL_TO_STRING(bError));
-	comm.Publish('telescope', 'dome', 'ready',		BOOL_TO_STRING(bReady));
-	comm.Publish('telescope', 'dome', 'sliding',	BOOL_TO_STRING(bSliding));
-	comm.Publish('telescope', 'dome', 'tracking', 	BOOL_TO_STRING(bTracking));
-	comm.Publish('telescope', 'dome', 'stopped',	BOOL_TO_STRING(bStopped));
-	comm.Publish('telescope', 'dome', 'homed',		BOOL_TO_STRING(bHomed));
-	comm.Publish('telescope', 'dome', 'parked',		BOOL_TO_STRING(isparked));
-	comm.Publish('telescope', 'dome', 'busy',		BOOL_TO_STRING(bBusy));
+	fbComm.Publish('telescope', 'dome', 'errorid',	UDINT_TO_STRING(nErrorID));
+	fbComm.Publish('telescope', 'dome', 'error',		BOOL_TO_STRING(bError));
+	fbComm.Publish('telescope', 'dome', 'ready',		BOOL_TO_STRING(bReady));
+	fbComm.Publish('telescope', 'dome', 'sliding',	BOOL_TO_STRING(bSliding));
+	fbComm.Publish('telescope', 'dome', 'tracking', 	BOOL_TO_STRING(bTracking));
+	fbComm.Publish('telescope', 'dome', 'stopped',	BOOL_TO_STRING(bStopped));
+	fbComm.Publish('telescope', 'dome', 'homed',		BOOL_TO_STRING(bHomed));
+	fbComm.Publish('telescope', 'dome', 'parked',		BOOL_TO_STRING(bIsParked));
+	fbComm.Publish('telescope', 'dome', 'busy',		BOOL_TO_STRING(bBusy));
 END_IF
 
-StatusWord.0 := bError;
-StatusWord.1 := bReady;
-StatusWord.2 := bSliding;
-StatusWord.3 := bTracking;
-StatusWord.4 := bStopped;
-StatusWord.5 := bHomed;
-StatusWord.6 := bPower;
-StatusWord.7 := bPark;
-StatusWord.8 := bGoHome;
-StatusWord.9 := bTrack;
-StatusWord.10 := bGoto;
-StatusWord.11 := bSlew;
-StatusWord.12 := bStop;
-StatusWord.13 := bBusy;
 
-IF StatusWord<>LastStatus THEN // publish new payload every second
-	LastStatus := StatusWord;
-	comm.Publish('telescope', 'dome', 'error',		BOOL_TO_STRING(bError));
-	comm.Publish('telescope', 'dome', 'ready',		BOOL_TO_STRING(bReady));
-	comm.Publish('telescope', 'dome', 'sliding',		BOOL_TO_STRING(bSliding));
-	comm.Publish('telescope', 'dome', 'tracking', 	BOOL_TO_STRING(bTracking));
-	comm.Publish('telescope', 'dome', 'stopped',		BOOL_TO_STRING(bStopped));
-	comm.Publish('telescope', 'dome', 'homed',		BOOL_TO_STRING(bHomed));
-	comm.Publish('telescope', 'dome', 'power',		BOOL_TO_STRING(bPower));
-	comm.Publish('telescope', 'dome', 'park',		BOOL_TO_STRING(bPark));
-	comm.Publish('telescope', 'dome', 'gohome',		BOOL_TO_STRING(bGoHome));
-	comm.Publish('telescope', 'dome', 'track',		BOOL_TO_STRING(bTrack));
-	comm.Publish('telescope', 'dome', 'goto',		BOOL_TO_STRING(bGoto));
-	comm.Publish('telescope', 'dome', 'slew',		BOOL_TO_STRING(bSlew));
-	comm.Publish('telescope', 'dome', 'stop',		BOOL_TO_STRING(bStop));
-	comm.Publish('telescope', 'dome', 'busy',		BOOL_TO_STRING(bBusy));
+IF nStatusWord<>nLastStatus THEN // publish new payload every second
+	nLastStatus := nStatusWord;
+	fbComm.Publish('telescope', 'dome', 'error',		BOOL_TO_STRING(bError));
+	fbComm.Publish('telescope', 'dome', 'ready',		BOOL_TO_STRING(bReady));
+	fbComm.Publish('telescope', 'dome', 'sliding',		BOOL_TO_STRING(bSliding));
+	fbComm.Publish('telescope', 'dome', 'tracking', 	BOOL_TO_STRING(bTracking));
+	fbComm.Publish('telescope', 'dome', 'stopped',		BOOL_TO_STRING(bStopped));
+	fbComm.Publish('telescope', 'dome', 'homed',		BOOL_TO_STRING(bHomed));
+	fbComm.Publish('telescope', 'dome', 'power',		BOOL_TO_STRING(bPower));
+	fbComm.Publish('telescope', 'dome', 'park',		BOOL_TO_STRING(bPark));
+	fbComm.Publish('telescope', 'dome', 'gohome',		BOOL_TO_STRING(bGoHome));
+	fbComm.Publish('telescope', 'dome', 'track',		BOOL_TO_STRING(bTrack));
+	fbComm.Publish('telescope', 'dome', 'goto',		BOOL_TO_STRING(bGoto));
+	fbComm.Publish('telescope', 'dome', 'slew',		BOOL_TO_STRING(bSlew));
+	fbComm.Publish('telescope', 'dome', 'stop',		BOOL_TO_STRING(bStop));
+	fbComm.Publish('telescope', 'dome', 'busy',		BOOL_TO_STRING(bBusy));
 END_IF
 
 
 (* Event function blocks start here. *)
-TCSpowerEvent(	Trigger := powerfailure, 
+TCSpowerEvent(	Trigger := bPowerFailure, 
 				Level := ADSLOG_MSGTYPE_ERROR,
 				FormatString := 'power %s',
 				//OnMessage := 'Failure',
 				OffMessage := 'OK', 
-				Comm := comm);
+				Comm := fbComm);
 
 TCSgohomeEvent(	Trigger := bGoHome, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'GOHOME %s',
 				OnMessage := 'commencing',
 				OffMEssage := 'completed', 
-				Comm := comm);
+				Comm := fbComm);
 TCSparkEvent(	Trigger := bPark, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'PARK %s',
 				OnMessage := 'commencing',
 				OffMEssage := 'completed', 
-				Comm := comm);
+				Comm := fbComm);
 TCSgotoEvent(	Trigger := bGoto, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'GOTO %s',
 				OnMessage := 'commencing',
 				OffMEssage := 'completed', 
-				Comm := comm);
+				Comm := fbComm);
 TCStrackEvent(	Trigger := bTrack, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'TRACK %s',
 				OnMessage := 'commencing',
 				OffMEssage := 'completed', 
-				Comm := comm);
+				Comm := fbComm);
 TCSstopEvent(	Trigger := bStop, 
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := 'STOP %s',
 				OnMessage := 'commencing',
 				OffMEssage := 'completed',
 				OffLevel := ADSLOG_MSGTYPE_HINT, 
-				Comm := comm);
-TCStargetHorizonEvent(	Trigger := bReady AND elevation_calc<fHorizon, 
+				Comm := fbComm);
+TCStargetHorizonEvent(	Trigger := bReady AND fElevationCalc<fHorizon, 
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'Target below safe horizon',
 				OffMEssage := '', 
-				Comm := comm);
-TCSaltitudeEvent(	Trigger := elevation_current<(fHorizon+2.0), 
+				Comm := fbComm);
+TCSaltitudeEvent(	Trigger := fElevationCurrent<(fHorizon+2.0), 
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'Telescope below safe horizon',
 				OffMEssage := '', 
-				Comm := comm);
+				Comm := fbComm);
 TCSnearPoleEvent(	Trigger := fDeclination + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone), 
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'To close to the pole, stopping telescope.',
 				OffMEssage := '', 
-				Comm := comm);			
+				Comm := fbComm);			
 TCSreadyEvent(	Trigger := bReady, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := '%s',
 				OnMessage := 'IAG50cm startup finished', 
-				Comm := comm);
-TCSCTOEvent(	Trigger := command_timeout.Q,
+				Comm := fbComm);
+TCSCTOEvent(	Trigger := tonCommandTimeout.Q,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := 'A timeout occured during %s command!',
 				OnMessage := 'NOCOMMAND', 
-				Comm := comm);]]></ST>
+				Comm := fbComm);]]></ST>
     </Implementation>
     <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
     <Folder Name="internal methods" Id="{43f8a5dc-2166-4fdb-b436-34a8f62ea04a}" />
@@ -622,48 +631,48 @@ VAR_INPUT
 END_VAR
 VAR
 	GoToEvent		: FB_Eventlog;
-	commandTimeout	: TON;
+	tonCommandTimeout	: TON;
 END_VAR
 VAR_STAT
-	Stage			: USINT := 0;
-	LastStage		: USINT := 101;
+	nStage			: USINT := 0;
+	nLastStage		: USINT := 101;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[_GotoTelescope := Stage;
-commandTimeout(IN := Stage < 100 AND Stage > 0, PT := T#600S);
-IF commandTimeout.Q THEN
+        <ST><![CDATA[_GotoTelescope := nStage;
+tonCommandTimeout(IN := nStage < 100 AND nStage > 0, PT := T#600S);
+IF tonCommandTimeout.Q THEN
 	bError := TRUE;
-	errorid := 16#10;
+	nErrorID := 16#10;
 	bGoto := FALSE;
-	Stage := 0;
+	nStage := 0;
 	RETURN;
 END_IF
 
-IF elevation_calc < fHorizon THEN
+IF fElevationCalc < fHorizon THEN
 	bHorizonError := TRUE;
-	errorid := 16#15;
+	nErrorID := 16#15;
 	bGoto := FALSE;
-	Stage := 0;
+	nStage := 0;
 	RETURN;
 END_IF
 
 
 IF bReset OR bError OR bStop OR bInterupted THEN
-	Stage := 0;
+	nStage := 0;
 	RETURN;
 END_IF
 
-CASE Stage OF
+CASE nStage OF
 	0:	
 		IF bReady AND NOT bBusy THEN
-			Stage := 10;
+			nStage := 10;
 		END_IF
 	10:
 		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
 			fbHourAngle.Tracking := FALSE;
 			fbDeclination.Tracking := FALSE;
 		ELSE
-			Stage := 20;
+			nStage := 20;
 		END_IF
 	20:	
 		// clear offsets
@@ -672,7 +681,7 @@ CASE Stage OF
 		// Declination (including offest and pointing model)
 		IF fDeclination + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone) THEN
 			// if too close to pole -> stop
-			Stage := 0;
+			nStage := 0;
 			bGoto := FALSE;
 			bStop := TRUE;
 			RETURN;
@@ -691,76 +700,76 @@ CASE Stage OF
 		fbDeclination.Velocity := fSlewVelocity;
 		
 		// make sure to never drive under Horizon
-		IF ABS(fbHourAngle.Position) < ABS(hourangle_current) THEN
+		IF ABS(fbHourAngle.Position) < ABS(fHourAngleCurrent) THEN
 			// move Ha then Dec
-			Stage := 30;
+			nStage := 30;
 		ELSE
 			// move Dec then HA
-			Stage := 40;
+			nStage := 40;
 		END_IF
 	// Stage 30: move Ha and then Dec
 	30:
 		fbHourAngle.MoveAxis := TRUE;
 		IF fbHourAngle.Busy THEN
-			Stage := 31;
+			nStage := 31;
 		END_IF
 	31:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbHourAngle.MoveAxis THEN
-		   Stage := 32;
+		   nStage := 32;
 		END_IF
 	32:
 		fbDeclination.MoveAxis := TRUE;
 		IF fbDeclination.Busy THEN
-			Stage := 33;
+			nStage := 33;
 		END_IF
 	33:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbDeclination.MoveAxis THEN
-		   Stage := 75;
+		   nStage := 75;
 		END_IF
 	// Stage 40: move Dec and then Ha
 	40:
 		fbDeclination.MoveAxis := TRUE;
 		IF fbDeclination.Busy THEN
-			Stage := 41;
+			nStage := 41;
 		END_IF
 	41:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbDeclination.MoveAxis THEN
-		   Stage := 42;
+		   nStage := 42;
 		END_IF
 	42:
 		fbHourAngle.MoveAxis := TRUE;
 		IF fbHourAngle.Busy THEN
-			Stage := 43;
+			nStage := 43;
 		END_IF
 	43:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbHourAngle.MoveAxis THEN
-		   Stage := 75;
+		   nStage := 75;
 		END_IF
 
 	75:
 		IF NOT bSliding AND bStopped THEN // all axis standstill
-			Stage := 100;
+			nStage := 100;
 		END_IF
 	100:
 		bGoto := FALSE;
 		// enable automatic tracking
 		bTrack := bAutoTrack;
-		Stage := 0;
+		nStage := 0;
 END_CASE
-GoToEvent(Trigger := Stage > LastStage, FormatString := 'GOTO progress: %s', OnMessage := USINT_TO_STRING(Stage), comm := comm);
-LastStage := Stage;
+GoToEvent(Trigger := nStage > nLastStage, FormatString := 'GOTO progress: %s', OnMessage := USINT_TO_STRING(nStage), comm := fbComm);
+nLastStage := nStage;
 ]]></ST>
       </Implementation>
     </Method>
@@ -770,36 +779,36 @@ VAR_INPUT
 END_VAR
 VAR
 	HomeEvent:	FB_Eventlog;
-	commandTimeout: TON;
+	tonCommandTimeout: TON;
 END_VAR
 VAR_STAT
-	Stage:		USINT := 0;
-	LastStage:	USINT := 101;
+	nStage:		USINT := 0;
+	nLastStage:	USINT := 101;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[_HomeTelescope := Stage;
-commandTimeout(IN := Stage < 100 AND Stage > 0, PT := T#600S);
-IF commandTimeout.Q THEN
+        <ST><![CDATA[_HomeTelescope := nStage;
+tonCommandTimeout(IN := nStage < 100 AND nStage > 0, PT := T#600S);
+IF tonCommandTimeout.Q THEN
 	bError := TRUE;
-	errorid := 16#30;
-	Stage := 0;
+	nErrorID := 16#30;
+	nStage := 0;
 END_IF
 
 IF bReset OR bError OR bStop OR bInterupted THEN
-	Stage := 0;
+	nStage := 0;
 	RETURN;
 END_IF
-CASE Stage OF
+CASE nStage OF
 	0:	
 		IF bReady AND bStopped AND NOT bBusy THEN
-			Stage := 10;
+			nStage := 10;
 		END_IF
 	10:
 		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
 			fbHourAngle.Tracking := FALSE;
 			fbDeclination.Tracking := FALSE;
 		ELSE
-			Stage := 20;
+			nStage := 20;
 		END_IF
 	20:
 		fbHourAngle.Position := telescopeConfig.hourangleHome;
@@ -808,73 +817,73 @@ CASE Stage OF
 		fbDeclination.Velocity := fSlewVelocity;
 		
 		// make sure to never drive under Horizon
-		IF ABS(telescopeConfig.hourangleHome) < ABS(hourangle_current) THEN
+		IF ABS(telescopeConfig.hourangleHome) < ABS(fHourAngleCurrent) THEN
 			// move Ha then Dec
-			Stage := 30;
+			nStage := 30;
 		ELSE
 			// move Dec then HA
-			Stage := 40;
+			nStage := 40;
 		END_IF
-	// Stage 30: move Ha and then Dec
+	// nStage 30: move Ha and then Dec
 	30:
 		fbHourAngle.MoveAxis := TRUE;
 		IF fbHourAngle.Busy THEN
-			Stage := 31;
+			nStage := 31;
 		END_IF
 	31:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbHourAngle.MoveAxis THEN
-		   Stage := 32;
+		   nStage := 32;
 		END_IF
 	32:
 		fbDeclination.MoveAxis := TRUE;
 		IF fbDeclination.Busy THEN
-			Stage := 33;
+			nStage := 33;
 		END_IF
 	33:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbDeclination.MoveAxis THEN
-		   Stage := 100;
+		   nStage := 100;
 		END_IF
-	// Stage 40: move Dec and then Ha
+	// nStage 40: move Dec and then Ha
 	40:
 		fbDeclination.MoveAxis := TRUE;
 		IF fbDeclination.Busy THEN
-			Stage := 41;
+			nStage := 41;
 		END_IF
 	41:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbDeclination.MoveAxis THEN
-		   Stage := 42;
+		   nStage := 42;
 		END_IF
 	42:
 		fbHourAngle.MoveAxis := TRUE;
 		IF fbHourAngle.Busy THEN
-			Stage := 43;
+			nStage := 43;
 		END_IF
 	43:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbHourAngle.MoveAxis THEN
-		   Stage := 100;
+		   nStage := 100;
 		END_IF
 	100:
 		fbFocus.Position := telescopeConfig.focusHome;
-		fRightAscension := rightascension_current;
-		fDeclination := declination_current;
+		fRightAscension := fRightAscensionCurrent;
+		fDeclination := fDeclinationCurrent;
 		bGoHome := FALSE;
-		Stage := 0;
+		nStage := 0;
 END_CASE
 
-HomeEvent(Trigger := Stage > LastStage, FormatString := 'GOHOME progress: %s', OnMessage := USINT_TO_STRING(Stage), comm := comm);
-LastStage := Stage;]]></ST>
+HomeEvent(Trigger := nStage > nLastStage, FormatString := 'GOHOME progress: %s', OnMessage := USINT_TO_STRING(nStage), comm := fbComm);
+nLastStage := nStage;]]></ST>
       </Implementation>
     </Method>
     <Method Name="_ParkTelescope" Id="{94a12771-4c75-4743-9ad3-850f66878f1f}" FolderPath="internal methods\">
@@ -885,19 +894,19 @@ VAR
 	ParkEvent	: FB_Eventlog;
 END_VAR
 VAR_STAT
-	Stage		: USINT := 0;
-	LastStage	: USINT := 0;
+	nStage		: USINT := 0;
+	nLastStage	: USINT := 0;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[_ParkTelescope := Stage;
+        <ST><![CDATA[_ParkTelescope := nStage;
 IF bReset OR bError OR bStop OR bInterupted THEN
-	Stage := 0;
+	nStage := 0;
 	RETURN;
 END_IF
-IF isparked THEN
-	Stage := 100;
+IF bIsParked THEN
+	nStage := 100;
 END_IF
-CASE Stage OF
+CASE nStage OF
 	0: 
 		IF fbFocus <> 0 THEN
 			fbFocus.Position := telescopeConfig.focusPark;
@@ -906,17 +915,17 @@ CASE Stage OF
 			fbHourAngle.Enable := FALSE;
 			fbDeclination.Enable := FALSE;	
 			fbCovers.Close();	
-			Stage := 80;
+			nStage := 80;
 		END_IF
 		IF NOT bBusy THEN
-			Stage := 10;
+			nStage := 10;
 		END_IF
 	10:
 		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
 			fbHourAngle.Tracking := FALSE;
 			fbDeclination.Tracking := FALSE;
 		ELSE
-			Stage := 20;
+			nStage := 20;
 		END_IF
 	20:
 		THIS^.HourAngleOffset := 0.0;
@@ -927,66 +936,66 @@ CASE Stage OF
 		fbDeclination.Velocity := fSlewVelocity;
 		
 		// make sure to never drive under Horizon
-		IF ABS(telescopeConfig.houranglePark) < ABS(hourangle_current) THEN
+		IF ABS(telescopeConfig.houranglePark) < ABS(fHourAngleCurrent) THEN
 			// move Ha then Dec
-			Stage := 30;
+			nStage := 30;
 		ELSE
 			// move Dec then HA
-			Stage := 40;
+			nStage := 40;
 		END_IF
 	// Stage 30: move Ha and then Dec
 	30:
 		fbHourAngle.MoveAxis := TRUE;
 		IF fbHourAngle.Busy THEN
-			Stage := 31;
+			nStage := 31;
 		END_IF
 	31:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbHourAngle.MoveAxis THEN
-		   Stage := 32;
+		   nStage := 32;
 		END_IF
 	32:
 		fbDeclination.MoveAxis := TRUE;
 		IF fbDeclination.Busy THEN
-			Stage := 33;
+			nStage := 33;
 		END_IF
 	33:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbDeclination.MoveAxis THEN
-		   Stage := 60;
+		   nStage := 60;
 		END_IF
 	// Stage 40: move Dec and then Ha
 	40:
 		fbDeclination.MoveAxis := TRUE;
 		IF fbDeclination.Busy THEN
-			Stage := 41;
+			nStage := 41;
 		END_IF
 	41:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbDeclination.MoveAxis THEN
-		   Stage := 42;
+		   nStage := 42;
 		END_IF
 	42:
 		fbHourAngle.MoveAxis := TRUE;
 		IF fbHourAngle.Busy THEN
-			Stage := 43;
+			nStage := 43;
 		END_IF
 	43:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbHourAngle.MoveAxis THEN
-		   Stage := 60;
+		   nStage := 60;
 		END_IF
 	60:
 		IF NOT fbHourAngle.Enable AND NOT fbDeclination.Enable THEN
-			stage := 80;
+			nStage := 80;
 		END_IF
 
 		IF bStopped THEN
@@ -998,71 +1007,171 @@ CASE Stage OF
 		fbDeclination.bMoveAxis := FALSE;
 	80:
 		IF fbHourAngle.Enable OR fbDeclination.Enable THEN
-			stage := 60;
+			nStage := 60;
 		END_IF
 		fbCovers.Close();
 		fbFocus.Enable := FALSE;
-		Stage := 90;	
+		nStage := 90;	
 	90:
 		IF fbCovers.Closed THEN
-			Stage := 100;
+			nStage := 100;
 		END_IF
 	100:
-		isparked := TRUE;
+		bIsPowered:=FALSE;
+		bIsParked := TRUE;
 		bPark := FALSE;
 		_ParkTelescope := 100;
-		Stage := 0;	
+		nStage := 0;	
 END_CASE
-ParkEvent(Trigger := Stage > LastStage, FormatString := 'Parking progress: %s', OnMessage := USINT_TO_STRING(Stage), comm := comm);
-LastStage := Stage;
+ParkEvent(Trigger := nStage > nLastStage, FormatString := 'Parking progress: %s', OnMessage := USINT_TO_STRING(nStage), comm := fbComm);
+nLastStage := nStage;
 ]]></ST>
       </Implementation>
     </Method>
     <Method Name="_PowerOn" Id="{1dafa267-4251-4a45-a8e2-ae0ece289894}" FolderPath="internal methods\">
-      <Declaration><![CDATA[METHOD PRIVATE _PowerOn : BOOL
+      <Declaration><![CDATA[METHOD PRIVATE _PowerOn : USINT
 VAR_INPUT
 END_VAR
-]]></Declaration>
+VAR
+	PowerOnEvent	: FB_Eventlog;
+END_VAR
+VAR_STAT
+	nStage		: USINT := 0;
+	nLastStage	: USINT := 0;
+END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF bError THEN
-	powerfailure := TRUE;
+	bPowerFailure := TRUE;
 	TCSpowerEvent.OnMessage := 'Generic error during power on occured.';
 	bPower := FALSE;
 ELSE
-	powerfailure := FALSE;		
+	bPowerFailure := FALSE;		
+END_IF
+
+_PowerOn := nStage;
+IF bReset OR bError OR bStop OR bInterupted THEN
+	nStage := 0;
+	RETURN;
+END_IF
+IF bIsPowered THEN
+	nStage := 100;
 END_IF
 // COVER MUST BE OPENED FOR A SUCCESSFUL WAKE & SHAKE COMMAND!
-
-fbCovers.Open();
-
-
-
-// enable hourangle, enable declination
-IF bMainReady AND fbCovers.Opened THEN 
-	fbHourAngle.Enable := TRUE;
-	fbDeclination.Enable := TRUE;
-END_IF
-
-
-IF fbHourAngle.Calibrated AND fbFocus <> 0 THEN
-	fbFocus.Enable := TRUE;
-	fbFocus.Position := telescopeConfig.focusPark;
-END_IF
-
-IF fbHourAngle.Calibrated AND
-	fbDeclination.Calibrated AND
-	fbCovers.Opened AND 
-	fbFocus.Calibrated THEN
-	//PowerOn is done, set bPower to False
-	bPower := FALSE;
-	_PowerOn := TRUE;
-	isparked := FALSE;
-	// slew the telescope to the home position
-	bGoHome := TRUE;
-ELSE
-	_PowerOn := FALSE;
-END_IF
+CASE nStage OF
+	0:
+		bIsParked := FALSE;
+		// COVER MUST BE OPENED FOR A SUCCESSFUL WAKE & SHAKE COMMAND!
+		fbCovers.Open();
+		nStage := 20;
+	20:
+		IF bMainReady AND fbCovers.Opened THEN
+			nStage := 40;
+		END_IF
+	40:
+		// enable hourangle, enable declination
+		fbHourAngle.Enable := TRUE;
+		fbDeclination.Enable := TRUE;
+		IF fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
+			nStage := 70;
+		END_IF
+	70:
+		// if Focus, enable and calibrate
+		IF fbFocus <> 0 THEN
+			fbFocus.Enable := TRUE;
+			fbFocus.Position := telescopeConfig.focusPark;
+			IF fbFocus.Calibrated THEN
+				nStage := 100;
+			END_IF
+		ELSE
+			nStage := 100;
+		END_IF
+	100:
+		//PowerOn is done, set bPower to False
+		bPower := FALSE;
+		bIsPowered := TRUE;
+		// slew the telescope to the home position
+		bGoHome := TRUE;
+		_PowerOn := 100;
+		nStage := 0;	
+END_CASE
+PowerOnEvent(Trigger := nStage > nLastStage, FormatString := 'PowerOn progress: %s', OnMessage := USINT_TO_STRING(nStage), comm := fbComm);
+nLastStage := nStage;
 ]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_SendTelemetryEquitorial" Id="{2e72b74c-93b9-406f-985e-048a1bd902d8}" FolderPath="internal methods\">
+      <Declaration><![CDATA[METHOD _SendTelemetryEquitorial : BOOL
+VAR_INPUT
+
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(* Open TSI standart *)
+
+(* TELESCOPE module*)
+
+fbComm.Publish('telescope', 'dome', 'TELESCOPE.READY_STATE',	LREAL_TO_STRING(fReadyState));
+fbComm.Publish('telescope', 'dome', 'TELESCOPE.Motion_STATE',	LREAL_TO_STRING(nMotionState));
+
+// INFO
+fbComm.Publish('telescope', 'dome', 'TELESCOPE.INFO.NAME',	'50cm');
+fbComm.Publish('telescope', 'dome', 'TELESCOPE.INFO.DIAMETER',	'0.5');
+fbComm.Publish('telescope', 'dome', 'TELESCOPE.INFO.CABINET',	'Beckhoff');
+fbComm.Publish('telescope', 'dome', 'TELESCOPE.INFO.MANUFACTURER', 'Halfmann, Haidenhain, Beckhoff');
+
+// CONFIG
+IF fbDome <> 0 THEN
+	fbComm.Publish('telescope', 'dome', 'TELESCOPE.CONFIG.CAPABILITIES', INT_TO_STRING(fbDome.Capabilities));
+ELSE
+	fbComm.Publish('telescope', 'dome', 'TELESCOPE.CONFIG.CAPABILITIES', '0');
+END_IF
+fbComm.Publish('telescope', 'dome', 'TELESCOPE.CONFIG.MOUNTOPTIONS', 'HA-DEC');
+fbComm.Publish('telescope', 'dome', 'TELESCOPE.CONFIG.MOUNT', 'HA-DEC');
+
+// STATUS
+IF bEstopTriggered THEN
+	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', '1');
+ELSIF bError THEN
+	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', '2');
+ELSE
+	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', '0');
+END_IF
+(* ERROR LIST: TO BE IMPLEMENTED!!!*)
+
+(* OBJECT Module*)
+
+// INSTRUMENTAL
+// Set Coords from outside | GoTo:RA DEC | Slew:Alt Az
+fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.RA', LREAL_TO_STRING(fRightAscension));
+fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.DEC', LREAL_TO_STRING(fDeclination));
+fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.ALT', LREAL_TO_STRING(fElevation));
+fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.AZ', LREAL_TO_STRING(fAzimuth));
+
+// HORIZONTAL
+IF bSlew THEN
+	fbComm.Publish('telescope', 'dome', 'OBJECT.HORIZONTAL.ALT', LREAL_TO_STRING(fElevation));
+	fbComm.Publish('telescope', 'dome', 'OBJECT.HORIZONTAL.AZ', LREAL_TO_STRING(fAzimuth));
+ELSE
+	fbComm.Publish('telescope', 'dome', 'OBJECT.HORIZONTAL.ALT', LREAL_TO_STRING(fElevationCalc));
+	fbComm.Publish('telescope', 'dome', 'OBJECT.HORIZONTAL.AZ', LREAL_TO_STRING(fAzimuthCalc));
+END_IF
+
+//EQUATORIAL
+fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.EPOCH', 'J2000.0');
+fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.EQUINOX', 'J2000.0');
+fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.RA_PM', '0.0');
+fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC_PM', '0.0');
+fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.RA_RATE', '0.0');
+fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC_RATE', '0.0');
+IF bSlew THEN
+	fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.RA', LREAL_TO_STRING(fRightAscensionCalc/15.0));
+	fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC', LREAL_TO_STRING(fDeclinationCalc));
+ELSE
+	fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.RA', LREAL_TO_STRING(fRightAscension/15.0));
+	fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC', LREAL_TO_STRING(fDeclination));
+END_IF
+
+(* POINTING *)]]></ST>
       </Implementation>
     </Method>
     <Method Name="_SlewTelescope" Id="{4aaca2e7-2dba-4c2d-80b3-cd4dcc5ad38b}" FolderPath="internal methods\">
@@ -1071,144 +1180,138 @@ VAR_INPUT
 END_VAR
 VAR
 	SlewEvent:	FB_Eventlog;
-	command_timeout: TON;
+	tonCommandTimeout: TON;
 END_VAR
 VAR_STAT
-	Stage:		USINT := 0;
-	LastStage:	USINT := 101;
+	nStage:		USINT := 0;
+	nLastStage:	USINT := 101;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[_SlewTelescope := Stage;
-command_timeout(IN := Stage < 100 AND Stage > 0, PT := T#600S);
-IF command_timeout.Q THEN
+        <ST><![CDATA[_SlewTelescope := nStage;
+tonCommandTimeout(IN := nStage < 100 AND nStage > 0, PT := T#600S);
+IF tonCommandTimeout.Q THEN
 	bError := TRUE;
-	errorid := 16#40;
+	nErrorID := 16#40;
 	bSlew := FALSE;
-	Stage := 0;
+	nStage := 0;
 	RETURN;
 END_IF
 IF fElevation < fHorizon THEN
 	bHorizonError := TRUE;
-	errorid := 16#15;
+	nErrorID := 16#15;
 	bSlew := FALSE;
-	Stage := 0;
+	nStage := 0;
 	RETURN;
 END_IF
 IF bReset OR bError OR bStop OR bInterupted THEN
-	Stage := 0;
+	nStage := 0;
 	RETURN;
 END_IF
-CASE Stage OF
+CASE nStage OF
 	0:	
 		IF bReady AND bStopped AND NOT bBusy AND NOT bTracking THEN
-			Stage := 10;
+			nStage := 10;
 		END_IF
 	10:
 		IF fbHourAngle.Tracking = TRUE OR fbDeclination.Tracking = TRUE THEN
 			fbHourAngle.Tracking := FALSE;
 			fbDeclination.Tracking := FALSE;
 		ELSE
-			Stage := 25;
+			nStage := 25;
 		END_IF
 	25:
 		THIS^.HourAngleOffset := 0.0;
 		THIS^.DeclinationOffset := 0.0;
-		// change to -180 to 180 degree in HA
-		IF hourangle_calc > 180 THEN
-			fbHourAngle.Position := hourangle_calc-360.0;
-		ELSE
-			fbHourAngle.Position := hourangle_calc;
-		END_IF
+		
 		// Declination (including offest and pointing model)
-		IF declination_calc + fDeclinationPointingOffset > (90.0 - fPoleZone) THEN
+		IF fDeclinationCalc + fDeclinationPointingOffset > (90.0 - fPoleZone) THEN
 			// if too close to pole -> stop
-			Stage := 0;
+			nStage := 0;
 			bStop := TRUE;
 			RETURN;
 		ELSE
-			fbDeclination.Position := declination_calc + fDeclinationPointingOffset;
+			fbDeclination.Position := fDeclinationCalc + fDeclinationPointingOffset;
 			// HourAngle
 			// change to -180 to 180 degree in HA
-			IF MODABS(hourangle_calc + fHourAnglePointingOffset, 360) > 180 THEN
-				fbHourAngle.Position := MODABS(hourangle_calc + fHourAnglePointingOffset,360) - 360.0;
+			IF MODABS(fHourangleCalc + fHourAnglePointingOffset, 360) > 180 THEN
+				fbHourAngle.Position := MODABS(fHourangleCalc + fHourAnglePointingOffset,360) - 360.0;
 			ELSE
-				fbHourAngle.Position := MODABS(hourangle_calc + fHourAnglePointingOffset,360);
+				fbHourAngle.Position := MODABS(fHourangleCalc + fHourAnglePointingOffset,360);
 			END_IF
 		END_IF
 		fbHourAngle.Velocity := fSlewVelocity;
 		fbDeclination.Velocity := fSlewVelocity;
 		// make sure to never drive under Horizon
-		IF ABS(fbHourAngle.Position) < ABS(hourangle_current) THEN
+		IF ABS(fbHourAngle.Position) < ABS(fHourangleCurrent) THEN
 			// move Ha then Dec
-			Stage := 30;
+			nStage := 30;
 		ELSE
 			// move Dec then HA
-			Stage := 40;
+			nStage := 40;
 		END_IF
 	// Stage 30: move Ha and then Dec
 	30:
 		fbHourAngle.MoveAxis := TRUE;
 		IF fbHourAngle.Busy THEN
-			Stage := 31;
+			nStage := 31;
 		END_IF
 	31:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbHourAngle.MoveAxis THEN
-		   Stage := 32;
+		   nStage := 32;
 		END_IF
 	32:
 		fbDeclination.MoveAxis := TRUE;
 		IF fbDeclination.Busy THEN
-			Stage := 33;
+			nStage := 33;
 		END_IF
 	33:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbDeclination.MoveAxis THEN
-		   Stage := 75;
+		   nStage := 75;
 		END_IF
 	// Stage 40: move Dec and then Ha
 	40:
 		fbDeclination.MoveAxis := TRUE;
 		IF fbDeclination.Busy THEN
-			Stage := 41;
+			nStage := 41;
 		END_IF
 	41:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbDeclination.MoveAxis THEN
-		   Stage := 42;
+		   nStage := 42;
 		END_IF
 	42:
 		fbHourAngle.MoveAxis := TRUE;
 		IF fbHourAngle.Busy THEN
-			Stage := 43;
+			nStage := 43;
 		END_IF
 	43:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
 		END_IF
 		IF NOT fbHourAngle.MoveAxis THEN
-		   Stage := 75;
+		   nStage := 75;
 		END_IF
 	75:
 		IF NOT bSliding AND bStopped THEN // all axis standstill
-			Stage := 100;
+			nStage := 100;
 		END_IF
 	100:
 		fbHourAngle.MoveAxis := FALSE;
 		fbDeclination.MoveAxis := FALSE;
-		fRightAscension := rightascension_current;
-		fDeclination := declination_current;
+
 		bSlew := FALSE;
-		Stage := 0;
+		nStage := 0;
 END_CASE
-SlewEvent(Trigger := Stage > LastStage, FormatString := 'Slew progress: %s', OnMessage := USINT_TO_STRING(Stage), comm := comm);
-LastStage := Stage;		
+SlewEvent(Trigger := nStage > nLastStage, FormatString := 'Slew progress: %s', OnMessage := USINT_TO_STRING(nStage), comm := fbComm);
+nLastStage := nStage;		
 ]]></ST>
       </Implementation>
     </Method>
@@ -1310,8 +1413,8 @@ END_IF
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[AltAz.Altitude 	:= elevation_calc;
-AltAz.Azimuth 	:= azimuth_calc;]]></ST>
+          <ST><![CDATA[AltAz.Altitude 	:= fElevationCalc;
+AltAz.Azimuth 	:= fAzimuthCalc;]]></ST>
         </Implementation>
       </Get>
     </Property>
@@ -1324,7 +1427,7 @@ PROPERTY Altitude : LREAL
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[]]></ST>
+          <ST><![CDATA[Altitude := fElevationCurrent;]]></ST>
         </Implementation>
       </Get>
     </Property>
@@ -1337,7 +1440,7 @@ PROPERTY Azimuth : LREAL
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[Azimuth := azimuth_current;]]></ST>
+          <ST><![CDATA[Azimuth := fAzimuthCurrent;]]></ST>
         </Implementation>
       </Get>
     </Property>
@@ -1383,10 +1486,10 @@ METHOD FB_Init: BOOL
 VAR_INPUT
     bInitRetains	: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
     bInCopyCode		: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)
-	comm			: I_Comm;
+	fbComm			: I_Comm;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[THIS^.comm 				:= comm;
+        <ST><![CDATA[THIS^.fbComm 				:= fbComm;
 ]]></ST>
       </Implementation>
     </Method>
@@ -1440,8 +1543,8 @@ END_VAR
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[RaDec.RightAscension	:= rightascension_calc;
-RaDec.Declination		:= declination_calc;]]></ST>
+          <ST><![CDATA[RaDec.RightAscension	:= fRightAscensionCalc;
+RaDec.Declination		:= fDeclinationCalc;]]></ST>
         </Implementation>
       </Get>
     </Property>
@@ -1607,7 +1710,7 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="5485" Count="0" />
       <LineId Id="7745" Count="0" />
       <LineId Id="7747" Count="0" />
-      <LineId Id="7749" Count="0" />
+      <LineId Id="7942" Count="0" />
       <LineId Id="7751" Count="2" />
       <LineId Id="7759" Count="1" />
       <LineId Id="7746" Count="0" />
@@ -1702,12 +1805,27 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="5562" Count="4" />
       <LineId Id="5569" Count="6" />
       <LineId Id="5577" Count="1" />
-      <LineId Id="5580" Count="37" />
+      <LineId Id="5580" Count="34" />
+      <LineId Id="8075" Count="0" />
+      <LineId Id="5615" Count="2" />
       <LineId Id="5619" Count="3" />
       <LineId Id="5624" Count="2" />
       <LineId Id="5628" Count="1" />
       <LineId Id="5635" Count="4" />
-      <LineId Id="5641" Count="2" />
+      <LineId Id="8060" Count="0" />
+      <LineId Id="5641" Count="0" />
+      <LineId Id="8074" Count="0" />
+      <LineId Id="8073" Count="0" />
+      <LineId Id="8076" Count="0" />
+      <LineId Id="8061" Count="0" />
+      <LineId Id="8077" Count="0" />
+      <LineId Id="8062" Count="1" />
+      <LineId Id="8065" Count="3" />
+      <LineId Id="8064" Count="0" />
+      <LineId Id="5642" Count="1" />
+      <LineId Id="8078" Count="0" />
+      <LineId Id="8080" Count="3" />
+      <LineId Id="8079" Count="0" />
       <LineId Id="5648" Count="5" />
       <LineId Id="6990" Count="0" />
       <LineId Id="5654" Count="7" />
@@ -1748,7 +1866,12 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="7852" Count="0" />
       <LineId Id="5686" Count="1" />
       <LineId Id="6147" Count="6" />
-      <LineId Id="5695" Count="81" />
+      <LineId Id="5695" Count="1" />
+      <LineId Id="5711" Count="1" />
+      <LineId Id="8086" Count="0" />
+      <LineId Id="5714" Count="14" />
+      <LineId Id="8085" Count="0" />
+      <LineId Id="5730" Count="46" />
       <LineId Id="6762" Count="4" />
       <LineId Id="6761" Count="0" />
       <LineId Id="7936" Count="4" />
@@ -1848,28 +1971,86 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="103" Count="0" />
       <LineId Id="205" Count="0" />
       <LineId Id="98" Count="0" />
-      <LineId Id="73" Count="12" />
+      <LineId Id="73" Count="4" />
+      <LineId Id="229" Count="0" />
+      <LineId Id="78" Count="7" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._PowerOn">
-      <LineId Id="5" Count="7" />
+      <LineId Id="5" Count="6" />
+      <LineId Id="96" Count="7" />
+      <LineId Id="95" Count="0" />
+      <LineId Id="12" Count="0" />
       <LineId Id="69" Count="0" />
-      <LineId Id="63" Count="0" />
-      <LineId Id="65" Count="0" />
-      <LineId Id="13" Count="4" />
-      <LineId Id="84" Count="0" />
-      <LineId Id="20" Count="0" />
+      <LineId Id="104" Count="0" />
+      <LineId Id="146" Count="0" />
+      <LineId Id="114" Count="0" />
+      <LineId Id="106" Count="0" />
+      <LineId Id="157" Count="0" />
+      <LineId Id="156" Count="0" />
+      <LineId Id="107" Count="3" />
+      <LineId Id="113" Count="0" />
+      <LineId Id="111" Count="1" />
+      <LineId Id="116" Count="0" />
+      <LineId Id="115" Count="0" />
+      <LineId Id="117" Count="1" />
+      <LineId Id="120" Count="2" />
+      <LineId Id="124" Count="5" />
+      <LineId Id="123" Count="0" />
+      <LineId Id="130" Count="0" />
+      <LineId Id="132" Count="2" />
+      <LineId Id="136" Count="0" />
+      <LineId Id="131" Count="0" />
+      <LineId Id="119" Count="0" />
+      <LineId Id="137" Count="0" />
+      <LineId Id="105" Count="0" />
+      <LineId Id="138" Count="1" />
+      <LineId Id="55" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_TelescopeControl._SendTelemetryEquitorial">
+      <LineId Id="5" Count="0" />
+      <LineId Id="7" Count="0" />
+      <LineId Id="6" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="11" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="12" Count="3" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="17" Count="0" />
+      <LineId Id="19" Count="1" />
+      <LineId Id="22" Count="1" />
+      <LineId Id="21" Count="0" />
+      <LineId Id="18" Count="0" />
       <LineId Id="28" Count="0" />
-      <LineId Id="35" Count="0" />
-      <LineId Id="37" Count="0" />
-      <LineId Id="90" Count="0" />
-      <LineId Id="89" Count="0" />
-      <LineId Id="40" Count="2" />
-      <LineId Id="44" Count="0" />
-      <LineId Id="80" Count="0" />
+      <LineId Id="32" Count="0" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="37" Count="1" />
+      <LineId Id="34" Count="1" />
+      <LineId Id="39" Count="1" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="43" Count="0" />
+      <LineId Id="42" Count="0" />
       <LineId Id="46" Count="0" />
-      <LineId Id="76" Count="0" />
-      <LineId Id="74" Count="0" />
-      <LineId Id="48" Count="7" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="49" Count="0" />
+      <LineId Id="53" Count="0" />
+      <LineId Id="47" Count="0" />
+      <LineId Id="54" Count="0" />
+      <LineId Id="33" Count="0" />
+      <LineId Id="56" Count="0" />
+      <LineId Id="55" Count="0" />
+      <LineId Id="58" Count="1" />
+      <LineId Id="65" Count="0" />
+      <LineId Id="62" Count="2" />
+      <LineId Id="60" Count="0" />
+      <LineId Id="67" Count="0" />
+      <LineId Id="66" Count="0" />
+      <LineId Id="76" Count="5" />
+      <LineId Id="69" Count="6" />
+      <LineId Id="68" Count="0" />
+      <LineId Id="57" Count="0" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._SlewTelescope">
       <LineId Id="1" Count="6" />
@@ -1887,7 +2068,6 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="17" Count="0" />
       <LineId Id="210" Count="0" />
       <LineId Id="212" Count="0" />
-      <LineId Id="173" Count="4" />
       <LineId Id="172" Count="0" />
       <LineId Id="214" Count="14" />
       <LineId Id="213" Count="0" />
@@ -1896,7 +2076,7 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="115" Count="56" />
       <LineId Id="39" Count="0" />
       <LineId Id="43" Count="6" />
-      <LineId Id="51" Count="7" />
+      <LineId Id="52" Count="6" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._StopTelescope">
       <LineId Id="16" Count="1" />

@@ -63,7 +63,9 @@ VAR
 	eReceiveErrorID	: ComError_t;
 	bReceiveTimeout	: BOOL;
 END_VAR
-]]></Declaration>
+VAR CONSTANT
+	nCapabilities : INT := 2; 	//OPEN TSI : TELESCOPE.CONFIG.CAPABILITIES
+END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[IF ipTelescope <> 0 THEN
 	fDomeAzi_go := ipTelescope.Azimuth;
@@ -304,6 +306,17 @@ END_VAR
 ]]></Declaration>
         <Implementation>
           <ST><![CDATA[_Track := bTrack;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Capabilities" Id="{a5232eb4-5866-434a-858f-b0136e7dd593}" FolderPath="properties\">
+      <Declaration><![CDATA[PROPERTY Capabilities : INT]]></Declaration>
+      <Get Name="Get" Id="{97d77058-b27e-4c1e-ab84-3307e1bea0b7}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Capabilities := nCapabilities;]]></ST>
         </Implementation>
       </Get>
     </Property>
@@ -615,6 +628,9 @@ END_VAR
       <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl._Track.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Capabilities.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl.Close">

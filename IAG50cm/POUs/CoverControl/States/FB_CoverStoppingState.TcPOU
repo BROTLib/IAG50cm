@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_CoverStoppingState" Id="{f48b8b07-47c1-4266-826f-5feb1ff6fbca}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CoverStoppingState EXTENDS FB_CoverState
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="RunState" Id="{7fdd173a-4c60-45f6-b8c9-8d404fcf0de6}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Stop Motor 1
+pCover^._Motor1RelaisA := FALSE;
+pCover^._Motor1RelaisB := FALSE;
+// Stop Motor 2
+pCover^._Motor2RelaisA := FALSE;
+pCover^._Motor2RelaisB := FALSE;
+THIS^.SuccessfulFinished();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SuccessfulFinished" Id="{16696f42-d127-4d1e-b50e-ff1289983df1}">
+      <Declaration><![CDATA[METHOD SuccessfulFinished : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pCover^._CoverState := E_MirrorCoverState.stopped;
+pCover^.SetState(pCover^.fbCoverIdleState);]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_CoverStoppingState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverStoppingState.RunState">
+      <LineId Id="5" Count="2" />
+      <LineId Id="10" Count="0" />
+      <LineId Id="9" Count="0" />
+      <LineId Id="4" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="11" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverStoppingState.SuccessfulFinished">
+      <LineId Id="8" Count="0" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

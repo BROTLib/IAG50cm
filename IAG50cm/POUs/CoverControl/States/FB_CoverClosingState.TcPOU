@@ -1,0 +1,104 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_CoverClosingState" Id="{01dc9b33-581a-47c6-88d3-673a749ad1ec}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CoverClosingState EXTENDS FB_CoverState
+VAR
+	nStage			: UINT:= 0;
+	tonDelta		: TON := (PT:= pCover^.Delta);
+	tonFullCycle	: TON:= (PT:= pCover^.TimeToCycle );
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="OpenCommand" Id="{37b09ab2-b8c8-4a93-a138-b28f6cb2bcf3}">
+      <Declaration><![CDATA[METHOD OpenCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nStage := 0;
+tonDelta(IN:=FALSE);
+tonFullCycle(IN:=FALSE);
+pCover^.SetState(pCover^.fbCoverOpeningState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{80955472-6560-4181-a9ba-febd31ed8ad0}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[tonDelta();
+tonFullCycle();
+CASE nStage OF
+	0:
+		pCover^._CoverState := E_MirrorCoverState.closing;
+		tonDelta.IN := TRUE;
+		nStage := 1;
+	1:
+		// Stop Motor 1
+		pCover^._Motor1RelaisA := FALSE;
+		pCover^._Motor1RelaisB := FALSE;
+		// Close Motor 2
+		pCover^._Motor2RelaisA := FALSE;
+		pCover^._Motor2RelaisB := TRUE;
+		nStage := 2;
+	2:
+		IF tonDelta.Q THEN
+			tonDelta.IN := FALSE;
+			nStage:=3;
+		END_IF 
+	3:
+		// Close Motor 1
+		pCover^._Motor1RelaisA := FALSE;
+		pCover^._Motor1RelaisB := TRUE;
+		tonFullCycle.IN:=TRUE;
+		nStage := 4;
+	4:
+		IF tonFullCycle.Q THEN
+			tonFullCycle.IN := FALSE;
+			THIS^.SuccessfulFinished();
+		END_IF 
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StopCommand" Id="{81fd907d-7afe-4d61-9013-3ad196b8d9b7}">
+      <Declaration><![CDATA[METHOD StopCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nStage := 0;
+tonDelta(IN:=FALSE);
+tonFullCycle(IN:=FALSE);
+pCover^.SetState(pCover^.fbCoverStoppingState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SuccessfulFinished" Id="{9a7dbaad-c9df-40cc-bdd5-9cc345f04d2e}">
+      <Declaration><![CDATA[METHOD SuccessfulFinished : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nStage := 0;
+tonDelta(IN:=FALSE);
+tonFullCycle(IN:=FALSE);
+pCover^._CoverState := E_MirrorCoverState.closed;
+pCover^.SetState(pCover^.fbCoverIdleState);]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_CoverClosingState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverClosingState.OpenCommand">
+      <LineId Id="5" Count="2" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverClosingState.RunState">
+      <LineId Id="34" Count="1" />
+      <LineId Id="5" Count="28" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverClosingState.StopCommand">
+      <LineId Id="5" Count="2" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverClosingState.SuccessfulFinished">
+      <LineId Id="5" Count="3" />
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -4,36 +4,36 @@
     <Declaration><![CDATA[PROGRAM MAIN
 VAR
 	comm			: FB_Comm_MQTT_Influx;
-	coverControl 	: FB_MirrorCoverControl(comm:=comm);
+	coverControl		: FB_CoverControl(fbComm := comm);
 	focusControl	: FB_FocusControl(comm:=comm);
 	haControl		: FB_HourAngleControl(comm:=comm);
 	decControl		: FB_DeclinationControl(comm:=comm);
-	telescopeControl: FB_TelescopeControl(comm := comm);
+	telescopeControl: FB_TelescopeControl(fbComm := comm);
 	domeControl		: FB_DomeControl(comm := comm);
 	pendantControl 	: FB_PendantControl(comm:=comm);
 	safetyHandling	: FB_SafetyHandling(comm:=comm);
-	latch_test	:FB_RefMarkerSearch;
-	home_test : FB_LatchHome;
-	Axis : AXIS_REF;
+
 	
 END_VAR
 VAR CONSTANT
 	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
-													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 10.1,
-													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 10.1);
+													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 16.3,
+													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 16.3);
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[latch_test();
-
-
-domeControl(ipTelescope	:= telescopeControl);
+      <ST><![CDATA[domeControl(ipTelescope	:= telescopeControl);
 
 pendantControl(
 	ipTelescope	:= telescopeControl,
 	ipFocus		:= focusControl);
 
-coverControl(delta_t:= T#5s);
-focusControl(fVelocity:=1);
+coverControl(
+	Delta := T#5S,
+	TimeToCycle := T#15S);
+	
+focusControl(
+	fVelocity:=1);
+	
 haControl();
 decControl();
 telescopeControl(
@@ -65,15 +65,18 @@ comm(
 ]]></ST>
     </Implementation>
     <LineIds Name="MAIN">
-      <LineId Id="187" Count="0" />
-      <LineId Id="200" Count="0" />
-      <LineId Id="99" Count="0" />
       <LineId Id="53" Count="0" />
       <LineId Id="223" Count="0" />
       <LineId Id="116" Count="0" />
       <LineId Id="226" Count="1" />
       <LineId Id="133" Count="0" />
-      <LineId Id="54" Count="2" />
+      <LineId Id="295" Count="0" />
+      <LineId Id="297" Count="1" />
+      <LineId Id="301" Count="0" />
+      <LineId Id="55" Count="0" />
+      <LineId Id="299" Count="0" />
+      <LineId Id="302" Count="0" />
+      <LineId Id="56" Count="0" />
       <LineId Id="41" Count="0" />
       <LineId Id="70" Count="0" />
       <LineId Id="43" Count="2" />

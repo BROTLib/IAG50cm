@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_CoverIdleState" Id="{f1d58d15-5a8c-4164-99e1-a5d9e089ed6c}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_CoverIdleState EXTENDS FB_CoverState
+VAR_INPUT
+END_VAR
+VAR_OUTPUT
+END_VAR
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="CloseCommand" Id="{6dfe491a-a1e5-4076-a615-62fc471ebe72}">
+      <Declaration><![CDATA[METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pCover^.SetState(pCover^.fbCoverClosingState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="OpenCommand" Id="{4c8f3564-fa75-48d7-b56e-701d8b57a66d}">
+      <Declaration><![CDATA[METHOD OpenCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pCover^.SetState(pCover^.fbCoverOpeningState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StopCommand" Id="{43efa24f-8021-4279-87de-321de14fc42b}">
+      <Declaration><![CDATA[METHOD StopCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pCover^.SetState(pCover^.fbCoverStoppingState);]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_CoverIdleState">
+      <LineId Id="9" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverIdleState.CloseCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverIdleState.OpenCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverIdleState.StopCommand">
+      <LineId Id="4" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
