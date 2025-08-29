@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_AxisControl" Id="{6fdef2a3-176a-42ec-90be-24250bb425eb}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK ABSTRACT FB_AxisControl EXTENDS FB_BaseAxis IMPLEMENTS I_Axis
 VAR_INPUT
@@ -29,6 +29,26 @@ END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[]]></ST>
     </Implementation>
+    <Property Name="ActualPosition" Id="{a8007bf4-e523-4f3c-a3f0-e8e7a9781d3d}">
+      <Declaration><![CDATA[PROPERTY ActualPosition : LREAL
+]]></Declaration>
+      <Get Name="Get" Id="{99515da2-8ff8-4d02-8cbd-d31c15b8daba}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ActualPosition := fActualPosition;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{2bea3c83-0b62-4b36-a6b5-8c781fd530db}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[fActualPosition := ActualPosition;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
     <Property Name="isTracking" Id="{d14d4ed7-aa44-40b8-a06b-dbd9bb4bc398}">
       <Declaration><![CDATA[PROPERTY isTracking : BOOL]]></Declaration>
       <Get Name="Get" Id="{d8cce5f4-c21e-4d9a-87e8-69b1f87cb648}">
@@ -121,6 +141,12 @@ END_VAR
     </Property>
     <LineIds Name="FB_AxisControl">
       <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.ActualPosition.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_AxisControl.ActualPosition.Set">
+      <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_AxisControl.isTracking.Get">
       <LineId Id="1" Count="0" />

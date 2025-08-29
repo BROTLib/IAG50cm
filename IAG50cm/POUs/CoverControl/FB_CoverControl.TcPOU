@@ -62,9 +62,9 @@ ipState.RunState();
 
 // send telemetry
 tonComm(IN:=TRUE);
-IF tonComm.Q THEN
+IF tonComm.Q THEN // publish new payload every second
 	tonComm(IN:=FALSE);
-	fbComm.Publish('telescope', 'dome', 'MirrorCover', TO_STRING(eCoverState));
+	THIS^._SendTelemetry();	
 END_IF
 
 
@@ -137,6 +137,25 @@ END_VAR
         </Implementation>
       </Set>
     </Property>
+    <Method Name="_SendTelemetry" Id="{0a8e627f-9fae-40e1-bd53-318ad436c233}">
+      <Declaration><![CDATA[METHOD _SendTelemetry : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//OLD
+fbComm.Publish('telescope', 'dome', 'MirrorCover', TO_STRING(eCoverState));
+
+IF eCoverState = E_MirrorCoverState.closed THEN
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', '0.0');
+ELSIF eCoverState = E_MirrorCoverState.open THEN
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', '1.0');
+ELSE
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', '0.5');
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="Close" Id="{0a475567-f0d9-4b8f-a207-512f31f9b819}">
       <Declaration><![CDATA[METHOD Close : BOOL
 VAR_INPUT
@@ -192,10 +211,10 @@ METHOD FB_Init: BOOL
 VAR_INPUT
     bInitRetains	: BOOL; // TRUE: the retain variables are initialized (reset warm / reset cold)
     bInCopyCode		: BOOL;  // TRUE: the instance will be copied to the copy code afterward (online change)
-	fbComm			: I_Comm;
+	comm			: I_Comm;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[THIS^.fbComm 				:= fbComm;
+        <ST><![CDATA[THIS^.fbComm 				:= comm;
 ]]></ST>
       </Implementation>
     </Method>
@@ -257,9 +276,9 @@ END_VAR
       <LineId Id="9" Count="0" />
       <LineId Id="60" Count="0" />
       <LineId Id="59" Count="0" />
-      <LineId Id="62" Count="4" />
-      <LineId Id="68" Count="0" />
-      <LineId Id="73" Count="7" />
+      <LineId Id="73" Count="0" />
+      <LineId Id="128" Count="5" />
+      <LineId Id="74" Count="6" />
       <LineId Id="88" Count="3" />
       <LineId Id="87" Count="0" />
       <LineId Id="61" Count="0" />
@@ -278,6 +297,15 @@ END_VAR
     </LineIds>
     <LineIds Name="FB_CoverControl._Motor2RelaisB.Set">
       <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CoverControl._SendTelemetry">
+      <LineId Id="13" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="6" Count="1" />
+      <LineId Id="9" Count="3" />
+      <LineId Id="8" Count="0" />
+      <LineId Id="5" Count="0" />
     </LineIds>
     <LineIds Name="FB_CoverControl.Close">
       <LineId Id="5" Count="0" />

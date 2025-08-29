@@ -4,11 +4,11 @@
     <Declaration><![CDATA[PROGRAM MAIN
 VAR
 	comm			: FB_Comm_MQTT_Influx;
-	coverControl		: FB_CoverControl(fbComm := comm);
+	coverControl	: FB_CoverControl(comm := comm);
 	focusControl	: FB_FocusControl(comm:=comm);
 	haControl		: FB_HourAngleControl(comm:=comm);
 	decControl		: FB_DeclinationControl(comm:=comm);
-	telescopeControl: FB_TelescopeControl(fbComm := comm);
+	telescopeControl: FB_TelescopeControl(comm := comm);
 	domeControl		: FB_DomeControl(comm := comm);
 	pendantControl 	: FB_PendantControl(comm:=comm);
 	safetyHandling	: FB_SafetyHandling(comm:=comm);
@@ -18,7 +18,9 @@ END_VAR
 VAR CONSTANT
 	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
 													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 16.3,
-													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 16.3);
+													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 16.3,
+													name := '50cm', diameter := 0.5, cabinet := 'Beckhoff', manufacturer := 'Halfmann, Haidenhain, Beckhoff',
+													mountOptions := 'HA-DEC', mount := 'HA_DEC');
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[domeControl(ipTelescope	:= telescopeControl);

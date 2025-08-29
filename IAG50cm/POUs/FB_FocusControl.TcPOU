@@ -97,8 +97,6 @@ IF bSoEReset THEN
 	END_IF
 END_IF
 
-
-SendTelemetry();
 HandleEvents();
 ]]></ST>
     </Implementation>
@@ -124,22 +122,6 @@ CalibrationEvent(
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="SendTelemetry" Id="{9492de4d-6d2e-401c-bc97-10786d283636}">
-      <Declaration><![CDATA[METHOD PRIVATE SendTelemetry : BOOL
-VAR_INPUT
-END_VAR
-]]></Declaration>
-      <Implementation>
-        <ST><![CDATA[mqttTimer(IN:=TRUE);
-IF mqttTimer.Q THEN // publish new payload every second
-	mqttTimer(IN:=FALSE);
-	fbComm.Publish('telescope', 'dome', 'FocusPosition', LREAL_TO_FMTSTR(fActualPosition, 5, TRUE));
-	fbComm.Publish('telescope', 'dome', 'FocusCalibrated', BOOL_TO_STRING(bCalibrated));	
-	fbComm.Publish('telescope', 'dome', 'FocusReady', BOOL_TO_STRING(bReady));	
-END_IF
-]]></ST>
-      </Implementation>
-    </Method>
     <LineIds Name="FB_FocusControl">
       <LineId Id="58" Count="0" />
       <LineId Id="9" Count="0" />
@@ -157,16 +139,12 @@ END_IF
       <LineId Id="88" Count="0" />
       <LineId Id="90" Count="19" />
       <LineId Id="116" Count="24" />
-      <LineId Id="144" Count="1" />
       <LineId Id="180" Count="0" />
       <LineId Id="173" Count="0" />
       <LineId Id="59" Count="0" />
     </LineIds>
     <LineIds Name="FB_FocusControl.HandleEvents">
       <LineId Id="1" Count="14" />
-    </LineIds>
-    <LineIds Name="FB_FocusControl.SendTelemetry">
-      <LineId Id="1" Count="7" />
     </LineIds>
   </POU>
 </TcPlcObject>

@@ -17,6 +17,15 @@ STRUCT
 	hourangleHome		: LREAL;
 	declinationHome		: LREAL;
 	focusHome			: LREAL;
+	
+	name				: STRING;
+	diameter			: LREAL;
+	cabinet				: STRING;
+	manufacturer		: STRING;
+	
+	mountOptions		: STRING;
+	mount				: STRING;
+	
 
 END_STRUCT
 END_TYPE]]></Declaration>

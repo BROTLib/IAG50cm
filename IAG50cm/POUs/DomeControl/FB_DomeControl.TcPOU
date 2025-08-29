@@ -135,14 +135,9 @@ ELSE
 END_IF
 // send telemetry
 tonComm(IN:=TRUE);
-IF tonComm.Q THEN // publish new payload every second
+IF tonComm.Q THEN // publish new payload every 5 seconds
 	tonComm(IN:=FALSE);
-
-	fbComm.Publish('telescope', 'dome', 'DomeShutter', TO_STRING(eDomeShutterState));
-	fbComm.Publish('telescope', 'dome', 'DomeRotation', TO_STRING(eDomeRotationState));
-	fbComm.Publish('telescope', 'dome', 'DomeParked', BOOL_TO_STRING(bParked));
-	fbComm.Publish('telescope', 'dome', 'DomeTracking', BOOL_TO_STRING(bTrack));
-	fbComm.Publish('telescope', 'dome', 'DomeError', BOOL_TO_STRING(bDomeError));
+	THIS^._SendTelemetry();	
 END_IF
 
 
@@ -298,6 +293,58 @@ END_VAR
         </Implementation>
       </Set>
     </Property>
+    <Method Name="_SendTelemetry" Id="{fbbd6c37-f392-4c14-80af-cf2ffd3d50c5}">
+      <Declaration><![CDATA[METHOD _SendTelemetry : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//OLD
+fbComm.Publish('telescope', 'dome', 'DomeShutter', TO_STRING(eDomeShutterState));
+fbComm.Publish('telescope', 'dome', 'DomeRotation', TO_STRING(eDomeRotationState));
+fbComm.Publish('telescope', 'dome', 'DomeParked', BOOL_TO_STRING(bParked));
+fbComm.Publish('telescope', 'dome', 'DomeTracking', BOOL_TO_STRING(bTrack));
+fbComm.Publish('telescope', 'dome', 'DomeError', BOOL_TO_STRING(bDomeError));
+
+IF eDomeShutterState = E_RoofState.opened THEN
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '1.0');
+ELSIF eDomeShutterState = E_RoofState.closing OR eDomeShutterState = E_RoofState.opening OR eDomeShutterState = E_RoofState.unknown THEN
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '0.5');
+ELSIF eDomeShutterState = E_RoofState.closed THEN
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '0.0');
+ELSE
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '-1.0');
+END_IF
+
+IF ipState.StateID = 'Opening State' THEN
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.TARGETPOS', '1.0');
+ELSE
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.TARGETPOS', '0.0');
+END_IF
+
+IF bDomeError THEN
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.ERROR_STATE', '1');
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', '-1.0');
+ELSE
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.ERROR_STATE', '0');
+	IF bParked THEN
+		fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', '0.0');
+	ELSIF bTrack THEN
+		fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', '8.0');
+	ELSE
+		fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', '1.0');
+	END_IF
+END_IF
+
+IF eDomeRotationState = E_DomeRotationState.slewing OR eDomeRotationState = E_DomeRotationState.unknown THEN
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.MOTION_STATE', '1.0');
+ELSE
+	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.MOTION_STATE', '0.0');
+END_IF
+fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.AZ', LREAL_TO_STRING(THIS^.Position));
+]]></ST>
+      </Implementation>
+    </Method>
     <Property Name="_Track" Id="{a690fc2a-3ca4-499b-bcfe-9a72b5ec9057}" FolderPath="internal properties\">
       <Declaration><![CDATA[PROPERTY _Track : BOOL]]></Declaration>
       <Get Name="Get" Id="{64355058-626f-404d-8e97-1c1fd171de1e}">
@@ -565,10 +612,7 @@ END_VAR
       <LineId Id="744" Count="1" />
       <LineId Id="743" Count="0" />
       <LineId Id="650" Count="0" />
-      <LineId Id="657" Count="3" />
-      <LineId Id="648" Count="0" />
-      <LineId Id="746" Count="0" />
-      <LineId Id="663" Count="1" />
+      <LineId Id="657" Count="2" />
       <LineId Id="666" Count="0" />
       <LineId Id="661" Count="0" />
       <LineId Id="539" Count="0" />
@@ -626,6 +670,38 @@ END_VAR
     </LineIds>
     <LineIds Name="FB_DomeControl._ReceivedString.Set">
       <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl._SendTelemetry">
+      <LineId Id="10" Count="0" />
+      <LineId Id="6" Count="3" />
+      <LineId Id="5" Count="0" />
+      <LineId Id="14" Count="0" />
+      <LineId Id="12" Count="0" />
+      <LineId Id="15" Count="0" />
+      <LineId Id="17" Count="5" />
+      <LineId Id="16" Count="0" />
+      <LineId Id="24" Count="0" />
+      <LineId Id="23" Count="0" />
+      <LineId Id="25" Count="0" />
+      <LineId Id="27" Count="1" />
+      <LineId Id="26" Count="0" />
+      <LineId Id="29" Count="0" />
+      <LineId Id="13" Count="0" />
+      <LineId Id="30" Count="0" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="32" Count="1" />
+      <LineId Id="36" Count="1" />
+      <LineId Id="39" Count="1" />
+      <LineId Id="42" Count="1" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="31" Count="0" />
+      <LineId Id="44" Count="0" />
+      <LineId Id="41" Count="0" />
+      <LineId Id="45" Count="0" />
+      <LineId Id="47" Count="1" />
+      <LineId Id="46" Count="0" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="11" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl._Track.Get">
       <LineId Id="2" Count="0" />
