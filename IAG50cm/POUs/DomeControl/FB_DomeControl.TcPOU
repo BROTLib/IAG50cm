@@ -299,14 +299,7 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[//OLD
-fbComm.Publish('telescope', 'dome', 'DomeShutter', TO_STRING(eDomeShutterState));
-fbComm.Publish('telescope', 'dome', 'DomeRotation', TO_STRING(eDomeRotationState));
-fbComm.Publish('telescope', 'dome', 'DomeParked', BOOL_TO_STRING(bParked));
-fbComm.Publish('telescope', 'dome', 'DomeTracking', BOOL_TO_STRING(bTrack));
-fbComm.Publish('telescope', 'dome', 'DomeError', BOOL_TO_STRING(bDomeError));
-
-IF eDomeShutterState = E_RoofState.opened THEN
+        <ST><![CDATA[IF eDomeShutterState = E_RoofState.opened THEN
 	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '1.0');
 ELSIF eDomeShutterState = E_RoofState.closing OR eDomeShutterState = E_RoofState.opening OR eDomeShutterState = E_RoofState.unknown THEN
 	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '0.5');
@@ -672,10 +665,6 @@ END_VAR
       <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl._SendTelemetry">
-      <LineId Id="10" Count="0" />
-      <LineId Id="6" Count="3" />
-      <LineId Id="5" Count="0" />
-      <LineId Id="14" Count="0" />
       <LineId Id="12" Count="0" />
       <LineId Id="15" Count="0" />
       <LineId Id="17" Count="5" />

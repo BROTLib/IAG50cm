@@ -143,10 +143,7 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[//OLD
-fbComm.Publish('telescope', 'dome', 'MirrorCover', TO_STRING(eCoverState));
-
-IF eCoverState = E_MirrorCoverState.closed THEN
+        <ST><![CDATA[IF eCoverState = E_MirrorCoverState.closed THEN
 	fbComm.Publish('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', '0.0');
 ELSIF eCoverState = E_MirrorCoverState.open THEN
 	fbComm.Publish('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', '1.0');
@@ -299,9 +296,6 @@ END_VAR
       <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_CoverControl._SendTelemetry">
-      <LineId Id="13" Count="0" />
-      <LineId Id="15" Count="0" />
-      <LineId Id="14" Count="0" />
       <LineId Id="6" Count="1" />
       <LineId Id="9" Count="3" />
       <LineId Id="8" Count="0" />
