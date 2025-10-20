@@ -28,6 +28,27 @@ END_VAR
     <Implementation>
       <ST><![CDATA[]]></ST>
     </Implementation>
+    <Property Name="ActualPosition" Id="{fd2fe0ed-cfc2-44f5-bf58-a027596e0de0}">
+      <Declaration><![CDATA[{warning 'add property implementation'}
+PROPERTY ActualPosition : LREAL
+]]></Declaration>
+      <Get Name="Get" Id="{a7d0b5c9-cd41-4847-ab75-c0929287ff65}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{616deadc-bb6c-4080-b257-08bae400ef5c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
     <Property Name="Busy" Id="{567e8af7-1006-4a9e-a236-efe3efee35b4}">
       <Declaration><![CDATA[PROPERTY Busy : BOOL]]></Declaration>
       <Get Name="Get" Id="{bc8cb34d-293c-40ce-ac83-5fd7efe63294}">
@@ -243,6 +264,12 @@ END_VAR
     </Property>
     <LineIds Name="FB_BaseAxis">
       <LineId Id="1" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_BaseAxis.ActualPosition.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_BaseAxis.ActualPosition.Set">
+      <LineId Id="2" Count="0" />
     </LineIds>
     <LineIds Name="FB_BaseAxis.Busy.Get">
       <LineId Id="1" Count="0" />

@@ -26,7 +26,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	fHorizon			: LREAL := 1.0;		// ELEVATION below which value the telescope will not go
 	fPoleZone			: LREAL := 3.0;		// 90° - fPoleZone = No go Zone near the Pole
 	
-	fSlewVelocity		: LREAL := 4.0;		// Motor velocity for moving the telescope in degree/s
+	fSlewVelocity		: LREAL := 8.0;		// Motor velocity for moving the telescope in degree/s
 	
 	bEstopTriggered		: BOOL	:= FALSE;	// TODO: CHANGE
 	bMainReady			: BOOL	:= TRUE;
