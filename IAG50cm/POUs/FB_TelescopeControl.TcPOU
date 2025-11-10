@@ -595,7 +595,9 @@ CASE nStage OF
 		ELSE
 			nStage := 20;
 		END_IF
-	20:	
+	20:
+		// send Dome position
+		THIS^.fbDome.Position := fAzimuthCalc;
 		// clear offsets
 		THIS^.HourAngleOffset := 0.0;
 		THIS^.DeclinationOffset := 0.0;
@@ -1270,6 +1272,8 @@ CASE nStage OF
 			nStage := 20;
 		END_IF
 	20:
+		// send Dome position
+		THIS^.fbDome.Position := fAzimuth;
 		THIS^.HourAngleOffset := 0.0;
 		THIS^.DeclinationOffset := 0.0;
 		// write the calculated coordinates into the goto coordinates
@@ -1412,7 +1416,9 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[// Declination (including offest and pointing model)
+        <ST><![CDATA[// send Dome position
+THIS^.fbDome.Position := fAzimuthCurrent;
+// Declination (including offest and pointing model)
 IF fDeclination + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone) THEN
 	// if too close to pole -> stop
 	bStop := TRUE;
@@ -1907,6 +1913,8 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="101" Count="0" />
       <LineId Id="105" Count="1" />
       <LineId Id="29" Count="0" />
+      <LineId Id="261" Count="0" />
+      <LineId Id="260" Count="0" />
       <LineId Id="212" Count="2" />
       <LineId Id="225" Count="2" />
       <LineId Id="246" Count="0" />
@@ -2145,6 +2153,7 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="87" Count="0" />
       <LineId Id="92" Count="1" />
       <LineId Id="17" Count="0" />
+      <LineId Id="254" Count="1" />
       <LineId Id="210" Count="0" />
       <LineId Id="212" Count="0" />
       <LineId Id="243" Count="0" />
@@ -2177,6 +2186,8 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="9" Count="1" />
     </LineIds>
     <LineIds Name="FB_TelescopeControl._TrackTelescope">
+      <LineId Id="144" Count="0" />
+      <LineId Id="143" Count="0" />
       <LineId Id="105" Count="0" />
       <LineId Id="126" Count="1" />
       <LineId Id="129" Count="10" />

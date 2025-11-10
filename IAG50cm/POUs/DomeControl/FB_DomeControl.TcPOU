@@ -14,7 +14,7 @@ VAR
 	bTrack		: BOOL;
 	bPark		: BOOL;
 	
-	fDomeAzi_go		: LREAL := 0.0;
+	fDomeAzi_go		: LREAL := 180.0;
 	fDomeAzi_current: LREAL := 0.0;
 	eDomeRotationState		: E_DomeRotationState;
 	eDomeRotationStateOld	: E_DomeRotationState;
@@ -67,9 +67,11 @@ VAR CONSTANT
 	nCapabilities : INT := 2; 	//OPEN TSI : TELESCOPE.CONFIG.CAPABILITIES
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[IF ipTelescope <> 0 THEN
+      <ST><![CDATA[(*
+IF ipTelescope <> 0 THEN
 	fDomeAzi_go := ipTelescope.Azimuth;
 END_IF
+*)
 //	Receive string data:
 fbReceive(
 	Prefix:='',
@@ -569,9 +571,11 @@ END_VAR
       </Get>
     </Property>
     <LineIds Name="FB_DomeControl">
+      <LineId Id="896" Count="0" />
       <LineId Id="817" Count="0" />
       <LineId Id="831" Count="0" />
       <LineId Id="819" Count="0" />
+      <LineId Id="897" Count="0" />
       <LineId Id="44" Count="0" />
       <LineId Id="373" Count="9" />
       <LineId Id="436" Count="0" />
