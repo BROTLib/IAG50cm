@@ -98,8 +98,8 @@ track_dec_esti := track_dec_esti + c_flex_dec * alt_diff * ((cos_alt * sin_DEC) 
 
 HourAngle_correction	:= off_tau_esti;
 Declination_correction	:= off_dec_esti;
-HourAngle_velocity		:= ABS((track_tau_esti + omega)/d2r);
-Declination_velocity 	:= ABS(track_dec_esti/d2r); 
+HourAngle_velocity		:= (track_tau_esti + omega)/d2r;
+Declination_velocity 	:= track_dec_esti/d2r; 
 
             ]]></ST>
     </Implementation>
