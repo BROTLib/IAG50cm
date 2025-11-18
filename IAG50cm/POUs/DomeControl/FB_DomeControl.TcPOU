@@ -14,8 +14,9 @@ VAR
 	bTrack		: BOOL;
 	bPark		: BOOL;
 	
-	fDomeAzi_go		: LREAL := 180.0;
-	fDomeAzi_current: LREAL := 0.0;
+	fDomeAziGoInput			: LREAL := 180.0;
+	fDomeAziGo				: LREAL := 180.0;
+	fDomeAziCurrent			: LREAL := 0.0;
 	eDomeRotationState		: E_DomeRotationState;
 	eDomeRotationStateOld	: E_DomeRotationState;
 	eDomeShutterState		: E_RoofState;
@@ -67,11 +68,15 @@ VAR CONSTANT
 	nCapabilities : INT := 2; 	//OPEN TSI : TELESCOPE.CONFIG.CAPABILITIES
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[(*
-IF ipTelescope <> 0 THEN
-	fDomeAzi_go := ipTelescope.Azimuth;
+      <ST><![CDATA[// account for off center mount
+IF fDomeAziGoInput >= 0.0 AND fDomeAziGoInput < 115.0 THEN
+	fDomeAziGo := fDomeAziGoInput - 5.0;
+ELSIF fDomeAziGoInput >= 225.0 AND fDomeAziGoInput < 360.0 THEN
+	fDomeAziGo := fDomeAziGoInput + 5.0;
+ELSE
+	fDomeAziGo := fDomeAziGoInput;
 END_IF
-*)
+
 //	Receive string data:
 fbReceive(
 	Prefix:='',
@@ -264,7 +269,7 @@ END_VAR
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[_Position := fDomeAzi_go;]]></ST>
+          <ST><![CDATA[_Position := fDomeAziGo;]]></ST>
         </Implementation>
       </Get>
       <Set Name="Set" Id="{651597fa-a85f-49cd-8330-7278a65501fd}">
@@ -272,7 +277,7 @@ END_VAR
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[fDomeAzi_current := _Position;]]></ST>
+          <ST><![CDATA[fDomeAziCurrent := _Position;]]></ST>
         </Implementation>
       </Set>
     </Property>
@@ -467,7 +472,7 @@ END_VAR
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[Position := fDomeAzi_current;]]></ST>
+          <ST><![CDATA[Position := fDomeAziCurrent;]]></ST>
         </Implementation>
       </Get>
       <Set Name="Set" Id="{ac1cf9b5-c5c0-487f-baa8-762c0c8e8d55}">
@@ -475,7 +480,7 @@ END_VAR
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[fDomeAzi_go := Position;]]></ST>
+          <ST><![CDATA[fDomeAziGoInput := Position;]]></ST>
         </Implementation>
       </Set>
     </Property>
@@ -574,6 +579,7 @@ END_VAR
       <LineId Id="896" Count="0" />
       <LineId Id="817" Count="0" />
       <LineId Id="831" Count="0" />
+      <LineId Id="899" Count="3" />
       <LineId Id="819" Count="0" />
       <LineId Id="897" Count="0" />
       <LineId Id="44" Count="0" />
