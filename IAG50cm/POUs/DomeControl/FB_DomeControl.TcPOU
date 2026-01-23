@@ -130,6 +130,7 @@ END_IF
 
 IF (rtrigPark.Q) THEN
 	bPark := FALSE;
+	bTrack := FALSE;
 	ipState.ParkCommand();
 END_IF
 
@@ -606,7 +607,9 @@ END_VAR
       <LineId Id="9" Count="0" />
       <LineId Id="521" Count="3" />
       <LineId Id="520" Count="0" />
-      <LineId Id="534" Count="4" />
+      <LineId Id="534" Count="2" />
+      <LineId Id="968" Count="0" />
+      <LineId Id="537" Count="1" />
       <LineId Id="579" Count="0" />
       <LineId Id="577" Count="0" />
       <LineId Id="741" Count="0" />

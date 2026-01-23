@@ -222,6 +222,9 @@ IF Axis_Status.Status.Homed THEN
 	Calibrated := TRUE;
 	HomeDone := TRUE;
 	HomeAxis := FALSE;
+ELSE
+	Calibrated := FALSE;
+	HomeDone := FALSE;
 END_IF
 
 IF StopDone THEN
@@ -402,6 +405,7 @@ Homing :=	Axis_Status.Homing;
       <LineId Id="394" Count="2" />
       <LineId Id="2820" Count="0" />
       <LineId Id="691" Count="0" />
+      <LineId Id="3027" Count="2" />
       <LineId Id="397" Count="0" />
       <LineId Id="893" Count="3" />
       <LineId Id="875" Count="5" />

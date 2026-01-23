@@ -6,21 +6,25 @@
 	Hour Angle	: tau
 	Declination	: dec
 	*)
-	C_mAl_tau	: LREAL := 0.0064754067907296774;
-	C_mEl_tau	: LREAL := -0.03590084231168387;
-	C_Coll_tau	: LREAL := 0.11405349045263889;
-	C_Refr_tau	: LREAL := -0.036567426451868106;
-	C_Enc_tau	: LREAL := 0.007065954629024876;
-	C_Flex_tau	: LREAL := 0.03986889862121126;
-	C_NP_tau	: LREAL := 0.020681176979211277;
-	C_E1_tau	: LREAL := 0.015199727033107046;
-	C_E2_tau	: LREAL := 0.0006911953204423686;
+
+	(*
+	 pointing from: 21.01.2026 136 points (from Lukas Melzig)
+	RMS Ha:  17.69244750276253
+	RMS Dec:  13.468555776826959
+	*)
+	C_mAl_tau	: LREAL := 0.01687078;
+	C_mEl_tau	: LREAL := -0.02608578;
+	C_Coll_tau	: LREAL := 0.29826615;
+	C_Refr_tau	: LREAL := -0.00759962;
+	C_Enc_tau	: LREAL := 0.00108764;
+	C_Flex_tau	: LREAL := -0.02462705;
+	C_NP_tau	: LREAL := 0.02128217;
 	
-	C_mAl_dec	: LREAL := -0.13025211606546372;
-	C_mEl_dec	: LREAL := 0.008160278959940509;
-	C_Coll_dec	: LREAL := -0.019627379752301517;
-	C_Refr_dec	: LREAL :=0.010058195509688719;
-	C_Flex_dec	: LREAL := -0.026674744162266735;
+	C_mAl_dec	: LREAL := 0.01606325;
+	C_mEl_dec	: LREAL := -0.05749048;
+	C_Coll_dec	: LREAL := -0.17376101;
+	C_Refr_dec	: LREAL := 0.01678090;
+	C_Flex_dec	: LREAL := -0.01915146;
 END_VAR]]></Declaration>
   </GVL>
 </TcPlcObject>

@@ -12,6 +12,7 @@ VAR
 	domeControl		: FB_DomeControl(comm := comm);
 	pendantControl 	: FB_PendantControl(comm:=comm);
 	safetyHandling	: FB_SafetyHandling(comm:=comm);
+	search			: FB_RefMarkerSearch();
 
 	
 END_VAR
@@ -19,11 +20,13 @@ VAR CONSTANT
 	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
 													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 16.3,
 													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 16.3,
-													name := '50cm', diameter := 0.5, cabinet := 'Beckhoff', manufacturer := 'Halfmann, Haidenhain, Beckhoff',
+													name := 'Emmy Noether', diameter := 0.5, cabinet := 'Beckhoff', manufacturer := '???',
 													mountOptions := 'HA-DEC', mount := 'HA_DEC');
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[domeControl(ipTelescope	:= telescopeControl);
+      <ST><![CDATA[search(Enable:=TRUE);
+
+domeControl(ipTelescope	:= telescopeControl);
 
 pendantControl(
 	ipTelescope	:= telescopeControl,
@@ -67,6 +70,7 @@ comm(
 ]]></ST>
     </Implementation>
     <LineIds Name="MAIN">
+      <LineId Id="324" Count="1" />
       <LineId Id="53" Count="0" />
       <LineId Id="223" Count="0" />
       <LineId Id="116" Count="0" />

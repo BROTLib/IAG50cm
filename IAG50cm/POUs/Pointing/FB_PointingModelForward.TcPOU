@@ -71,7 +71,6 @@ off_tau_esti := off_tau_esti + C_Refr_tau * ((sin_TAU * cos_lat) / (sin_alt * co
 off_tau_esti := off_tau_esti + C_Flex_tau * ((sin_TAU * cos_lat) / cos_DEC);
 off_tau_esti := off_tau_esti + C_Enc_tau / cos_DEC;
 off_tau_esti := off_tau_esti - C_NP_tau * (sin_DEC / cos_DEC);
-off_tau_esti := off_tau_esti - C_E1_tau * cos_TAU - C_E2_tau * COS(4 * tau);
 
 
 track_tau_esti := c_mal_tau * omega * ((sin_TAU * sin_DEC) / cos_DEC);
@@ -79,7 +78,6 @@ track_tau_esti := track_tau_esti + c_mel_tau * omega * ((cos_TAU * sin_DEC) / co
 track_tau_esti := track_tau_esti + c_refr_tau * omega * ((cos_TAU * cos_lat) / (sin_alt * cos_DEC)); // 1ST derivative term
 track_tau_esti := track_tau_esti - c_refr_tau * alt_diff * cos_alt * ((sin_TAU * cos_lat) / (sin_alt*sin_alt * cos_DEC)); // 2nd term
 track_tau_esti := track_tau_esti + c_flex_tau * omega * ((cos_TAU * cos_lat) / cos_DEC);
-track_tau_esti := track_tau_esti + omega * (c_e1_tau * sin_TAU + 4 * c_e2_tau * SIN(4 * tau));
 
 
 // ### DEC offset ###
@@ -117,12 +115,10 @@ Declination_velocity 	:= track_dec_esti/d2r;
       <LineId Id="58" Count="3" />
       <LineId Id="138" Count="1" />
       <LineId Id="142" Count="3" />
-      <LineId Id="141" Count="0" />
       <LineId Id="161" Count="0" />
       <LineId Id="155" Count="1" />
       <LineId Id="154" Count="0" />
       <LineId Id="157" Count="2" />
-      <LineId Id="146" Count="0" />
       <LineId Id="162" Count="1" />
       <LineId Id="140" Count="0" />
       <LineId Id="148" Count="1" />

@@ -7,6 +7,7 @@ VAR_INPUT
 	Declination		: LREAL;
 	Altitude		: LREAL;
 	Latitude		: LREAL;
+	epsilon			: LREAL := 0.25; //iteration accuracy in arcsec
 END_VAR
 VAR_OUTPUT
 	HourAngle_correction	: LREAL;
@@ -14,32 +15,41 @@ VAR_OUTPUT
 END_VAR
 VAR
 	fbpointing : FB_PointingModelForward;
-	d_ha	: LREAL := 0.0;
-	d_dec	: LREAL := 0.0;
-	i		: INT;
+	d_ha		: LREAL := 0.0;
+	d_dec		: LREAL := 0.0;
+	d_ha_new	: LREAL := 0.0;
+	d_dec_new	: LREAL := 0.0;
+	i			: INT;
 	
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[FOR i:=0 TO 10 BY 1 DO
+      <ST><![CDATA[// iterate untill diff < epsilon or i_max=20 is reached
+FOR i:=0 TO 20 BY 1 DO
+	d_ha := d_ha_new;
+	d_dec := d_dec_new;
 	fbpointing(
 		HourAngle := LMOD(HourAngle-d_ha,360),
 		Declination:= Declination-d_dec,
 		Latitude:= Latitude,
-		HourAngle_correction => d_ha,
-		Declination_correction => d_dec,
-		HourAngle_velocity =>,
-		Declination_velocity =>
+		HourAngle_correction => d_ha_new,
+		Declination_correction => d_dec_new
 	);
+	IF ABS(d_ha - d_ha_new) <= epsilon/3600.0 AND ABS(d_dec - d_dec_new) <= epsilon/3600.0 THEN
+		EXIT;
+	END_IF
 END_FOR;
-HourAngle_correction := d_ha;
-Declination_correction := d_dec;]]></ST>
+HourAngle_correction := d_ha_new;
+Declination_correction := d_dec_new;]]></ST>
     </Implementation>
     <LineIds Name="FB_PointingModelInversion">
+      <LineId Id="97" Count="0" />
       <LineId Id="47" Count="0" />
+      <LineId Id="91" Count="1" />
       <LineId Id="53" Count="2" />
-      <LineId Id="57" Count="4" />
+      <LineId Id="57" Count="2" />
       <LineId Id="50" Count="0" />
+      <LineId Id="94" Count="2" />
       <LineId Id="65" Count="0" />
       <LineId Id="69" Count="1" />
     </LineIds>
