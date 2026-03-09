@@ -14,6 +14,7 @@ VAR
 	nAxisErrorID : UDINT;
 	nLatchHomeErrorID: UDINT;
 	fbLatchHome : FB_LatchHome;
+	omega 	: LREAL := 360.0 / 86164.099 * (PI/180.0); //sidereal velocity
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -44,6 +45,8 @@ fbAxis(
 	HomingMode 		:= MC_ForceCalibration,
 	Position 		:= fPosition, 
 	Velocity 		:= fVelocity,
+	TrackVelocityRef	:= omega,
+	TrackDirectionRef:=0,
 	Enable_Positive := NOT axisRef.Status.SoftLimitMaxExceeded,
 	Enable_Negative := NOT axisRef.Status.SoftLimitMinExceeded,
 	Jog_Forward 	:= bMovePos,
@@ -144,7 +147,9 @@ CalibrationEvent(
       <LineId Id="149" Count="0" />
       <LineId Id="32" Count="0" />
       <LineId Id="136" Count="0" />
-      <LineId Id="33" Count="4" />
+      <LineId Id="33" Count="2" />
+      <LineId Id="197" Count="1" />
+      <LineId Id="36" Count="1" />
       <LineId Id="97" Count="1" />
       <LineId Id="39" Count="3" />
       <LineId Id="153" Count="2" />

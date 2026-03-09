@@ -17,6 +17,10 @@ VAR_INPUT
 	Position: 	LREAL;
 	// maximum velocity
 	Velocity:	LREAL := 10.0;
+	// expected average tracking velocity
+	TrackVelocityRef: LREAL := 0.0;
+	// Tracking direction (-1,0,1)
+	TrackDirectionRef: INT := 0;
 	// Enable movement in positive direction (considering limit switch)
 	Enable_Positive:	BOOL := TRUE;
 	// Enable movement in negative direction (considering limit switch)
@@ -128,7 +132,6 @@ IF Tracking THEN
 		TrackVelocity := 0.05;
 		TrackAcceleration := 0.05;
 	ELSE
-		TrackVelocity := ABS(LIMIT(0.0, Velocity, 0.007));
 		TrackAcceleration := 0.005;
 	END_IF
 ELSE
@@ -139,16 +142,29 @@ END_IF
 
 
 IF NOT Tracking OR ABS(PositionDifference) < 1E-5 THEN
-	Direction := 0;
-	TrackVelocity := 0.0;
-	TrackAcceleration := 0.0;
+	Direction := TrackDirectionRef;
+	TrackVelocityRef := TrackVelocityRef;
+	TrackAcceleration := 0.005;
 ELSIF PositionDifference < 0.0 THEN
 	Direction := -1;
+	IF TrackDirectionRef = -1 THEN
+		TrackVelocity := ABS(LIMIT(0.0, Velocity, 0.009));
+	ELSE
+		TrackVelocity := ABS(LIMIT(0.0, Velocity-TrackVelocityRef, 0.009));
+	END_IF
+	
 ELSE
 	Direction := 1;
+	IF TrackDirectionRef = 1 THEN
+		TrackVelocity := ABS(LIMIT(0.0, Velocity, 0.009));
+	ELSE
+		TrackVelocity := ABS(LIMIT(0.0, Velocity-TrackVelocityRef, 0.009));
+	END_IF
 END_IF
 
-isTracking := Tracking AND ABS(Position - ActualPosition) < 5.0E-3;
+
+
+isTracking := Tracking AND ABS(Position - ActualPosition) < (5.0/3600.0);
 IF Tracking AND Ready AND Calibrated AND NOT StopAxis THEN
 	Axis_SetpointEnable.Execute := TRUE;
 ELSIF NOT Axis_SetpointEnable.Busy AND Axis_SetpointEnable.Done THEN
@@ -285,6 +301,9 @@ IF Axis_Stop.Error THEN
 	ErrorID := Axis_Stop.ErrorID;
 END_IF
 
+IF Axis_Status.Error THEN
+	ErrorID := Axis_Status.ErrorID;
+END_IF
 Busy := 	Axis_SetpointEnable.Busy OR
 			Axis_Reset.Busy OR 
 			Axis_Modulo.Busy OR
@@ -299,7 +318,8 @@ Error := 	Axis_Power.Error OR
 			Axis_Move.Error OR 
 			Axis_Home.Error OR
 			Axis_Jog.Error OR 
-			Axis_Stop.Error;
+			Axis_Stop.Error OR
+			Axis_Status.Error;
 
 Active := 	// Axis_Power.Active OR //alsways true if enabled 
 			Axis_Modulo.Active OR
@@ -347,7 +367,8 @@ Homing :=	Axis_Status.Homing;
       <LineId Id="2372" Count="0" />
       <LineId Id="2922" Count="1" />
       <LineId Id="2928" Count="0" />
-      <LineId Id="2925" Count="2" />
+      <LineId Id="2925" Count="0" />
+      <LineId Id="2927" Count="0" />
       <LineId Id="2924" Count="0" />
       <LineId Id="2265" Count="1" />
       <LineId Id="2376" Count="1" />
@@ -359,8 +380,16 @@ Homing :=	Axis_Status.Homing;
       <LineId Id="2919" Count="1" />
       <LineId Id="2142" Count="0" />
       <LineId Id="1417" Count="0" />
+      <LineId Id="3140" Count="1" />
+      <LineId Id="3143" Count="1" />
+      <LineId Id="3142" Count="0" />
+      <LineId Id="3134" Count="0" />
       <LineId Id="1419" Count="1" />
+      <LineId Id="3145" Count="3" />
+      <LineId Id="3133" Count="0" />
       <LineId Id="1418" Count="0" />
+      <LineId Id="3139" Count="0" />
+      <LineId Id="3138" Count="0" />
       <LineId Id="2256" Count="0" />
       <LineId Id="2148" Count="2" />
       <LineId Id="2152" Count="1" />
@@ -437,6 +466,7 @@ Homing :=	Axis_Status.Homing;
       <LineId Id="913" Count="2" />
       <LineId Id="783" Count="3" />
       <LineId Id="779" Count="3" />
+      <LineId Id="3129" Count="2" />
       <LineId Id="903" Count="0" />
       <LineId Id="905" Count="3" />
       <LineId Id="911" Count="0" />
@@ -447,6 +477,7 @@ Homing :=	Axis_Status.Homing;
       <LineId Id="884" Count="2" />
       <LineId Id="912" Count="0" />
       <LineId Id="887" Count="1" />
+      <LineId Id="3128" Count="0" />
       <LineId Id="1177" Count="0" />
       <LineId Id="1179" Count="1" />
       <LineId Id="1182" Count="2" />

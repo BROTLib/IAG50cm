@@ -44,6 +44,8 @@ fbAxis(
 	HomingMode 		:= MC_ForceCalibration,
 	Position 		:= fPosition, 
 	Velocity 		:= fVelocity,
+	TrackVelocityRef:= 0.0,
+	TrackDirectionRef:= 0,
 	Enable_Positive := NOT axisRef.Status.SoftLimitMaxExceeded,
 	Enable_Negative := NOT axisRef.Status.SoftLimitMinExceeded,
 	Jog_Forward 	:= bMovePos,
@@ -140,7 +142,9 @@ CalibrationEvent(
     <LineIds Name="FB_DeclinationControl">
       <LineId Id="10" Count="22" />
       <LineId Id="136" Count="0" />
-      <LineId Id="33" Count="4" />
+      <LineId Id="33" Count="2" />
+      <LineId Id="186" Count="1" />
+      <LineId Id="36" Count="1" />
       <LineId Id="97" Count="1" />
       <LineId Id="39" Count="3" />
       <LineId Id="146" Count="0" />
