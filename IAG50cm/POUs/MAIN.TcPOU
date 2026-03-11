@@ -12,7 +12,7 @@ VAR
 	domeControl		: FB_DomeControl(comm := comm);
 	pendantControl 	: FB_PendantControl(comm:=comm);
 	safetyHandling	: FB_SafetyHandling(comm:=comm);
-	search			: FB_RefMarkerSearch();
+	//search			: FB_RefMarkerSearch(); // use for searching for the Heideinhain encoder reference markers
 
 	
 END_VAR
@@ -24,7 +24,7 @@ VAR CONSTANT
 													mountOptions := 'HA-DEC', mount := 'HA_DEC');
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[search(Enable:=TRUE);
+      <ST><![CDATA[//search(Enable:=TRUE); // use for reference marker search
 
 domeControl(ipTelescope	:= telescopeControl);
 
