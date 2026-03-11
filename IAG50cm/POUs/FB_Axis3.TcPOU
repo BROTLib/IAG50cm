@@ -21,6 +21,8 @@ VAR_INPUT
 	TrackVelocityRef: LREAL := 0.0;
 	// Tracking direction (-1,0,1)
 	TrackDirectionRef: INT := 0;
+	// PosDiff for isTracking (arcsec)
+	TrackEnvelope: LREAL := 10.0;
 	// Enable movement in positive direction (considering limit switch)
 	Enable_Positive:	BOOL := TRUE;
 	// Enable movement in negative direction (considering limit switch)
@@ -164,7 +166,7 @@ END_IF
 
 
 
-isTracking := Tracking AND ABS(Position - ActualPosition) < (5.0/3600.0);
+isTracking := Tracking AND ABS(Position - ActualPosition) < (TrackEnvelope/3600.0);
 IF Tracking AND Ready AND Calibrated AND NOT StopAxis THEN
 	Axis_SetpointEnable.Execute := TRUE;
 ELSIF NOT Axis_SetpointEnable.Busy AND Axis_SetpointEnable.Done THEN
