@@ -497,9 +497,9 @@ END_IF
 bSliding := NOT bTracking AND (fbHourAngle.fbAxis.InMotion OR fbHourAngle.fbAxis.InRamp OR
 			fbDeclination.fbAxis.InMotion OR fbDeclination.fbAxis.InRamp );
 
-// signal must be stable for 5500MS
+// signal must be stable for 1s
 tonTrackingDelay(in := fbHourAngle.fbAxis.isTracking AND 
-			fbDeclination.fbAxis.isTracking ,PT :=T#5500MS, Q => bTracking);
+			fbDeclination.fbAxis.isTracking ,PT :=T#1000MS, Q => bTracking);
 
 bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
 			(NOT fbDeclination.bEnable OR fbDeclination.fbAxis.StandStill);

@@ -18,8 +18,8 @@ VAR
 END_VAR
 VAR CONSTANT
 	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
-													houranglePark := 0.0, declinationPark := -23.0, focusPark:= 16.3,
-													hourangleHome := 0.0, declinationHome := -23.0, focusHome:= 16.3,
+													houranglePark := 0.0, declinationPark := 52.0, focusPark:= 16.3,
+													hourangleHome := 0.0, declinationHome := 52.0, focusHome:= 16.3,
 													name := 'Emmy Noether', diameter := 0.5, cabinet := 'Beckhoff', manufacturer := '???',
 													mountOptions := 'HA-DEC', mount := 'HA_DEC');
 END_VAR]]></Declaration>
