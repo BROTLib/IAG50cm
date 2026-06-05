@@ -8,6 +8,10 @@ VAR_OUTPUT
 END_VAR
 VAR
 	bCabinetError : BOOL;
+	bTelescopeError : BOOL;
+	bReset	: BOOL;
+	
+	rtrigReset : R_TRIG;
 	
 	bAuxiliaryContact24V AT %I* : BOOL; // Auxilary Contact of the 24V DC: TRUE = operational
 	bAuxiliaryContact48V AT %I* : BOOL; // Auxilary Contact of the 48V DC: TRUE = operational
@@ -15,10 +19,23 @@ VAR
 	bAuxiliaryContactFOCUS AT %I* : BOOL; // Auxilary Contact of the FOCUS motor: TRUE = operational
 	bCollectiveReport24VFuse AT %I*: BOOL; // Collective Report of the 24V Fuse box: TRUE = operational
 	bState24VFuse AT %I*: BOOL; 
+	
+	bOErrorLED	AT %Q* : BOOL;
+	bIReset     AT %I* : BOOL;
+	bIMode      AT %I* : BOOL;
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[bCabinetError := NOT( bAuxiliaryContact24V OR bAuxiliaryContact48V OR bAuxiliaryContactHADEC OR bAuxiliaryContactFOCUS OR bCollectiveReport24VFuse);]]></ST>
+      <ST><![CDATA[bCabinetError := NOT( bAuxiliaryContact24V OR bAuxiliaryContact48V OR bAuxiliaryContactHADEC OR bAuxiliaryContactFOCUS OR bCollectiveReport24VFuse);
+
+// if error -> LED on
+bOErrorLED := bTelescopeError;
+
+// if reset -> trigger reset
+rtrigReset(CLK:= bIReset,Q=>bReset);
+
+
+]]></ST>
     </Implementation>
     <Property Name="Error" Id="{2fd28cb2-1a27-461e-9a1b-c500f525d0b9}">
       <Declaration><![CDATA[PROPERTY Error : BOOL]]></Declaration>
@@ -30,11 +47,59 @@ END_VAR
           <ST><![CDATA[Error := bCabinetError;]]></ST>
         </Implementation>
       </Get>
+      <Set Name="Set" Id="{36e391d8-c7f3-4e87-b860-5fb1000ab8f0}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bTelescopeError := Error;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="LocalMode" Id="{aa0338ec-4b34-4867-92b3-49794b884548}">
+      <Declaration><![CDATA[PROPERTY LocalMode : BOOL]]></Declaration>
+      <Get Name="Get" Id="{5ed1a07b-9864-46cc-a5e2-a0f53f03b541}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[LocalMode := bIMode;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Reset" Id="{a6ba6162-19c5-4bfe-9eb1-47708d254cbe}">
+      <Declaration><![CDATA[PROPERTY Reset : BOOL]]></Declaration>
+      <Get Name="Get" Id="{69fd46f6-74db-4eda-b30d-0c164dc17a6c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Reset := bReset;]]></ST>
+        </Implementation>
+      </Get>
     </Property>
     <LineIds Name="FB_CabinetControl">
       <LineId Id="9" Count="0" />
+      <LineId Id="35" Count="0" />
+      <LineId Id="34" Count="0" />
+      <LineId Id="36" Count="0" />
+      <LineId Id="38" Count="0" />
+      <LineId Id="37" Count="0" />
+      <LineId Id="43" Count="0" />
+      <LineId Id="42" Count="0" />
+      <LineId Id="39" Count="0" />
+      <LineId Id="33" Count="0" />
     </LineIds>
     <LineIds Name="FB_CabinetControl.Error.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CabinetControl.Error.Set">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CabinetControl.LocalMode.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CabinetControl.Reset.Get">
       <LineId Id="2" Count="0" />
     </LineIds>
   </POU>

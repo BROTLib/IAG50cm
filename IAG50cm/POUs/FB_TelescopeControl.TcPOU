@@ -97,6 +97,7 @@ VAR
 	
 	
 	nStatusWord, nLastStatus:	UDINT;
+	bTestError : BOOL; // Test Error, deactivates under reset command
 END_VAR
 VAR_OUTPUT
 	bReady				: BOOL;		// TRUE, IF telescope can be operated 
@@ -122,6 +123,7 @@ VAR_OUTPUT
 	fSlewTime			: LREAL;	//	(time in sec. to reach the goto/track position) 
 	bHomed				: BOOL;		// True: telescope is calibrated
 	bBusy				: BOOL;		// telescope does not accept further commands
+	bLocalMode			: BOOL;		// TRUE if switch is flipped to prevent Robotic Mode
 END_VAR
 VAR CONSTANT
 	d2r		: LREAL := PI/180.0;
@@ -135,13 +137,13 @@ fLst := CT2LST(telescopeConfig.longitude, fJd);
 
 // State of the Cabinet
 fbCabinet();
+bLocalMode := fbCabinet.LocalMode;
 
 // set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
-
-
-rtrigReset(CLK := bReset);
+rtrigReset(CLK := fbCabinet.Reset AND bError, Q=>bReset);
 
 IF bReset THEN
+	bTestError := FALSE;
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
 	fDeclination := telescopeConfig.declinationPark;
 	fbHaDec2RaDec(	jd := fJd +fTimeOffset,
@@ -185,7 +187,7 @@ END_IF
 fSlewTime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
 
 // ERROR (either one of the Axis or below safe Horizon (fHorizon))
-bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error;
+bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error OR bTestError;
 			
 IF bError THEN
 	bGoHome := 	FALSE;
@@ -194,7 +196,9 @@ IF bError THEN
 	bSlew := 	FALSE;
 	fbHourAngle.Enable := FALSE;
 	fbDeclination.Enable := FALSE;
+	fbCabinet.Error := TRUE;
 ELSE
+	fbCabinet.Error := FALSE;
 	nErrorID := 0;
 END_IF
 
@@ -1149,6 +1153,12 @@ ELSIF bError THEN
 ELSE
 	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', '0');
 END_IF
+
+IF bLocalMode THEN
+	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.LOCAL_MODE', '1');
+ELSE
+	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.LOCAL_MODE', '0');
+END_IF
 (* ERROR LIST: TO BE IMPLEMENTED!!!*)
 
 (* OBJECT Module*)
@@ -1801,10 +1811,12 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="7248" Count="0" />
       <LineId Id="7247" Count="0" />
       <LineId Id="7368" Count="0" />
+      <LineId Id="8747" Count="0" />
       <LineId Id="5431" Count="0" />
-      <LineId Id="5434" Count="2" />
+      <LineId Id="5436" Count="0" />
       <LineId Id="6752" Count="0" />
       <LineId Id="6637" Count="0" />
+      <LineId Id="8750" Count="0" />
       <LineId Id="8366" Count="0" />
       <LineId Id="7122" Count="0" />
       <LineId Id="8364" Count="0" />
@@ -1836,7 +1848,10 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="7114" Count="0" />
       <LineId Id="5460" Count="5" />
       <LineId Id="7115" Count="1" />
-      <LineId Id="5466" Count="2" />
+      <LineId Id="8748" Count="0" />
+      <LineId Id="5466" Count="0" />
+      <LineId Id="8749" Count="0" />
+      <LineId Id="5467" Count="1" />
       <LineId Id="5474" Count="0" />
       <LineId Id="5910" Count="0" />
       <LineId Id="5475" Count="0" />
@@ -2186,6 +2201,11 @@ bGoto			:= TRUE;]]></ST>
       <LineId Id="34" Count="1" />
       <LineId Id="39" Count="1" />
       <LineId Id="36" Count="0" />
+      <LineId Id="273" Count="0" />
+      <LineId Id="272" Count="0" />
+      <LineId Id="274" Count="0" />
+      <LineId Id="276" Count="1" />
+      <LineId Id="275" Count="0" />
       <LineId Id="41" Count="0" />
       <LineId Id="43" Count="0" />
       <LineId Id="42" Count="0" />
