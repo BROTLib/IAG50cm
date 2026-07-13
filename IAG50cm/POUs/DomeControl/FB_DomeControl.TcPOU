@@ -547,6 +547,15 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
+    <Method Name="Stop" Id="{437563e5-1f1f-4c46-b138-d206b8d0b2ae}">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="StopTrack" Id="{592d7f7e-1fdb-4ea9-b619-2542fb2b964e}">
       <Declaration><![CDATA[METHOD StopTrack : BOOL
 VAR_INPUT
@@ -761,6 +770,9 @@ END_VAR
     </LineIds>
     <LineIds Name="FB_DomeControl.Slewing.Get">
       <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_DomeControl.Stop">
+      <LineId Id="5" Count="0" />
     </LineIds>
     <LineIds Name="FB_DomeControl.StopTrack">
       <LineId Id="5" Count="0" />

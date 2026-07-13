@@ -64,7 +64,8 @@ comm(
 	Telescope			:= telescopeControl,
 	RaDecTelescope		:= telescopeControl,
 	Focus				:= focusControl,
-	Dome				:= domeControl
+	Dome				:= domeControl,
+	MirrorCovers		:= coverControl,
 );
 
 ]]></ST>
@@ -99,6 +100,7 @@ comm(
       <LineId Id="273" Count="0" />
       <LineId Id="85" Count="0" />
       <LineId Id="168" Count="0" />
+      <LineId Id="347" Count="0" />
       <LineId Id="20" Count="0" />
       <LineId Id="248" Count="0" />
       <LineId Id="151" Count="0" />
