@@ -51,7 +51,7 @@ fbAxis(
 	Jog_Forward 	:= bMovePos,
 	Jog_Backwards 	:= bMoveNeg,
 	ActualPosition 	=> fActualPosition,
-	Error 			=> bError,
+	Error 			=> bAxisError,
 	ErrorID 		=> nErrorID,
 	AxisRef 		:= axisRef);
 	
@@ -70,6 +70,7 @@ fbLatchHome(
 	Error 				=> bLatchHomeError,
 	ErrorID 			=> nLatchHomeErrorID);
 	
+
 
 bError := bLatchHomeError OR bAxisError;
 
@@ -148,7 +149,9 @@ CalibrationEvent(
       <LineId Id="97" Count="1" />
       <LineId Id="39" Count="3" />
       <LineId Id="146" Count="0" />
-      <LineId Id="148" Count="21" />
+      <LineId Id="148" Count="14" />
+      <LineId Id="202" Count="0" />
+      <LineId Id="163" Count="6" />
       <LineId Id="147" Count="0" />
       <LineId Id="43" Count="4" />
       <LineId Id="50" Count="0" />
