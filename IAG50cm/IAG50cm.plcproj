@@ -156,9 +156,6 @@
     <Compile Include="POUs\FB_AxisControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_BaseAxis.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_CabinetControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
