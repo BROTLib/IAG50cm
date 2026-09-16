@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
-  <GVL Name="GVL_Version" Id="{1df434ce-200b-456e-977d-e0c8a5db7b9f}">
+  <GVL Name="Global_Version" Id="{1df434ce-200b-456e-977d-e0c8a5db7b9f}">
     <Declaration><![CDATA[{attribute 'qualified_only'}
 VAR_GLOBAL CONSTANT
 	// Mirrors Beckhoff's own Global_Version.stLibVersion_* pattern (see ST_LibVersion),
-	// which only covers Tc2_*/Tc3_* library references, not custom ones like this one.
+	// which only covers Tc2_*/Tc3_* library references, not custom ones -- until now: this
+	// GVL uses Beckhoff's own naming exactly, so it merges into a consumer's Global_Version.
 	// Kept in sync with <ProjectVersion> in IAG50cm.plcproj at release time.
-	stVersion : ST_LibVersion := (
+	stLibVersion_IAG50cm : ST_LibVersion := (
 		iMajor := 0,
 		iMinor := 1,
 		iBuild := 0,
