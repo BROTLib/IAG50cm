@@ -20,10 +20,12 @@
 # design and how RepTool.exe was found.
 
 param(
-    # Exactly the custom libraries IAG50cm.plcproj references via PlaceholderReference
-    # (excludes Beckhoff Tc2_*/Tc3_* and System_Visu*/VisuDialogs, which ship with XAE
-    # itself and aren't managed this way).
-    [string[]]$Libraries = @("BROTLib"),
+    # IAG50cm.plcproj only directly references BROTLib via PlaceholderReference, but
+    # BROTLib itself references AstroBROT -- TcBuild does not install transitive
+    # library dependencies as a side effect, so AstroBROT has to be installed here
+    # too for BROTLib's own reference to resolve. (Excludes Beckhoff Tc2_*/Tc3_* and
+    # System_Visu*/VisuDialogs, which ship with XAE itself and aren't managed this way.)
+    [string[]]$Libraries = @("BROTLib", "AstroBROT"),
     [string]$TcProfile
 )
 
