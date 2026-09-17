@@ -81,7 +81,7 @@ foreach ($lib in $Libraries) {
     # (recursively), independent of any project/source -- this is what the
     # TwinCAT installer itself uses internally for the same purpose, and what
     # the community "snappy" CLI tool wraps for the exact same use case.
-    & $RepTool --profile="$TcProfile" --installLibsRecursNoOverwrite $tempDir
+    & $RepTool --profile="$TcProfile" --installLibsRecurs $tempDir
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  Installed $($libFile.Name) ($latestVersion)" -ForegroundColor Green
     } else {
