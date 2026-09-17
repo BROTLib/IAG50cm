@@ -29,7 +29,7 @@ param(
     [string]$TcProfile
 )
 
-$LibraryRoot = "C:\ProgramData\Beckhoff\TwinCAT\PlcEngineering\Managed Libraries"
+$LibraryRoot = "C:\TwinCAT\3.1\Components\Plc\Managed Libraries"
 $RepTool = "C:\TwinCAT\3.1\Components\Plc\Common\RepTool.exe"
 $ProfilesDir = "C:\TwinCAT\3.1\Components\Plc\Profiles"
 
@@ -81,7 +81,14 @@ foreach ($lib in $Libraries) {
     # (recursively), independent of any project/source -- this is what the
     # TwinCAT installer itself uses internally for the same purpose, and what
     # the community "snappy" CLI tool wraps for the exact same use case.
-    & $RepTool --profile="$TcProfile" --installLibsRecurs $tempDir
+    #
+    # Invoked via cmd.exe rather than PowerShell's & operator: PowerShell's own
+    # argument marshalling mangles --profile values containing spaces (every
+    # real TwinCAT profile name has spaces) into something RepTool rejects as
+    # "No profile name specified", confirmed by isolated testing. cmd.exe passes
+    # the same quoted string through correctly.
+    $repToolCmd = "`"$RepTool`" --profile=`"$TcProfile`" --installLibsRecurs `"$tempDir`""
+    cmd.exe /c $repToolCmd
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  Installed $($libFile.Name) ($latestVersion)" -ForegroundColor Green
     } else {
