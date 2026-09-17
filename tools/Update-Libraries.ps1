@@ -6,9 +6,11 @@
 #
 # Requires: gh (GitHub CLI), already authenticated.
 #
-# -TcProfile is auto-discovered from this machine's Profiles folder if not given
-# explicitly. If auto-discovery finds more than one *.profile file, or none, you
-# must pass -TcProfile yourself -- check via
+# -TcProfile is auto-discovered if not given explicitly, by reading TcVersion from
+# this repo's own .tsproj (e.g. TcVersion="3.1.4024.66" -> profile
+# "TwinCAT PLC Control_Build_4024.66") and matching it against this machine's
+# Profiles folder. Falls back to "the one .profile file" if there's exactly one
+# and no .tsproj match. If neither works, pass -TcProfile yourself -- check via
 # IAG/specs/steering/brotlib-checking-twincat-xae-version.md.
 #
 # NOTE: the Profiles folder path below (Components\Plc\Profiles) is inferred by
@@ -35,11 +37,29 @@ $ProfilesDir = "C:\TwinCAT\3.1\Components\Plc\Profiles"
 
 if (-not $TcProfile) {
     $profileFiles = Get-ChildItem -Path $ProfilesDir -Filter "*.profile" -ErrorAction SilentlyContinue
-    if ($profileFiles.Count -eq 1) {
+
+    $repoRoot = Join-Path $PSScriptRoot ".."
+    $tsproj = Get-ChildItem -Path $repoRoot -Recurse -Depth 2 -Filter "*.tsproj" -ErrorAction SilentlyContinue | Select-Object -First 1
+    $expectedBuild = $null
+    if ($tsproj) {
+        $m = Select-String -Path $tsproj.FullName -Pattern 'TcVersion="3\.1\.([\d.]+)"' | Select-Object -First 1
+        if ($m) { $expectedBuild = $m.Matches[0].Groups[1].Value }
+    }
+
+    if ($expectedBuild) {
+        $expectedName = "TwinCAT PLC Control_Build_$expectedBuild"
+        $match = $profileFiles | Where-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) -eq $expectedName }
+        if ($match) {
+            $TcProfile = $expectedName
+            Write-Host "Auto-discovered profile from $($tsproj.Name) (TcVersion 3.1.$expectedBuild): $TcProfile" -ForegroundColor Yellow
+        } else {
+            throw "Project declares TcVersion 3.1.$expectedBuild (expected profile '$expectedName') but no matching .profile file exists in $ProfilesDir. Pass -TcProfile explicitly."
+        }
+    } elseif ($profileFiles.Count -eq 1) {
         $TcProfile = [System.IO.Path]::GetFileNameWithoutExtension($profileFiles[0].Name)
-        Write-Host "Auto-discovered profile: $TcProfile" -ForegroundColor Yellow
+        Write-Host "Auto-discovered profile (only one present, no .tsproj match): $TcProfile" -ForegroundColor Yellow
     } else {
-        throw "Could not auto-discover a single profile in $ProfilesDir (found $($profileFiles.Count)). Pass -TcProfile explicitly."
+        throw "Could not determine TcProfile: no .tsproj with a TcVersion found under $repoRoot, and $($profileFiles.Count) profile files present in $ProfilesDir (need exactly 1 to fall back on). Pass -TcProfile explicitly."
     }
 }
 
