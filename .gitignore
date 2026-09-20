@@ -262,3 +262,7 @@ __pycache__/
 
 # weird Twincat thingy
 *.~u
+# TcBuild / TwinCAT XAE build artifacts
+_CompileInfo/
+_Boot/
+*.tsproj.bak
