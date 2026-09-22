@@ -8,7 +8,6 @@ VAR_INPUT
 	bStopAxis				: BOOL;		// stop the Axis
 END_VAR
 VAR_OUTPUT
-	fActualPosition			: LREAL;	// actual_position of the axis
 END_VAR
 VAR
 	fSlewTime				: LREAL;	// time to reach target position
@@ -29,37 +28,6 @@ END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[]]></ST>
     </Implementation>
-    <Property Name="ActualPosition" Id="{a8007bf4-e523-4f3c-a3f0-e8e7a9781d3d}">
-      <Declaration><![CDATA[PROPERTY ActualPosition : LREAL
-]]></Declaration>
-      <Get Name="Get" Id="{99515da2-8ff8-4d02-8cbd-d31c15b8daba}">
-        <Declaration><![CDATA[VAR
-END_VAR
-]]></Declaration>
-        <Implementation>
-          <ST><![CDATA[ActualPosition := fActualPosition;]]></ST>
-        </Implementation>
-      </Get>
-      <Set Name="Set" Id="{2bea3c83-0b62-4b36-a6b5-8c781fd530db}">
-        <Declaration><![CDATA[VAR
-END_VAR
-]]></Declaration>
-        <Implementation>
-          <ST><![CDATA[fActualPosition := ActualPosition;]]></ST>
-        </Implementation>
-      </Set>
-    </Property>
-    <Property Name="isTracking" Id="{d14d4ed7-aa44-40b8-a06b-dbd9bb4bc398}">
-      <Declaration><![CDATA[PROPERTY isTracking : BOOL]]></Declaration>
-      <Get Name="Get" Id="{d8cce5f4-c21e-4d9a-87e8-69b1f87cb648}">
-        <Declaration><![CDATA[VAR
-END_VAR
-]]></Declaration>
-        <Implementation>
-          <ST><![CDATA[isTracking := fbAxis.isTracking;]]></ST>
-        </Implementation>
-      </Get>
-    </Property>
     <Property Name="MoveAxis" Id="{62370465-c9c4-4b3d-9522-670fc80fcf7d}">
       <Declaration><![CDATA[PROPERTY MoveAxis : BOOL]]></Declaration>
       <Get Name="Get" Id="{b6a037c9-1a5a-4ccc-a67e-cd8fbf875616}">
@@ -140,15 +108,6 @@ END_VAR
       </Set>
     </Property>
     <LineIds Name="FB_AxisControl">
-      <LineId Id="1" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_AxisControl.ActualPosition.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_AxisControl.ActualPosition.Set">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_AxisControl.isTracking.Get">
       <LineId Id="1" Count="0" />
     </LineIds>
     <LineIds Name="FB_AxisControl.MoveAxis.Get">
