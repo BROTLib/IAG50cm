@@ -91,6 +91,24 @@ def inversion(hour_angle, declination, latitude, n, epsilon=0.0, c=C):
     return d_ha_new, d_dec_new
 
 
+def inversion_with_bvalid(hour_angle, declination, latitude, n=8, epsilon=0.25, c=C):
+    """Port of the bValid-guarded FB_PointingModelInversion.TcPOU (post-fix): FOR i:=0 TO n-1,
+    bValid only set TRUE on early exit at epsilon; HourAngle_correction/Declination_correction
+    are 0.0 when bValid is FALSE."""
+    d_ha = d_dec = 0.0
+    d_ha_new = d_dec_new = 0.0
+    b_valid = False
+    for _ in range(n):
+        d_ha, d_dec = d_ha_new, d_dec_new
+        d_ha_new, d_dec_new = forward((hour_angle - d_ha) % 360.0, declination - d_dec, latitude, c)
+        if abs(d_ha - d_ha_new) <= epsilon / 3600.0 and abs(d_dec - d_dec_new) <= epsilon / 3600.0:
+            b_valid = True
+            break
+    if b_valid:
+        return d_ha_new, d_dec_new, True
+    return 0.0, 0.0, False
+
+
 def residual_arcsec(hour_angle, declination, latitude, n, c=C):
     """Fixed-point residual of the returned offsets, as sky separation (d_ha * cos dec)."""
     d_ha, d_dec = inversion(hour_angle, declination, latitude, n, c=c)
@@ -140,3 +158,26 @@ if __name__ == "__main__":
     for i in range(15):
         d_ha, d_dec = forward((ha - d_ha) % 360.0, dec - d_dec, lat)
         print(f"  pass {i:2d}: d_ha={d_ha:10.4f}  d_dec={d_dec:12.4f}")
+
+    print("\nFix check: FB_PointingModelInversion now reports bValid and zeroes its output on")
+    print("non-convergence (n=8, epsilon=0.25\"); FB_TelescopeControl gates goto/slew/tracking at")
+    print("fPointingSafeAltitude=5deg. Verify: (a) bValid=True (no false rejections) everywhere at")
+    print("or above the 5deg floor, and (b) bValid correctly catches the chaotic case above.")
+    worst_false_negative = 0.0  # alt >= 5 deg where bValid incorrectly came back False
+    checked = 0
+    for lat in lats:
+        for ha in range(0, 360, 3):
+            for dec in decs:
+                alt = altitude(ha, dec, lat)
+                if alt < 5.0:
+                    continue
+                checked += 1
+                _, _, valid = inversion_with_bvalid(ha, dec, lat)
+                if not valid:
+                    worst_false_negative = max(worst_false_negative, alt)
+    print(f" checked {checked} points with alt >= 5deg: "
+          f"{'all bValid=True (OK)' if worst_false_negative == 0.0 else f'FALSE NEGATIVE up to alt={worst_false_negative:.2f}deg!'}")
+
+    _, _, valid_chaotic = inversion_with_bvalid(hour_angle=0.0, declination=59.5, latitude=-30.0)
+    print(f" chaotic case above (alt~0.5deg): bValid={valid_chaotic} "
+          f"({'OK, correctly rejected' if not valid_chaotic else 'BUG: should have been rejected'})")

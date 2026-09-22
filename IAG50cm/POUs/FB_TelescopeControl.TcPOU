@@ -26,6 +26,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	fTimeOffset			: LREAL := 0.0;		// absolute offset for time
 	fHorizon			: LREAL := 1.0;		// ELEVATION below which value the telescope will not go
 	fPoleZone			: LREAL := 3.0;		// 90° - fPoleZone = No go zone near the Pole
+	fPointingSafeAltitude	: LREAL := 5.0;	// ELEVATION below which the pointing model's fixed-point inversion is not numerically reliable (chaotic, see FB_PointingModelInversion / testing/check_pointing_inversion.py); gates goto/slew targets and tracking in addition to fHorizon
 	
 	fSlewVelocity		: LREAL := 8.0;		// Motor velocity for moving the telescope in degree/s
 	
@@ -60,6 +61,9 @@ VAR
 	fDeclinationPointingOffset	: LREAL; // pointing offset to sky
 	fHourAngleInversionOffset	: LREAL;
 	fDeclinationInversionOffset : LREAL;
+	fHourAngleInversionOffsetCalc	: LREAL;	// raw output of fbPointingInversion this cycle, only copied into fHourAngleInversionOffset when bPointingInversionValid
+	fDeclinationInversionOffsetCalc : LREAL;
+	bPointingInversionValid		: BOOL;		// FALSE near the horizon where the inversion doesn't converge; fHourAngleInversionOffset/fDeclinationInversionOffset then keep their last valid value
 	fHourAngleVelocity			: LREAL;	// rotational velocity of the HourAngle
 	fDeclinationVelocity		: LREAL;	// rotational velocity of the Declination
 	fbTime				: FB_AstroClock;	// precise astronomical	time
@@ -261,9 +265,16 @@ fbPointingInversion(
 	HourAngle:= fHourAngleCurrent,
 	Declination:= fDeclinationCurrent,
 	Latitude:=telescopeConfig.latitude,
-	HourAngle_correction => fHourAngleInversionOffset,
-	Declination_correction => fDeclinationInversionOffset
+	HourAngle_correction => fHourAngleInversionOffsetCalc,
+	Declination_correction => fDeclinationInversionOffsetCalc,
+	bValid => bPointingInversionValid
 );
+// near the horizon the inversion is chaotic and does not converge (see FB_PointingModelInversion);
+// keep reporting the last trustworthy correction rather than whatever garbage it would return
+IF bPointingInversionValid THEN
+	fHourAngleInversionOffset := fHourAngleInversionOffsetCalc;
+	fDeclinationInversionOffset := fDeclinationInversionOffsetCalc;
+END_IF
 (*--------------------------------------------------------------*)
 // transform from apparent to icrs
 
@@ -308,7 +319,8 @@ fbEq2Hor(
 	az => fAzimuthCurrentSky);
 //----------------------------------------------------------------------------------------------
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
-IF fElevationCurrent < (fHorizon+0.2) THEN
+// (also gated on fPointingSafeAltitude so tracking never lingers in the pointing model's chaotic zone)
+IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
 	IF NOT bStopped AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSE
@@ -325,7 +337,8 @@ IF (fDeclinationCurrent > (90.0 - fPoleZone)) OR (bTrack AND (fDeclinationAppare
 END_IF
 //----------------------------------------------------------------------------------------------
 // if the given coordinates to goto/slew are under the horizon
-IF (bGoTo AND (fElevationCalc < (fHorizon + 1.0))) OR (bSlew AND (fElevation < fHorizon)) THEN
+// (also rejects targets below fPointingSafeAltitude, where the pointing model's inversion is chaotic -- see FB_PointingModelInversion)
+IF (bGoTo AND (fElevationCalc < MAX(fHorizon + 1.0, fPointingSafeAltitude))) OR (bSlew AND (fElevation < MAX(fHorizon, fPointingSafeAltitude))) THEN
 	// trigger event
 	rtrigHorizonError(CLK:=TRUE);
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
@@ -622,7 +635,7 @@ TCStargetHorizonEvent(	Trigger := rtrigHorizonError.Q,
 				OnMessage := 'Target below safe horizon, stopping telescope.',
 				OffMEssage := '', 
 				Comm := fbComm);
-TCSaltitudeEvent(	Trigger := fElevationCurrent<(fHorizon+2.0), 
+TCSaltitudeEvent(	Trigger := fElevationCurrent<MAX(fHorizon+2.0, fPointingSafeAltitude+2.0),
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'Telescope below safe horizon, aboard and slew telescope to home position.',
@@ -670,16 +683,6 @@ IF tonCommandTimeout.Q THEN
 	nStage := 0;
 	RETURN;
 END_IF
-(*
-IF fElevationCalc < fHorizon THEN
-	bHorizonError := TRUE;
-	nErrorID := 16#15;
-	bGoto := FALSE;
-	nStage := 0;
-	RETURN;
-END_IF
-*)
-
 IF bReset OR bError OR bStop OR bInterupted THEN
 	nStage := 0;
 	RETURN;
@@ -1365,15 +1368,6 @@ IF tonCommandTimeout.Q THEN
 	nStage := 0;
 	RETURN;
 END_IF
-(*
-IF fElevation < fHorizon THEN
-	bHorizonError := TRUE;
-	nErrorID := 16#15;
-	bSlew := FALSE;
-	nStage := 0;
-	RETURN;
-END_IF
-*)
 IF bReset OR bError OR bStop OR bInterupted THEN
 	nStage := 0;
 	RETURN;
