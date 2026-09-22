@@ -24,8 +24,10 @@ VAR
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[// iterate untill diff < epsilon or i_max=20 is reached
-FOR i:=0 TO 20 BY 1 DO
+      <ST><![CDATA[// iterate untill diff < epsilon or i_max=7 is reached
+// 5 passes converge to <0.25" for the normal operating envelope (alt >= 3deg);
+// see testing/check_pointing_inversion.py. Kept a small margin over the bare minimum.
+FOR i:=0 TO 7 BY 1 DO
 	d_ha := d_ha_new;
 	d_dec := d_dec_new;
 	fbpointing(
