@@ -206,7 +206,7 @@
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, * (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.5.4 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="System_VisuElemBase">
@@ -314,7 +314,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <LibraryReference Include="AstroBROT,0.4.0,BROT">
+    <LibraryReference Include="AstroBROT,0.4.3,BROT">
       <Namespace>AstroBROT</Namespace>
     </LibraryReference>
     <LibraryReference Include="VisuSymbols,newest,System">
