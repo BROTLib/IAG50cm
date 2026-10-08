@@ -5,6 +5,9 @@
 VAR_INPUT
 	Delta		: TIME := T#5S;		// Time difference between both covers opening (and closing)
 	TimeToCycle	: TIME := T#15S;	// Time for one motor to fully open/close
+	// TRUE while the E-stop is triggered (MAIN: safetyHandling.estop): moving covers stop, open/close requests
+	// are dropped (#15)
+	bEmergency	: BOOL;
 END_VAR
 VAR_OUTPUT
 END_VAR
@@ -12,7 +15,6 @@ VAR
 	bOpen		: BOOL;
 	bClose		: BOOL;
 	bStop		: BOOL;
-	bEmergency	: BOOL;
 	// State
 	fbCoverIdleState : FB_CoverIdleState(THIS);
 	fbCoverOpeningState : FB_CoverOpeningState(THIS);
@@ -30,6 +32,7 @@ VAR
 	tonComm 		: TON := (PT:=T#5S);
 	fbCoverOpenEvent:	FB_EventLog;
 	fbCoverClosedEvent: FB_EventLog;
+	fbCoverEmergencyEvent: FB_EventLog;
 	// Motor relais
 	bMotor1RelaisA	AT%Q*	: BOOL := FALSE;
 	bMotor1RelaisB	AT%Q*	: BOOL := FALSE;
@@ -43,19 +46,30 @@ END_VAR
 rtrigClose(CLK := bClose);
 rtrigStop(CLK := bStop);
 
-IF (rtrigStop.Q) OR bEmergency THEN
-	bStop := FALSE;
-	ipState.StopCommand();
-END_IF
-
-IF (rtrigClose.Q) AND NOT bEmergency THEN
-	bClose := FALSE;
-	ipState.CloseCommand();
-END_IF
-
-IF (rtrigOpen.Q) AND NOT bEmergency THEN
+IF bEmergency THEN
+	// drop requests made during the E-stop: left set, they would block the rising edge of every later request
 	bOpen := FALSE;
-	ipState.OpenCommand();
+	bClose := FALSE;
+	bStop := FALSE;
+	// stop only moving covers, so that closed/open covers keep their known state
+	IF eCoverState = E_MirrorCoverState.opening OR eCoverState = E_MirrorCoverState.closing THEN
+		ipState.StopCommand();
+	END_IF
+ELSE
+	IF rtrigStop.Q THEN
+		bStop := FALSE;
+		ipState.StopCommand();
+	END_IF
+
+	IF rtrigClose.Q THEN
+		bClose := FALSE;
+		ipState.CloseCommand();
+	END_IF
+
+	IF rtrigOpen.Q THEN
+		bOpen := FALSE;
+		ipState.OpenCommand();
+	END_IF
 END_IF
 
 ipState.RunState();
@@ -77,6 +91,11 @@ fbCoverClosedEvent(
 	Trigger := eCoverState = E_MirrorCoverState.closed,
 	Level := ADSLOG_MSGTYPE_HINT,
 	OnMessage := 'Mirror cover is closed.',
+	comm:= fbComm);
+fbCoverEmergencyEvent(
+	Trigger := bEmergency,
+	Level := ADSLOG_MSGTYPE_WARN,
+	OnMessage := 'Mirror cover: E-stop, covers stopped and commands ignored.',
 	comm:= fbComm);
 ]]></ST>
     </Implementation>
