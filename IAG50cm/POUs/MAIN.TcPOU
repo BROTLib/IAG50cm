@@ -34,7 +34,8 @@ pendantControl(
 
 coverControl(
 	Delta := T#5S,
-	TimeToCycle := T#15S);
+	TimeToCycle := T#15S,
+	bEmergency := safetyHandling.estop);	// previous cycle's value, see bEstopTriggered below (#15)
 	
 focusControl(
 	fVelocity:=1);
