@@ -34,7 +34,8 @@ pendantControl(
 
 coverControl(
 	Delta := T#5S,
-	TimeToCycle := T#15S);
+	TimeToCycle := T#15S,
+	bEmergency := safetyHandling.estop);	// previous cycle's value, see bEstopTriggered below (#15)
 	
 focusControl(
 	fVelocity:=1);
@@ -48,6 +49,9 @@ telescopeControl(
 	fbDome			:= domeControl,
 	fbCovers		:= coverControl,
 	telescopeConfig	:= telescopeConfig,
+	// was never wired, so STATUS.GLOBAL never reported the E-stop (BROTLib#10). safetyHandling runs below, so
+	// this is the previous cycle's value; the drives are cut by the safety circuit regardless.
+	bEstopTriggered	:= safetyHandling.estop,
 );
 
 //Safety

@@ -30,7 +30,9 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	
 	fSlewVelocity		: LREAL := 8.0;		// Motor velocity for moving the telescope in degree/s
 	
-	bEstopTriggered		: BOOL	:= FALSE;	// TODO: CHANGE
+	// TRUE while the E-stop is triggered (MAIN: safetyHandling.estop): disables both axes, which only the next
+	// power-on enables again, and publishes STATUS.GLOBAL = 1
+	bEstopTriggered		: BOOL	:= FALSE;
 	bMainReady			: BOOL	:= TRUE;
 	bCoverAutoOpen		: BOOL	:= TRUE;
 	fbFocus				: I_Focus;
