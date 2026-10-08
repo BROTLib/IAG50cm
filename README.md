@@ -284,3 +284,5 @@ controller is a **CX5110-0115** running TwinCAT RT (x86); a boot project under
 safety applications (EL1918/ELM7212/ELM7221 `.tfzip`), so the controller boots
 directly into the application. Licenses: TC3 IoT Communication (TF6701) and
 TC3 Serial Communication (TF6340).
+
+**CI.** `.github/workflows/tcbuild.yml` builds `IAG50cm.sln` with TcBuild on every push (self-hosted runner, never on pull requests). A green run means the project compiles; TcBuild exit code 1 (built with warnings) counts as success. It only compiles; no tests run in CI.
