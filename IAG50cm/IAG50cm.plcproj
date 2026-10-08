@@ -108,6 +108,9 @@
     <Compile Include="POUs\FB_SerialBackground.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\Functions\F_HourAngleOffsetOnAxis.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\Functions\F_RoundLREAL.TcPOU">
       <SubType>Code</SubType>
     </Compile>
