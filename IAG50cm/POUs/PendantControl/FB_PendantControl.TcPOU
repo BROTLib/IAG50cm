@@ -110,7 +110,7 @@ ELSIF rtrigReceive.Q AND NOT bError THEN
 		ipState.HaCommand();
 	ELSIF sReceivedString = '{' AND bReady THEN
 		(* -, fast*)
-		bFastMoveTo := TRUE;
+		bFastMove := TRUE;
 		bMovePositive := FALSE;
 		ipState.HaCommand();
 	ELSIF sReceivedString = 'ý' AND bReady THEN
@@ -120,7 +120,7 @@ ELSIF rtrigReceive.Q AND NOT bError THEN
 		ipState.HaCommand();
 	ELSIF sReceivedString = '}' AND bReady THEN
 		(* +, fast*)
-		bFastMoveTo := TRUE;
+		bFastMove := TRUE;
 		bMovePositive := TRUE;
 		ipState.HaCommand();
 	
@@ -132,7 +132,7 @@ ELSIF rtrigReceive.Q AND NOT bError THEN
 		ipState.DecCommand();
 	ELSIF sReceivedString = 'o' AND bReady THEN
 		(* -, fast*)
-		bFastMoveTo := TRUE;
+		bFastMove := TRUE;
 		bMovePositive := FALSE;
 		ipState.DecCommand();
 	ELSIF sReceivedString = '÷' AND bReady THEN
@@ -142,7 +142,7 @@ ELSIF rtrigReceive.Q AND NOT bError THEN
 		ipState.DecCommand();
 	ELSIF sReceivedString = 'w' AND bReady THEN
 		(* +, fast*)
-		bFastMoveTo := TRUE;
+		bFastMove := TRUE;
 		bMovePositive := TRUE;
 		ipState.DecCommand();
 	
@@ -154,7 +154,7 @@ ELSIF rtrigReceive.Q AND NOT bError THEN
 		ipState.FocusCommand();
 	ELSIF sReceivedString = '?' AND bReady THEN
 		(* -, fast*)
-		bFastMoveTo := TRUE;
+		bFastMove := TRUE;
 		bMovePositive := FALSE;
 		ipState.FocusCommand();
 	ELSIF sReceivedString = 'ß' AND bReady THEN
@@ -164,7 +164,7 @@ ELSIF rtrigReceive.Q AND NOT bError THEN
 		ipState.FocusCommand();
 	ELSIF sReceivedString = '_' AND bReady THEN
 		(* +, fast*)
-		bFastMoveTo := TRUE;
+		bFastMove := TRUE;
 		bMovePositive := TRUE;
 		ipState.FocusCommand();
 	ELSE
