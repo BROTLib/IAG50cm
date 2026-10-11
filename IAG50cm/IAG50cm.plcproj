@@ -18,7 +18,7 @@
     <LibraryReferences>{ec693b73-ba10-4552-8093-a205a0d9c8b6}</LibraryReferences>
     <Released>false</Released>
     <CompilerDefines />
-    <ProjectVersion>0.2.1</ProjectVersion>
+    <ProjectVersion>0.3.0</ProjectVersion>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
@@ -106,6 +106,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_SerialBackground.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\Functions\F_HourAngleOffsetOnAxis.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\Functions\F_RoundLREAL.TcPOU">
@@ -206,7 +209,7 @@
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.5.5 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, * (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="System_VisuElemBase">

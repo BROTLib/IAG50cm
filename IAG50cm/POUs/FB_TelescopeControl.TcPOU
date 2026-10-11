@@ -290,7 +290,7 @@ fbHaDec2RaDec(
 	dec_out => fDeclinationCurrentICRS);
 //current corrected
 fbHaDec2RaDec(
-	ha := fHourAngleCurrent - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclinationApparent*d2r),
+	ha := fHourAngleCurrent - fHourAngleInversionOffset - F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent),
 	dec := fDeclinationCurrent - fDeclinationInversionOffset- fDeclinationOffset,
 	jd := fJd+fTimeOffset,
 	lon := telescopeConfig.longitude,
@@ -479,8 +479,8 @@ ELSIF bTrack THEN
 	END_IF
 ELSE
 	TCS_command := E_TCSCommand.no_command;
-	fbHourAngle.bMoveAxis := FALSE;
-	fbDeclination.bMoveAxis := FALSE;
+	fbHourAngle.MoveAxis := FALSE;
+	fbDeclination.MoveAxis := FALSE;
 	fbHourAngle.bTracking := FALSE;
 	fbDeclination.bTracking := FALSE;
 END_IF
@@ -712,10 +712,10 @@ CASE nStage OF
 		fbDeclination.Position := fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset;
 		// HourAngle
 		// change to -180 to 180 degree in HA
-		IF MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclinationApparent*d2r)+ fHourAnglePointingOffset, 360) > 180 THEN
-			fbHourAngle.Position := MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclination*d2r)+ fHourAnglePointingOffset,360) - 360.0;
+		IF MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset, 360) > 180 THEN
+			fbHourAngle.Position := MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclination)+ fHourAnglePointingOffset,360) - 360.0;
 		ELSE
-			fbHourAngle.Position := MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclination*d2r)+ fHourAnglePointingOffset,360);
+			fbHourAngle.Position := MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclination)+ fHourAnglePointingOffset,360);
 		END_IF
 
 
@@ -1032,8 +1032,8 @@ CASE nStage OF
 			fbDeclination.Enable := FALSE;
 		END_IF
 		
-		fbHourAngle.bMoveAxis := FALSE;
-		fbDeclination.bMoveAxis := FALSE;
+		fbHourAngle.MoveAxis := FALSE;
+		fbDeclination.MoveAxis := FALSE;
 	80:
 		IF fbHourAngle.Enable OR fbDeclination.Enable THEN
 			nStage := 60;
@@ -1188,10 +1188,10 @@ END_IF
 // INSTRUMENTAL
 fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.DEC', LREAL_TO_STRING(fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset));
 // change to -180 to 180 degree in HA
-IF MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclination*d2r)+ fHourAnglePointingOffset, 360) > 180 THEN
-	fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.HA', LREAL_TO_STRING(MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclinationApparent*d2r)+ fHourAnglePointingOffset,360)- 360.0));
+IF MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclination)+ fHourAnglePointingOffset, 360) > 180 THEN
+	fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.HA', LREAL_TO_STRING(MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset,360)- 360.0));
 ELSE
-	fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.HA', LREAL_TO_STRING(MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclinationApparent*d2r)+ fHourAnglePointingOffset,360)));
+	fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.HA', LREAL_TO_STRING(MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset,360)));
 END_IF
 
 // HORIZONTAL
@@ -1297,7 +1297,7 @@ ELSE
 END_IF
 
 fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.CURRPOS', LREAL_TO_STRING(fHourAngleCurrent));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.REALPOS', LREAL_TO_STRING(fHourAngleCurrent-fHourAngleOffset/COS(fDeclinationApparent*d2r)));
+fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.REALPOS', LREAL_TO_STRING(fHourAngleCurrent-F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)));
 fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.TARGETPOS', LREAL_TO_STRING(fbHourAngle.Position));
 fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.CURRSPEED', LREAL_TO_STRING(fbHourAngle.Velocity));
 fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.TARGETDISTANCE', LREAL_TO_STRING(ABS(fHourAngleCurrent-fbHourAngle.Position)));
@@ -1343,7 +1343,7 @@ fbComm.Publish('telescope', 'dome', 'POSITION.HORIZONTAL.DOME', LREAL_TO_STRING(
 (*EQUITORIAL*)
 fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.RA_ICRS', LREAL_TO_STRING(fRightAscensionCurrentICRScorr));	// degrees (BROTLib#37)
 fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.DEC_ICRS', LREAL_TO_STRING(fDeclinationCurrentICRScorr));
-fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.HA_APPARENT', LREAL_TO_STRING(fHourAngleCurrent - fHourAngleInversionOffset - fHourAngleOffset/COS(fDeclinationApparent*d2r)));
+fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.HA_APPARENT', LREAL_TO_STRING(fHourAngleCurrent - fHourAngleInversionOffset - F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)));
 fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.DEC_APPARENT', LREAL_TO_STRING(fDeclinationCurrent - fDeclinationInversionOffset - fDeclinationOffset));
 ]]></ST>
       </Implementation>
@@ -1531,10 +1531,10 @@ THIS^.fbDome.Position := fAzimuthCurrent;
 fbDeclination.Position := fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset;
 // HourAngle
 // change to -180 to 180 degree in HA
-IF MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclinationApparent*d2r)+ fHourAnglePointingOffset, 360) > 180 THEN
-	fbHourAngle.Position := MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclinationApparent*d2r)+ fHourAnglePointingOffset,360) - 360.0;
+IF MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset, 360) > 180 THEN
+	fbHourAngle.Position := MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset,360) - 360.0;
 ELSE
-	fbHourAngle.Position := MODABS(fHourAngleApparent + fHourAngleOffset/COS(fDeclinationApparent*d2r)+ fHourAnglePointingOffset,360);
+	fbHourAngle.Position := MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset,360);
 END_IF
 
 
