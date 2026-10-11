@@ -425,6 +425,7 @@ ELSIF bPark THEN
 		_HomeTelescope();
 		_GotoTelescope();
 		_SlewTelescope();
+		bInterupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage; it could latch otherwise
 		
 	ELSE
 		IF bReady AND NOT bBusy THEN
@@ -444,6 +445,7 @@ ELSIF bGoHome THEN
 		bInterupted := TRUE;
 		_GotoTelescope();
 		_SlewTelescope();
+		bInterupted := FALSE;	// #26: one-shot, see the park branch
 		
 	ELSE
 		IF bReady AND NOT bBusy AND bStopped THEN
@@ -460,6 +462,7 @@ ELSIF bGoto THEN
 		bSlew := FALSE;
 		bInterupted := TRUE;
 		_SlewTelescope();
+		bInterupted := FALSE;	// #26: one-shot, see the park branch
 	ELSE
 		IF bReady AND NOT bBusy THEN
 			bInterupted := FALSE;
