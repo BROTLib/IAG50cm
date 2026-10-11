@@ -17,14 +17,20 @@ fPosition := LIMIT(fMinPosition, fPosition, fMaxPosition);
 
 
 IF bEnable AND NOT fbAxis.Calibrated THEN
-	bHomeAxis := TRUE;
+	THIS^.HomeAxis := TRUE;		// starts _StartHoming on FALSE -> TRUE
 END_IF
 
 IF fbAxis.Calibrated THEN
 	bHomeAxis := FALSE;
 	bCalibrated := fbAxis.Calibrated;
+	// the reference for the next homing (#20): there is no reference switch (#22)
+	fLastPosition := fActualPosition;
 	IF ABS(fPosition - fActualPosition) > fTolerance THEN
 			IF fbAxis.Ready AND NOT fbAxis.MoveDone THEN
+				// start a move on FALSE -> TRUE (BROTLib #63); bMoveAxis is cleared on MoveDone
+				IF NOT bMoveAxis THEN
+					fbAxis.MoveTo();
+				END_IF
 				bMoveAxis := TRUE;
 			ELSE
 				bMoveAxis := FALSE;
@@ -33,16 +39,10 @@ IF fbAxis.Calibrated THEN
 END_IF
 
 
-IF bHomeAxis THEN
-	fPosition := fPosition;
-END_IF
 
 fbAxis(
 	enable 			:= bEnable,
 	Reset 			:= bReset,
-	MoveAxis 		:= bMoveAxis,
-	HomeAxis 		:= bHomeAxis,
-	StopAxis 		:= bStopAxis,
 	HomingMode 		:= MC_ForceCalibration,
 	Position 		:= fPosition, 
 	Velocity 		:= fVelocity,
@@ -100,6 +100,25 @@ END_IF
 HandleEvents();
 ]]></ST>
     </Implementation>
+    <Method Name="_StartHoming" Id="{b0a48ed9-6cc9-4f17-be6a-c5242c1c697a}">
+      <Declaration><![CDATA[// The focus has no reference switch (#22): MC_ForceCalibration declares the current position to be the stored last
+// known position (fLastPosition, PERSISTENT in FB_AxisControl, written while calibrated; decision #20). Before the first
+// calibration there is none (-1): the target is used, which is telescopeConfig.focusHome after power-on, and a
+// warning is logged because that is a guess.
+METHOD _StartHoming : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF fLastPosition >= 0.0 THEN
+	fbAxis.Home(fReference := fLastPosition);
+ELSE
+	fbAxis.Home(fReference := fPosition);
+	ADSLOGSTR(ADSLOG_MSGTYPE_WARN OR ADSLOG_MSGTYPE_LOG,
+		'Focus: no stored position, calibrated to the target %s (a guess, see IAG50cm#20)', LREAL_TO_STRING(fPosition));
+END_IF
+_StartHoming := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="HandleEvents" Id="{375f50c9-e6ea-4fcd-9fab-a26147b70ce8}">
       <Declaration><![CDATA[METHOD PRIVATE HandleEvents : BOOL
 VAR_INPUT

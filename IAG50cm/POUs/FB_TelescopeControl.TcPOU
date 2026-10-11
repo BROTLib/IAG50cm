@@ -479,8 +479,8 @@ ELSIF bTrack THEN
 	END_IF
 ELSE
 	TCS_command := E_TCSCommand.no_command;
-	fbHourAngle.bMoveAxis := FALSE;
-	fbDeclination.bMoveAxis := FALSE;
+	fbHourAngle.MoveAxis := FALSE;
+	fbDeclination.MoveAxis := FALSE;
 	fbHourAngle.bTracking := FALSE;
 	fbDeclination.bTracking := FALSE;
 END_IF
@@ -1032,8 +1032,8 @@ CASE nStage OF
 			fbDeclination.Enable := FALSE;
 		END_IF
 		
-		fbHourAngle.bMoveAxis := FALSE;
-		fbDeclination.bMoveAxis := FALSE;
+		fbHourAngle.MoveAxis := FALSE;
+		fbDeclination.MoveAxis := FALSE;
 	80:
 		IF fbHourAngle.Enable OR fbDeclination.Enable THEN
 			nStage := 60;

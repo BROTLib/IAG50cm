@@ -38,9 +38,6 @@ END_IF
 fbAxis(
 	enable 			:= bEnable,
 	Reset 			:= bReset,
-	MoveAxis 		:= bMoveAxis,
-	HomeAxis 		:= FALSE,
-	StopAxis 		:= bStopAxis,
 	Tracking 		:= bTracking,
 	HomingMode 		:= MC_ForceCalibration,
 	Position 		:= fPosition, 
@@ -140,6 +137,16 @@ CalibrationEvent(
 	
 ]]></ST>
     </Implementation>
+    <Method Name="_StartHoming" Id="{49127acb-016f-424c-afa4-027f11cc41a9}">
+      <Declaration><![CDATA[// Homing goes through FB_LatchHome and MC_SetPosition on bHomeAxis (the level), not through fbAxis.Home(), so this
+// is empty (abstract in BROTLib's FB_BaseAxis, BROTLib #62).
+METHOD _StartHoming : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_StartHoming := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
     <LineIds Name="FB_HourAngleControl">
       <LineId Id="10" Count="1" />
       <LineId Id="138" Count="0" />
