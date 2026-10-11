@@ -86,6 +86,11 @@ VAR
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: TON;		// power on timeout
 	tonCommandTimeout		: TON;		// command timeout
+	// MONETcommon#17: 600 s timeouts of the goto/home/slew state machines. They were TONs in the methods' plain VAR, which is
+	// re-created on every call, so they never fired. Fed every scan in the body, reset when the command flag drops.
+	tonGotoTimeout			: TON;
+	tonHomeTimeout			: TON;
+	tonSlewTimeout			: TON;
 	tonTrackingDelay		: TON;		// tracking delay
 	
 	TCSpowerEvent,
@@ -387,6 +392,11 @@ tpPowerOnWarning(IN := bPower OR (NOT fbHourAngle.bEnable), PT := T#250MS);
 
 tonPowerTimeout(IN := TCS_command = E_TCSCommand.no_command AND NOT bIsParked, PT := T#12H);
 tonCommandTimeout();
+
+// MONETcommon#17: state-machine timeouts, checked in _GotoTelescope/_HomeTelescope/_SlewTelescope
+tonGotoTimeout(IN := bGoto, PT := T#600S);
+tonHomeTimeout(IN := bGoHome, PT := T#600S);
+tonSlewTimeout(IN := bSlew, PT := T#600S);
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
 END_IF
@@ -672,16 +682,14 @@ VAR_INPUT
 END_VAR
 VAR
 	GoToEvent		: FB_Eventlog;
-	tonCommandTimeout	: TON;
 END_VAR
-VAR_STAT
+VAR_INST
 	nStage			: USINT := 0;
 	nLastStage		: USINT := 101;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_GotoTelescope := nStage;
-tonCommandTimeout(IN := nStage < 100 AND nStage > 0, PT := T#600S);
-IF tonCommandTimeout.Q THEN
+IF tonGotoTimeout.Q THEN	// MONETcommon#17: fed every scan in the body, a method-local TON never kept its state
 	bError := TRUE;
 	nErrorID := 16#10;
 	bGoto := FALSE;
@@ -805,18 +813,17 @@ VAR_INPUT
 END_VAR
 VAR
 	HomeEvent:	FB_Eventlog;
-	tonCommandTimeout: TON;
 END_VAR
-VAR_STAT
+VAR_INST
 	nStage:		USINT := 0;
 	nLastStage:	USINT := 101;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_HomeTelescope := nStage;
-tonCommandTimeout(IN := nStage < 100 AND nStage > 0, PT := T#600S);
-IF tonCommandTimeout.Q THEN
+IF tonHomeTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
 	bError := TRUE;
 	nErrorID := 16#30;
+	bGoHome := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
 	nStage := 0;
 END_IF
 
@@ -919,7 +926,7 @@ END_VAR
 VAR
 	ParkEvent	: FB_Eventlog;
 END_VAR
-VAR_STAT
+VAR_INST
 	nStage		: USINT := 0;
 	nLastStage	: USINT := 0;
 END_VAR]]></Declaration>
@@ -1067,7 +1074,7 @@ END_VAR
 VAR
 	PowerOnEvent	: FB_Eventlog;
 END_VAR
-VAR_STAT
+VAR_INST
 	nStage		: USINT := 0;
 	nLastStage	: USINT := 0;
 END_VAR]]></Declaration>
@@ -1357,16 +1364,14 @@ VAR_INPUT
 END_VAR
 VAR
 	SlewEvent:	FB_Eventlog;
-	tonCommandTimeout: TON;
 END_VAR
-VAR_STAT
+VAR_INST
 	nStage:		USINT := 0;
 	nLastStage:	USINT := 101;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_SlewTelescope := nStage;
-tonCommandTimeout(IN := nStage < 100 AND nStage > 0, PT := T#600S);
-IF tonCommandTimeout.Q THEN
+IF tonSlewTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
 	bError := TRUE;
 	nErrorID := 16#40;
 	bSlew := FALSE;
