@@ -81,6 +81,11 @@ VAR
 	
 	rtrigReset		: R_TRIG;
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
+	bStopping			: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41)
+	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
+	bRestartSlew		: BOOL;		// Slew() while a slew is running: the new target replaces the old one (#41)
+	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
+	bUserStop			: BOOL;		// Stop() was called (one scan): aborts a running power-on, automatic stops do not (#27)
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	tpPowerOnWarning		: TP;		// triggers power warning
@@ -402,14 +407,17 @@ IF tonPowerTimeout.Q AND NOT bIsParked THEN
 END_IF
 //----------------------------------------------------------------------------------------------		
 // set TCS_command according to state variables ordered by precedence
-IF bPower THEN
-	TCS_command := E_TCSCommand.poweron;
-	
-ELSIF bStop THEN
+// #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
+// time) do not abort a running power-on, as before.
+IF bStop AND (bUserStop OR NOT bPower) THEN
 	bTrack := FALSE;
-	
+	bStopping := FALSE;
+
 	// If the stop is during a movement, reset the stage of the movement first
-	IF bPark THEN
+	IF bPower THEN
+		bPower := FALSE;
+		_PowerOn();		// bStop is set: resets its stage
+	ELSIF bPark THEN
 		bPark := FALSE;
 		_ParkTelescope();
 	ELSIF bGoto THEN
@@ -423,7 +431,19 @@ ELSIF bStop THEN
 		_HomeTelescope();
 	END_IF
 	TCS_command := E_TCSCommand.stop;
-	
+
+ELSIF bPower THEN
+	TCS_command := E_TCSCommand.poweron;
+
+ELSIF bStopping THEN
+	// #43: a movement was preempted. Its flag and stage are already reset; TCS_command must not stay on the old
+	// command (its method would keep the axes going), so run the stop until the axes stand still. The pending
+	// command is picked up below in the next scan.
+	TCS_command := E_TCSCommand.stop;
+	IF bStopped THEN
+		bStopping := FALSE;
+	END_IF
+
 ELSIF bPark THEN
 	bTrack := FALSE;
 	// If lower presedence commands are ongoing, let them know they are interupted
@@ -436,7 +456,12 @@ ELSIF bPark THEN
 		_GotoTelescope();
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage; it could latch otherwise
-		
+		// #43: stop the axes now, park starts when they stand still. Only if one of the preempted commands is
+		// the one moving; a Track()/Slew() arriving while the park itself runs must not stop the park.
+		IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew OR TCS_command = E_TCSCommand.gohome THEN
+			bStopping := TRUE;
+		END_IF
+
 	ELSE
 		IF bReady AND NOT bBusy THEN
 			bInterupted := FALSE;
@@ -456,7 +481,10 @@ ELSIF bGoHome THEN
 		_GotoTelescope();
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, see the park branch
-		
+		IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew THEN
+			bStopping := TRUE;	// #43, only if the preempted command is the one moving
+		END_IF
+
 	ELSE
 		IF bReady AND NOT bBusy AND bStopped THEN
 			bInterupted := FALSE;
@@ -473,17 +501,34 @@ ELSIF bGoto THEN
 		bInterupted := TRUE;
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, see the park branch
+		IF TCS_command = E_TCSCommand.slew THEN
+			bStopping := TRUE;	// #43, only if the preempted command is the one moving
+		END_IF
+	ELSIF bRestartGoto AND TCS_command = E_TCSCommand.goto THEN
+		// #41: Track() while going to a target: stop, then go to the new one (bGoto stays set)
+		bInterupted := TRUE;
+		_GotoTelescope();
+		bInterupted := FALSE;
+		tonGotoTimeout(IN := FALSE, PT := T#600S);	// the timeout counts from the new request
+		bStopping := TRUE;
 	ELSE
 		IF bReady AND NOT bBusy THEN
 			bInterupted := FALSE;
 			TCS_command := E_TCSCommand.goto;
 		END_IF
 	END_IF
-	
-	
+
+
 ELSIF bSlew THEN
 	bTrack := FALSE;
-	IF bReady AND NOT bBusy THEN
+	IF bRestartSlew AND TCS_command = E_TCSCommand.slew THEN
+		// #41: Slew() during a slew: stop, then slew to the new target (bSlew stays set)
+		bInterupted := TRUE;
+		_SlewTelescope();
+		bInterupted := FALSE;
+		tonSlewTimeout(IN := FALSE, PT := T#600S);	// the timeout counts from the new request
+		bStopping := TRUE;
+	ELSIF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.slew;
 	END_IF
 ELSIF bTrack THEN
@@ -497,6 +542,16 @@ ELSE
 	fbHourAngle.bTracking := FALSE;
 	fbDeclination.bTracking := FALSE;
 END_IF
+// the restart requests are consumed above or void
+bRestartGoto := FALSE;
+bRestartSlew := FALSE;
+bUserStop := FALSE;
+
+// #40: every command gets its own timeout; the timer used to run on from one command into the next
+IF TCS_command <> eLastTimeoutCommand THEN
+	tonCommandTimeout(IN := FALSE);
+	eLastTimeoutCommand := TCS_command;
+END_IF
 
 IF TCS_command = E_TCSCommand.poweron THEN
 	fReadyState := 0.7;
@@ -505,7 +560,7 @@ IF TCS_command = E_TCSCommand.poweron THEN
 	TCSCTOEvent.OnMessage := 'POWER';
 ELSIF TCS_command = E_TCSCommand.stop THEN
 	_StopTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.stop, PT := T#2S);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.stop, PT := T#30S);	// #40: a stop from slew speed takes about 4 s, a preempting stop can follow a long move
 	TCSCTOEvent.OnMessage := 'STOP';
 ELSIF TCS_command = E_TCSCommand.park THEN
 	fReadyState := 0.3;
@@ -670,7 +725,6 @@ TCSreadyEvent(	Trigger := bReady,
 TCSCTOEvent(	Trigger := tonCommandTimeout.Q,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := 'A timeout occured during %s command!',
-				OnMessage := 'NOCOMMAND', 
 				Comm := fbComm);]]></ST>
     </Implementation>
     <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
@@ -1384,7 +1438,9 @@ IF bReset OR bError OR bStop OR bInterupted THEN
 END_IF
 CASE nStage OF
 	0:	
-		IF bReady AND bStopped AND NOT bBusy AND NOT bTracking THEN
+		// #42: not gated on bStopped/bTracking any more, stage 10 ends the tracking (like the goto). Waiting for
+		// both here hung a slew sent while tracking: the arbitration had already dropped the track command.
+		IF bReady AND NOT bBusy THEN
 			nStage := 10;
 		END_IF
 	10:
@@ -1820,6 +1876,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[THIS^.fElevation 	:= fAltitude;
 THIS^.fAzimuth 	:= fAzimuth;
+bRestartSlew	:= bSlew;	// #41: a slew is already running, replace its target
 bSlew		:= TRUE;]]></ST>
       </Implementation>
     </Method>
@@ -1827,7 +1884,8 @@ bSlew		:= TRUE;]]></ST>
       <Declaration><![CDATA[METHOD Stop : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[bStop := TRUE;]]></ST>
+        <ST><![CDATA[bUserStop := TRUE;
+bStop := TRUE;]]></ST>
       </Implementation>
     </Method>
     <Method Name="Track" Id="{6d7c3b1b-06e1-4002-b952-698198812e9b}" FolderPath="command methods\">
@@ -1841,6 +1899,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[THIS^.fRightAscension	:= fRightAscension;
 THIS^.fDeclination	:= fDeclination;
+bRestartGoto	:= bGoto;	// #41: a goto is already running, replace its target
 bGoto			:= TRUE;]]></ST>
       </Implementation>
     </Method>
