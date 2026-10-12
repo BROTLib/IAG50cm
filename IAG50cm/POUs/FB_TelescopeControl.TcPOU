@@ -95,6 +95,7 @@ VAR
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
+	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: TON;		// power on timeout
 	tonCommandTimeout		: TON;		// command timeout
@@ -118,7 +119,8 @@ VAR
 	TCSreadyEvent,
 	TCSCTOEvent,
 	TCSsoftErrorEvent,
-	TCSparkErrorEvent		: FB_Eventlog;	// #30, park during an error
+	TCSparkErrorEvent,
+	TCSpowerBlockedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request)
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
 	
@@ -788,6 +790,11 @@ TCSparkErrorEvent(	Trigger := bParkInError,
 				OnMessage := 'Park during an error: covers closed and dome parked, the mount was not moved. Reset, then park again.',
 				Comm := fbComm);
 bParkInError := FALSE;
+TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
+				Level := ADSLOG_MSGTYPE_ERROR,
+				FormatString := '%s',
+				Comm := fbComm);
+bPowerBlocked := FALSE;
 TCSsoftErrorEvent(	Trigger := bSoftwareError,
 				Level := ADSLOG_MSGTYPE_ERROR,
 				FormatString := 'Command timeout error %s',	// 16 goto, 32 park, 48 gohome, 64 slew (16#10, 16#20, 16#30, 16#40)
@@ -1263,7 +1270,11 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF bError THEN
 	bPowerFailure := TRUE;
-	TCSpowerEvent.OnMessage := _PowerOnBlockedReason();		// #39: say why, not "Generic error"
+	TCSpowerEvent.OnMessage := 'failed';
+	// #39: say why, on every refused request. bPowerFailure stays TRUE until a power-on succeeds, so it gives
+	// no new edge for the second request and logged nothing; this one-scan flag does.
+	TCSpowerBlockedEvent.OnMessage := _PowerOnBlockedReason();
+	bPowerBlocked := TRUE;
 	bPower := FALSE;
 ELSE
 	bPowerFailure := FALSE;		
