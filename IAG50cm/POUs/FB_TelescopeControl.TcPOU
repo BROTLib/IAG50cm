@@ -187,6 +187,11 @@ IF bReset THEN
 	fElevation := 20.0;
 	// reset dome position
 	fbDome.Position := 180.0;
+	// #35: a dome error after an E-stop (serial link lost) stays latched until the dome is reset, and nothing else
+	// reaches it. Only the dome's error state reacts to a reset; in every other state it is ignored.
+	IF fbDome <> 0 THEN
+		fbDome.Reset();
+	END_IF
 	// reset the stages of all statemachine methods
 	bInterupted := TRUE; 
 	_HomeTelescope();
