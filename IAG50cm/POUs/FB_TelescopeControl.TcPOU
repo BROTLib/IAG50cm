@@ -15,6 +15,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	bSlew				: BOOL;		// move the telescope to a given az-alt position
 	bStop				: BOOL;		// boolean, TRUE: Stop motion OF telescope immediately, set goto AND track TO FALSE. FALSE: Allow motion OF telescope again via track/goto).	
 	bReset				: BOOL;		// initiates reset on all axis
+	bSafetyAckRequest	: BOOL;		// set by a telescope reset, taken (and cleared) by MAIN which gives the safety acknowledge (#11)
 	bAutoTrack			: BOOL := TRUE;	// automatic tracking after goto
 	fRightAscension		: LREAL :=  0.0;	//  right ascension, degrees, double	
 	fDeclination		: LREAL :=  0.0;	//  declination, degrees, double
@@ -80,7 +81,6 @@ VAR
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
 	rtrigReset		: R_TRIG;
-	bSafetyAckRequest	: BOOL;		// set by a telescope reset, taken by MAIN which gives the safety acknowledge (#11)
 	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
 	tonAxisResetAfterAck	: TON;
 	bResetRequest		: BOOL;		// Reset() was called (one scan); kept apart from bReset, which the trigger below drives (#36)
