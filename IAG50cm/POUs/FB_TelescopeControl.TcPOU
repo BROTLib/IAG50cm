@@ -1142,6 +1142,45 @@ nLastStage := nStage;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="_PowerOnBlockedReason" Id="{7c1e4b52-3a9d-4f60-b8e5-5d2f0a6c91e3}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// #39: the reason a power-on cannot start, as one line for the ADS log. First match wins.
+METHOD PRIVATE _PowerOnBlockedReason : STRING(120)
+VAR
+	sAxis		: STRING(8);
+	nId			: UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bEstopTriggered THEN
+	_PowerOnBlockedReason := 'Power-on blocked: E-stop pressed. Release it, then reset.';
+	RETURN;
+END_IF
+
+// the axis ids are used even when bError is FALSE (a hidden NC error, HA 16933 on 2026-10-12)
+IF fbHourAngle.nErrorID <> 0 THEN
+	sAxis := 'HA';
+	nId := fbHourAngle.nErrorID;
+ELSIF fbDeclination.nErrorID <> 0 THEN
+	sAxis := 'Dec';
+	nId := fbDeclination.nErrorID;
+ELSIF fbFocus <> 0 AND_THEN fbFocus.ErrorID <> 0 THEN
+	sAxis := 'Focus';
+	nId := fbFocus.ErrorID;
+END_IF
+
+IF nId <> 0 THEN
+	IF nId = 18000 OR nId = 19209 THEN
+		// drive hardware not ready / axis not ready: the drives are in STO until the safety is acknowledged
+		_PowerOnBlockedReason := CONCAT(CONCAT(CONCAT(CONCAT('Power-on blocked: safety not acknowledged (', sAxis), ' '), UDINT_TO_STRING(nId)), '). ErrAck and Reset in the VISU, then reset.');
+	ELSE
+		_PowerOnBlockedReason := CONCAT(CONCAT(CONCAT(CONCAT('Power-on blocked: ', sAxis), ' error '), UDINT_TO_STRING(nId)), '. Reset the telescope.');
+	END_IF
+ELSIF bSoftwareError THEN
+	_PowerOnBlockedReason := CONCAT(CONCAT('Power-on blocked: command timeout error ', UDINT_TO_STRING(nSoftwareErrorID)), '. Reset the telescope.');
+ELSE
+	_PowerOnBlockedReason := 'Power-on blocked: telescope error. Reset the telescope.';
+END_IF]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="_PowerOn" Id="{1dafa267-4251-4a45-a8e2-ae0ece289894}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _PowerOn : USINT
 VAR_INPUT
