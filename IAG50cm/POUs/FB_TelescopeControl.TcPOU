@@ -85,13 +85,14 @@ VAR
 	tonAxisResetAfterAck	: TON;
 	bResetRequest		: BOOL;		// Reset() was called (one scan); kept apart from bReset, which the trigger below drives (#36)
 	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
-	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#30 home, 16#40 slew timeout
+	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	bStopping			: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41)
 	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
 	bRestartSlew		: BOOL;		// Slew() while a slew is running: the new target replaces the old one (#41)
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
 	bUserStop			: BOOL;		// Stop() was called (one scan): aborts a running power-on, automatic stops do not (#27)
+	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	tpPowerOnWarning		: TP;		// triggers power warning
@@ -102,6 +103,7 @@ VAR
 	tonGotoTimeout			: TON;
 	tonHomeTimeout			: TON;
 	tonSlewTimeout			: TON;
+	tonParkTimeout			: TON;		// park had no state-machine timeout: covers that never close hung it forever
 	tonTrackingDelay		: TON;		// tracking delay
 	
 	TCSpowerEvent,
@@ -115,7 +117,8 @@ VAR
 	TCSnearPoleEvent,
 	TCSreadyEvent,
 	TCSCTOEvent,
-	TCSsoftErrorEvent		: FB_Eventlog;	// #30
+	TCSsoftErrorEvent,
+	TCSparkErrorEvent		: FB_Eventlog;	// #30, park during an error
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
 	
@@ -424,6 +427,7 @@ tonCommandTimeout();
 tonGotoTimeout(IN := bGoto, PT := T#600S);
 tonHomeTimeout(IN := bGoHome, PT := T#600S);
 tonSlewTimeout(IN := bSlew, PT := T#600S);
+tonParkTimeout(IN := bPark, PT := T#600S);
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
 END_IF
@@ -455,6 +459,17 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 	TCS_command := E_TCSCommand.stop;
 
 ELSIF bPower THEN
+	// Init() during a park cancels the park: its stage is reset and the move flags dropped. Left alone, bPark
+	// survived the power-on, the park then preempted the go-home, resumed at its old stage and hung at 90 waiting
+	// for covers that the power-on had just reopened.
+	IF bPark THEN
+		bPark := FALSE;
+		bInterupted := TRUE;
+		_ParkTelescope();
+		bInterupted := FALSE;
+		fbHourAngle.MoveAxis := FALSE;
+		fbDeclination.MoveAxis := FALSE;
+	END_IF
 	TCS_command := E_TCSCommand.poweron;
 
 ELSIF bStopping THEN
@@ -468,8 +483,31 @@ ELSIF bStopping THEN
 
 ELSIF bPark THEN
 	bTrack := FALSE;
+	IF bError THEN
+		// Park during an error: the axes are disabled by the error and the park state machine aborts on bError, so
+		// bPark used to stay set and the park fired after the next Init() (or hung half way after a reset). Do what
+		// is safe without the mount: close the covers, park the dome, disable the focus, and drop the command. The
+		// mount is not moved and bIsParked is not set.
+		bGoHome := FALSE;
+		bGoto := FALSE;
+		bSlew := FALSE;
+		bInterupted := TRUE;
+		_ParkTelescope();
+		_HomeTelescope();
+		_GotoTelescope();
+		_SlewTelescope();
+		bInterupted := FALSE;
+		fbCovers.Close();
+		fbDome.Position := 180.0;
+		fbDome.Park();
+		IF fbFocus <> 0 THEN
+			fbFocus.Enable := FALSE;
+		END_IF
+		bPark := FALSE;
+		bParkInError := TRUE;
+		TCS_command := E_TCSCommand.no_command;
 	// If lower presedence commands are ongoing, let them know they are interupted
-	IF bGoto OR bSlew OR bGoHome THEN
+	ELSIF bGoto OR bSlew OR bGoHome THEN
 		bGoHome := FALSE;
 		bGoto := FALSE;
 		bSlew := FALSE;
@@ -744,9 +782,15 @@ TCSreadyEvent(	Trigger := bReady,
 				FormatString := '%s',
 				OnMessage := 'IAG50cm startup finished', 
 				Comm := fbComm);
+TCSparkErrorEvent(	Trigger := bParkInError,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				OnMessage := 'Park during an error: covers closed and dome parked, the mount was not moved. Reset, then park again.',
+				Comm := fbComm);
+bParkInError := FALSE;
 TCSsoftErrorEvent(	Trigger := bSoftwareError,
 				Level := ADSLOG_MSGTYPE_ERROR,
-				FormatString := 'Command timeout error %s',	// 16 goto, 48 gohome, 64 slew (16#10, 16#30, 16#40)
+				FormatString := 'Command timeout error %s',	// 16 goto, 32 park, 48 gohome, 64 slew (16#10, 16#20, 16#30, 16#40)
 				OnMessage := UDINT_TO_STRING(nSoftwareErrorID),
 				OffMessage := 'reset',
 				Comm := fbComm);
@@ -1014,6 +1058,13 @@ VAR_INST
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_ParkTelescope := nStage;
+IF tonParkTimeout.Q THEN	// fed every scan in the body, like the goto/home/slew timeouts
+	bSoftwareError := TRUE;
+	nSoftwareErrorID := 16#20;
+	bPark := FALSE;
+	nStage := 0;
+	RETURN;
+END_IF
 IF bReset OR bError OR bStop OR bInterupted THEN
 	nStage := 0;
 	RETURN;
@@ -1026,15 +1077,8 @@ CASE nStage OF
 		IF fbFocus <> 0 THEN
 			fbFocus.Position := telescopeConfig.focusPark;
 		END_IF
-		IF bError THEN // emergency park
-			fbHourAngle.Enable := FALSE;
-			fbDeclination.Enable := FALSE;	
-			fbCovers.Close();
-			// send Dome position
-			fbDome.Position := 180.0;
-			fbDome.Park();	
-			nStage := 80;
-		END_IF
+		// (the former "emergency park" under IF bError never ran: the method returns on bError above, and the
+		// command is not even started while bError; a park during an error is handled in the arbitration)
 		IF NOT bBusy THEN
 			nStage := 10;
 		END_IF
@@ -1127,12 +1171,13 @@ CASE nStage OF
 		fbHourAngle.MoveAxis := FALSE;
 		fbDeclination.MoveAxis := FALSE;
 	80:
-		IF fbHourAngle.Enable OR fbDeclination.Enable THEN
-			nStage := 60;
-		END_IF
+		// (the former "IF an axis is enabled THEN nStage := 60" was overwritten by the line below and never took
+		// effect; nothing enables an axis while the park runs, _PowerOn is a different command)
 		fbCovers.Close();
-		fbFocus.Enable := FALSE;
-		nStage := 90;	
+		IF fbFocus <> 0 THEN
+			fbFocus.Enable := FALSE;
+		END_IF
+		nStage := 90;
 	90:
 		IF fbCovers.Closed THEN
 			nStage := 100;
