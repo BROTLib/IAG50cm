@@ -22,7 +22,7 @@ VAR
 	sStateEStop1			:STRING;
 	sDiagEStop1				:STRING;	
 	
-	// Info EL1904
+	// Info safety inputs: unused, the EL1918's local inputs have no connection info data
 	fbInfoSafetyIn			: FB_InfoConnection;
 	stInfoSafetyIn 	AT%I*	: ST_InfoDataConnection;
 	sStateSafetyIn			: STRING;
@@ -70,7 +70,7 @@ END_VAR
       <ST><![CDATA[// Safety is running on start
 outRun := remote_run;
 GVL_Safety.Run := outRun;
-(*
+
 // error?
 error := inError;
 
@@ -87,16 +87,9 @@ fbInfoEStop1(
 	sDiag		=> sDiagEStop1);
 estop := sStateEStop1 <> 'RUN' AND initialStartUpStep = 100;
 
-//Info SafetyIn EL1904
-fbInfoSafetyIn(
-	stInfoData		:=stInfoSafetyIn, 
-	sState			=>sStateSafetyIn, 
-	sDiag			=>sDiagSafetyIn, 
-	bChannel1		=>bSafetyInCh1, 
-	bChannel2		=>bSafetyInCh2, 
-	bChannel3		=>bSafetyInCh3, 
-	bChannel4		=>bSafetyInCh4);	
-	
+// No info for the safety inputs: they are the EL1918's own local inputs, not an FSoE connection,
+// so TwinSAFE offers no connection info data for them and stInfoSafetyIn stays unlinked (#34).
+
 //Info SafetyOut EL2904
 fbInfoSafetyOut(
 	stInfoData		:=stInfoSafetyOut, 
@@ -106,7 +99,7 @@ fbInfoSafetyOut(
 	bChannel2		=>bSafetyOutCh2, 
 	bChannel3		=>bSafetyOutCh3, 
 	bChannel4		=>bSafetyOutCh4);
-*)
+
 // initial startup	
 CASE initialStartUpStep OF
 	0:
