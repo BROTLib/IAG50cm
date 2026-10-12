@@ -1195,7 +1195,7 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF bError THEN
 	bPowerFailure := TRUE;
-	TCSpowerEvent.OnMessage := 'Generic error during power on occured.';
+	TCSpowerEvent.OnMessage := _PowerOnBlockedReason();		// #39: say why, not "Generic error"
 	bPower := FALSE;
 ELSE
 	bPowerFailure := FALSE;		
