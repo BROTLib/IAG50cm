@@ -1,11 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<safetyApplication Crc="3333279262" xmlns:dm0="http://schemas.microsoft.com/VisualStudio/2008/DslTools/Core" dslVersion="1.5.0.0" Id="5c700fce-25d9-49ac-897e-f79d58ee8450" name="" mapState="false" mapDiag="false" groupOrderId="0" passificationAllowed="false" temporaryDeactivationAllowed="false" permamentDeactivationAllowed="false" xmlid="0" analogFBOutputReplacementValues="Zero" verifyAnalogFBInputsIfStart="false" userFbId="00000000-0000-0000-0000-000000000000" xmlns="http://schemas.microsoft.com/dsltools/SafetyApplicationLanguage">
+<safetyApplication Crc="2320468982" xmlns:dm0="http://schemas.microsoft.com/VisualStudio/2008/DslTools/Core" dslVersion="1.5.0.0" Id="5c700fce-25d9-49ac-897e-f79d58ee8450" name="" mapState="true" mapDiag="true" groupOrderId="0" passificationAllowed="false" temporaryDeactivationAllowed="false" permamentDeactivationAllowed="false" xmlid="0" analogFBOutputReplacementValues="Zero" verifyAnalogFBInputsIfStart="false" userFbId="00000000-0000-0000-0000-000000000000" xmlns="http://schemas.microsoft.com/dsltools/SafetyApplicationLanguage">
   <networks>
     <safetyApplicationHasNetworks Id="cf95bd46-5d35-48b1-8439-89efd6cf70e2">
       <Network Id="eb6a6263-588a-472d-98d4-5c28292b4d1b" name="Network1" networkName="SS1" intId="1" networkOrderId="1">
         <functionBlocks>
           <networkHasFunctionBlocks Id="2d904f1b-2b39-4a4f-9c98-b570ce924f86">
-            <fBMon Id="f1284c27-9f2f-4001-831c-a9051d986268" name="FBMon1" instanceName="FBMon1" orderOfExecution="1" mapState="false" mapDiag="false" functionName="safeMon" safeInputsAfterDiscError="false" manualFunctionTest="false">
+            <fBMon Id="f1284c27-9f2f-4001-831c-a9051d986268" name="FBMon1" instanceName="FBMon1" orderOfExecution="1" mapState="true" mapDiag="true" functionName="safeMon" safeInputsAfterDiscError="false" manualFunctionTest="false">
               <inPorts>
                 <functioBlockHasInPorts Id="40c30ad2-90f3-490f-b8ae-66309890387b">
                   <inPort Id="05d4f7ef-233d-4951-8af8-35b4ab0bad4f" name="Restart" portName="Restart" portNum="2" objectIndex="0" varId="1" filter="3" portDataType="1" maxDeviation="0" resetTime="0" />
