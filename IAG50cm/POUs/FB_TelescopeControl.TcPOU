@@ -457,6 +457,17 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 	TCS_command := E_TCSCommand.stop;
 
 ELSIF bPower THEN
+	// Init() during a park cancels the park: its stage is reset and the move flags dropped. Left alone, bPark
+	// survived the power-on, the park then preempted the go-home, resumed at its old stage and hung at 90 waiting
+	// for covers that the power-on had just reopened.
+	IF bPark THEN
+		bPark := FALSE;
+		bInterupted := TRUE;
+		_ParkTelescope();
+		bInterupted := FALSE;
+		fbHourAngle.MoveAxis := FALSE;
+		fbDeclination.MoveAxis := FALSE;
+	END_IF
 	TCS_command := E_TCSCommand.poweron;
 
 ELSIF bStopping THEN
