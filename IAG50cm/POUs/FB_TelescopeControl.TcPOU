@@ -1127,12 +1127,13 @@ CASE nStage OF
 		fbHourAngle.MoveAxis := FALSE;
 		fbDeclination.MoveAxis := FALSE;
 	80:
-		IF fbHourAngle.Enable OR fbDeclination.Enable THEN
-			nStage := 60;
-		END_IF
+		// (the former "IF an axis is enabled THEN nStage := 60" was overwritten by the line below and never took
+		// effect; nothing enables an axis while the park runs, _PowerOn is a different command)
 		fbCovers.Close();
-		fbFocus.Enable := FALSE;
-		nStage := 90;	
+		IF fbFocus <> 0 THEN
+			fbFocus.Enable := FALSE;
+		END_IF
+		nStage := 90;
 	90:
 		IF fbCovers.Closed THEN
 			nStage := 100;
