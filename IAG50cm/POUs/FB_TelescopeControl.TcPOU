@@ -85,7 +85,7 @@ VAR
 	tonAxisResetAfterAck	: TON;
 	bResetRequest		: BOOL;		// Reset() was called (one scan); kept apart from bReset, which the trigger below drives (#36)
 	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
-	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#30 home, 16#40 slew timeout
+	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	bStopping			: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41)
 	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
@@ -103,6 +103,7 @@ VAR
 	tonGotoTimeout			: TON;
 	tonHomeTimeout			: TON;
 	tonSlewTimeout			: TON;
+	tonParkTimeout			: TON;		// park had no state-machine timeout: covers that never close hung it forever
 	tonTrackingDelay		: TON;		// tracking delay
 	
 	TCSpowerEvent,
@@ -426,6 +427,7 @@ tonCommandTimeout();
 tonGotoTimeout(IN := bGoto, PT := T#600S);
 tonHomeTimeout(IN := bGoHome, PT := T#600S);
 tonSlewTimeout(IN := bSlew, PT := T#600S);
+tonParkTimeout(IN := bPark, PT := T#600S);
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
 END_IF
@@ -788,7 +790,7 @@ TCSparkErrorEvent(	Trigger := bParkInError,
 bParkInError := FALSE;
 TCSsoftErrorEvent(	Trigger := bSoftwareError,
 				Level := ADSLOG_MSGTYPE_ERROR,
-				FormatString := 'Command timeout error %s',	// 16 goto, 48 gohome, 64 slew (16#10, 16#30, 16#40)
+				FormatString := 'Command timeout error %s',	// 16 goto, 32 park, 48 gohome, 64 slew (16#10, 16#20, 16#30, 16#40)
 				OnMessage := UDINT_TO_STRING(nSoftwareErrorID),
 				OffMessage := 'reset',
 				Comm := fbComm);
@@ -1056,6 +1058,13 @@ VAR_INST
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_ParkTelescope := nStage;
+IF tonParkTimeout.Q THEN	// fed every scan in the body, like the goto/home/slew timeouts
+	bSoftwareError := TRUE;
+	nSoftwareErrorID := 16#20;
+	bPark := FALSE;
+	nStage := 0;
+	RETURN;
+END_IF
 IF bReset OR bError OR bStop OR bInterupted THEN
 	nStage := 0;
 	RETURN;
