@@ -80,6 +80,9 @@ VAR
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
 	rtrigReset		: R_TRIG;
+	bResetRequest		: BOOL;		// Reset() was called (one scan); kept apart from bReset, which the trigger below drives (#36)
+	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
+	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#30 home, 16#40 slew timeout
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	bStopping			: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41)
 	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
@@ -108,7 +111,8 @@ VAR
 	TCSaltitudeEvent,
 	TCSnearPoleEvent,
 	TCSreadyEvent,
-	TCSCTOEvent			: FB_Eventlog;
+	TCSCTOEvent,
+	TCSsoftErrorEvent		: FB_Eventlog;	// #30
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
 	
@@ -163,10 +167,14 @@ fbCabinet();
 bLocalMode := fbCabinet.LocalMode;
 
 // set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
-rtrigReset(CLK := fbCabinet.Reset AND bError, Q=>bReset);
+// #36: the request from Reset() must not be overwritten by the key state, so it has its own flag
+rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND bError, Q=>bReset);
+bResetRequest := FALSE;
 
 IF bReset THEN
 	bTestError := FALSE;
+	bSoftwareError := FALSE;
+	nSoftwareErrorID := 0;
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
 	fDeclination := telescopeConfig.declinationPark;
 	fbHaDec2RaDec(	jd := fJd +fTimeOffset,
@@ -204,13 +212,15 @@ ELSIF fbFocus <> 0 AND_THEN fbFocus.Error THEN
 	IF bReset THEN
 		fbFocus.Reset();
 	END_IF
+ELSIF bSoftwareError THEN
+	nErrorID := nSoftwareErrorID;
 END_IF
 
 // fSlewTime
 fSlewTime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
 
 // ERROR (either one of the Axis or below safe Horizon (fHorizon))
-bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error OR bTestError;
+bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error OR bTestError OR bSoftwareError;
 			
 IF bError THEN
 	bGoHome := 	FALSE;
@@ -722,6 +732,12 @@ TCSreadyEvent(	Trigger := bReady,
 				FormatString := '%s',
 				OnMessage := 'IAG50cm startup finished', 
 				Comm := fbComm);
+TCSsoftErrorEvent(	Trigger := bSoftwareError,
+				Level := ADSLOG_MSGTYPE_ERROR,
+				FormatString := 'Command timeout error %s',	// 16 goto, 48 gohome, 64 slew (16#10, 16#30, 16#40)
+				OnMessage := UDINT_TO_STRING(nSoftwareErrorID),
+				OffMessage := 'reset',
+				Comm := fbComm);
 TCSCTOEvent(	Trigger := tonCommandTimeout.Q,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := 'A timeout occured during %s command!',
@@ -744,8 +760,8 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_GotoTelescope := nStage;
 IF tonGotoTimeout.Q THEN	// MONETcommon#17: fed every scan in the body, a method-local TON never kept its state
-	bError := TRUE;
-	nErrorID := 16#10;
+	bSoftwareError := TRUE;		// #30: latched until a reset, bError is recomputed every scan
+	nSoftwareErrorID := 16#10;
 	bGoto := FALSE;
 	nStage := 0;
 	RETURN;
@@ -875,8 +891,8 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_HomeTelescope := nStage;
 IF tonHomeTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
-	bError := TRUE;
-	nErrorID := 16#30;
+	bSoftwareError := TRUE;		// #30
+	nSoftwareErrorID := 16#30;
 	bGoHome := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
 	nStage := 0;
 END_IF
@@ -1426,8 +1442,8 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_SlewTelescope := nStage;
 IF tonSlewTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
-	bError := TRUE;
-	nErrorID := 16#40;
+	bSoftwareError := TRUE;		// #30
+	nSoftwareErrorID := 16#40;
 	bSlew := FALSE;
 	nStage := 0;
 	RETURN;
@@ -1799,7 +1815,7 @@ RaDec.Declination		:= fDeclinationCalc;]]></ST>
       <Declaration><![CDATA[METHOD Reset : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[bReset := TRUE;]]></ST>
+        <ST><![CDATA[bResetRequest := TRUE;]]></ST>
       </Implementation>
     </Method>
     <Property Name="RightAscension" Id="{fbe599ea-0c8f-4d80-a746-e4e19f11c40d}" FolderPath="properties\">
