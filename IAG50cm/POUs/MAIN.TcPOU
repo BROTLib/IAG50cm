@@ -55,6 +55,12 @@ telescopeControl(
 );
 
 //Safety
+// #11: a telescope reset (cabinet key or the reset command, only fires with an error) also gives the safety
+// acknowledge, so the drives leave STO without the VISU
+IF telescopeControl.bSafetyAckRequest THEN
+	telescopeControl.bSafetyAckRequest := FALSE;
+	safetyHandling.Acknowledge();
+END_IF
 safetyHandling();
 
 // Comm
