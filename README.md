@@ -131,7 +131,8 @@ The heart of the application: a full telescope control system implementing
   `FB_HOR2EQ` (AstroBROT); pointing model forward/inversion
   (`FB_PointingModelForward`, `FB_PointingModelInversion`).
 - **Safety checks**: target below horizon (`fHorizon` 1.0°) or in the pole zone
-  (`90° − fPoleZone`, 3.0°) → stop and go home; E-stop disables both axes.
+  (`90° − fPoleZone`, 3.0°) → stop and go home once the telescope is ready (a powered-off mount is
+  not homed until the power-on); E-stop disables both axes.
 - **Outputs**: `bReady`, `fReadyState` (0 shutdown / 0.3 parking / 0.7
   powering / 1.0 ready / −1 error), `nMotionState` (0 stopped / 1 moving /
   8 tracking), `bIsParked`, `bLocalMode`, current/target coordinates.
