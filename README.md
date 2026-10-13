@@ -124,8 +124,10 @@ The heart of the application: a full telescope control system implementing
 - **Power-on sequence**: open covers → enable + calibrate HA/DEC → focus →
   go home → dome tracking.
 - **Park**: focus park → dome 180°/park → HA/DEC park → disable drives → close
-  covers (emergency-park path on error); auto-park after 12 h without a
-  command.
+  covers; auto-park after 12 h without a command. A park during an error or
+  with the axes off only closes the covers and parks the dome (the mount is
+  not moved). A running park aborted by an error or an E-stop (at any stage)
+  logs one `PARK aborted ...` WARN, never `PARK completed`.
 - **Time and coordinates**: `FB_AstroClock` → JD (`DateTime2JD`), LST
   (`CT2LST`); conversions `FB_HADEC2RADEC` / `FB_RADEC2HADEC` / `FB_EQ2HOR` /
   `FB_HOR2EQ` (AstroBROT); pointing model forward/inversion
