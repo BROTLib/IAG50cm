@@ -46,6 +46,13 @@ VAR
 	startDelay 				: TON := (PT := T#2S);
 	stateDelay 				: TON := (PT := T#1S);
 
+	// #11: acknowledge on request (the telescope reset), the same ErrAck and Restart pulses as the start-up
+	bAckRequest				: BOOL;			// Acknowledge() was called (one scan)
+	bAckSkipped				: BOOL;			// the request was ignored this scan
+	nAckStep				: INT;			// 0 idle, 1 ErrAck, 2 Restart
+	ackDelay				: TON := (PT := T#1S);
+	AckLog, AckSkippedLog	: FB_EventLog;
+
 	
 	ErrAckLog				: FB_EventLog;		// Errack logging
 	RestartLog				: FB_EventLog;		// restart logging
@@ -128,7 +135,45 @@ CASE initialStartUpStep OF
 			initialStartUpStep := 100;
 		END_IF		
 END_CASE
-(*	
+
+// #11: acknowledge on request. Ignored while the start-up runs, while a sequence runs, and while the E-stop is
+// pressed (the safety logic also gates the drive acknowledge on the E-stop input, so it would do nothing).
+bAckSkipped := bAckRequest AND nAckStep = 0 AND (initialStartUpStep <> 100 OR estop);
+IF bAckRequest AND nAckStep = 0 AND NOT bAckSkipped THEN
+	nAckStep := 1;
+END_IF
+bAckRequest := FALSE;
+
+CASE nAckStep OF
+	1:
+		GVL_Safety.ErrAck := TRUE;
+		ackDelay(IN := TRUE);
+		IF ackDelay.Q THEN
+			ackDelay(IN := FALSE);
+			GVL_Safety.ErrAck := FALSE;
+			nAckStep := 2;
+		END_IF
+	2:
+		GVL_Safety.Restart := TRUE;
+		ackDelay(IN := TRUE);
+		IF ackDelay.Q THEN
+			ackDelay(IN := FALSE);
+			GVL_Safety.Restart := FALSE;
+			nAckStep := 0;
+		END_IF
+END_CASE
+
+AckLog(
+	Trigger		:= nAckStep = 1,
+	Level		:= ADSLOG_MSGTYPE_WARN,
+	OnMessage	:= 'Safety acknowledge by telescope reset: ErrAck, then Restart.',
+	Comm		:= comm);
+AckSkippedLog(
+	Trigger		:= bAckSkipped,
+	Level		:= ADSLOG_MSGTYPE_WARN,
+	OnMessage	:= 'Safety acknowledge skipped: E-stop pressed or safety start-up running.',
+	Comm		:= comm);
+(*
 
 ErrAckLog(  
 	Trigger 	:= outErrAck,
@@ -152,6 +197,14 @@ SafetyLog(
 	Comm		:= comm);
 *)]]></ST>
     </Implementation>
+    <Method Name="Acknowledge" Id="{2b6f9d14-8c3e-4a71-9e05-f4a8d1c73b62}">
+      <Declaration><![CDATA[// #11: request the safety acknowledge (ErrAck 1 s, then Restart 1 s), as the telescope reset does after an E-stop
+METHOD Acknowledge : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bAckRequest := TRUE;]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="FB_Init" Id="{78880c56-5a68-4979-b4f3-852d102d76af}">
       <Declaration><![CDATA[//FB_Init is always available implicitly and it is used primarily for initialization.
 //The return value is not evaluated. For a specific influence, you can also declare the

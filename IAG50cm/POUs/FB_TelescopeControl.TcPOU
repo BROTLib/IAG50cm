@@ -15,6 +15,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	bSlew				: BOOL;		// move the telescope to a given az-alt position
 	bStop				: BOOL;		// boolean, TRUE: Stop motion OF telescope immediately, set goto AND track TO FALSE. FALSE: Allow motion OF telescope again via track/goto).	
 	bReset				: BOOL;		// initiates reset on all axis
+	bSafetyAckRequest	: BOOL;		// set by a telescope reset, taken (and cleared) by MAIN which gives the safety acknowledge (#11)
 	bAutoTrack			: BOOL := TRUE;	// automatic tracking after goto
 	fRightAscension		: LREAL :=  0.0;	//  right ascension, degrees, double	
 	fDeclination		: LREAL :=  0.0;	//  declination, degrees, double
@@ -80,17 +81,22 @@ VAR
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
 	rtrigReset		: R_TRIG;
+	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
+	tonAxisResetAfterAck	: TON;
 	bResetRequest		: BOOL;		// Reset() was called (one scan); kept apart from bReset, which the trigger below drives (#36)
 	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
-	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#30 home, 16#40 slew timeout
+	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	bStopping			: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41)
 	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
 	bRestartSlew		: BOOL;		// Slew() while a slew is running: the new target replaces the old one (#41)
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
 	bUserStop			: BOOL;		// Stop() was called (one scan): aborts a running power-on, automatic stops do not (#27)
+	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
+	sParkEnd			: STRING(40) := 'completed';	// the park log line when bPark falls: completed, or why it ended (#57)
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
+	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: TON;		// power on timeout
 	tonCommandTimeout		: TON;		// command timeout
@@ -99,6 +105,7 @@ VAR
 	tonGotoTimeout			: TON;
 	tonHomeTimeout			: TON;
 	tonSlewTimeout			: TON;
+	tonParkTimeout			: TON;		// park had no state-machine timeout: covers that never close hung it forever
 	tonTrackingDelay		: TON;		// tracking delay
 	
 	TCSpowerEvent,
@@ -112,7 +119,9 @@ VAR
 	TCSnearPoleEvent,
 	TCSreadyEvent,
 	TCSCTOEvent,
-	TCSsoftErrorEvent		: FB_Eventlog;	// #30
+	TCSsoftErrorEvent,
+	TCSparkErrorEvent,
+	TCSpowerBlockedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request)
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
 	
@@ -187,6 +196,11 @@ IF bReset THEN
 	fElevation := 20.0;
 	// reset dome position
 	fbDome.Position := 180.0;
+	// #35: a dome error after an E-stop (serial link lost) stays latched until the dome is reset, and nothing else
+	// reaches it. Only the dome's error state reacts to a reset; in every other state it is ignored.
+	IF fbDome <> 0 THEN
+		fbDome.Reset();
+	END_IF
 	// reset the stages of all statemachine methods
 	bInterupted := TRUE; 
 	_HomeTelescope();
@@ -196,24 +210,30 @@ IF bReset THEN
 	bInterupted := FALSE;
 END_IF
 
-// get error ID, reset if bReset command is set
+// get error ID
 IF fbHourAngle.Error THEN
 	nErrorID := fbHourAngle.nErrorID;
-	IF bReset THEN
-		fbHourAngle.Reset();
-	END_IF
 ELSIF fbDeclination.bError THEN
 	nErrorID := fbDeclination.nErrorID;
-	IF bReset THEN
-		fbDeclination.Reset();
-	END_IF
 ELSIF fbFocus <> 0 AND_THEN fbFocus.Error THEN
 	nErrorID := fbFocus.ErrorID;
-	IF bReset THEN
-		fbFocus.Reset();
-	END_IF
 ELSIF bSoftwareError THEN
 	nErrorID := nSoftwareErrorID;
+END_IF
+
+// reset (#11): every errored axis in one go, not only the first one. The drives stay in STO until the safety
+// acknowledge (MAIN, bSafetyAckRequest: ErrAck 1 s, Restart 1 s), so the axes are reset again once it is done.
+// The second pass resets every axis that is errored or not enabled (#55): after an E-stop HA and Dec can have lost
+// their enable without latching an error, and then failed at the next power-on (18000) until they got a reset.
+IF bReset THEN
+	bSafetyAckRequest := TRUE;
+	bAxisResetAfterAck := TRUE;
+	_ResetErroredAxes(bAll := FALSE);
+END_IF
+tonAxisResetAfterAck(IN := bAxisResetAfterAck, PT := T#2500MS);
+IF tonAxisResetAfterAck.Q THEN
+	bAxisResetAfterAck := FALSE;
+	_ResetErroredAxes(bAll := TRUE);
 END_IF
 
 // fSlewTime
@@ -412,6 +432,7 @@ tonCommandTimeout();
 tonGotoTimeout(IN := bGoto, PT := T#600S);
 tonHomeTimeout(IN := bGoHome, PT := T#600S);
 tonSlewTimeout(IN := bSlew, PT := T#600S);
+tonParkTimeout(IN := bPark, PT := T#600S);
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
 END_IF
@@ -429,6 +450,7 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 		_PowerOn();		// bStop is set: resets its stage
 	ELSIF bPark THEN
 		bPark := FALSE;
+		sParkEnd := 'cancelled by stop';
 		_ParkTelescope();
 	ELSIF bGoto THEN
 		bGoto := FALSE;
@@ -443,6 +465,18 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 	TCS_command := E_TCSCommand.stop;
 
 ELSIF bPower THEN
+	// Init() during a park cancels the park: its stage is reset and the move flags dropped. Left alone, bPark
+	// survived the power-on, the park then preempted the go-home, resumed at its old stage and hung at 90 waiting
+	// for covers that the power-on had just reopened.
+	IF bPark THEN
+		bPark := FALSE;
+		sParkEnd := 'cancelled by power-on';
+		bInterupted := TRUE;
+		_ParkTelescope();
+		bInterupted := FALSE;
+		fbHourAngle.MoveAxis := FALSE;
+		fbDeclination.MoveAxis := FALSE;
+	END_IF
 	TCS_command := E_TCSCommand.poweron;
 
 ELSIF bStopping THEN
@@ -456,8 +490,44 @@ ELSIF bStopping THEN
 
 ELSIF bPark THEN
 	bTrack := FALSE;
+	IF bError OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
+		// Park during an error: the axes are disabled by the error and the park state machine aborts on bError, so
+		// bPark used to stay set and the park fired after the next Init() (or hung half way after a reset). Do what
+		// is safe without the mount: close the covers, park the dome, disable the focus, and drop the command. The
+		// mount is not moved and bIsParked is not set.
+		// The same with the axes off (#54): the park command is dispatched only with bReady, which needs the axes
+		// enabled, so a park after a stopped power-on, or on a parked telescope, waited until a power-on or the
+		// 600 s timeout with the covers open. Not while a park is running (TCS_command park): stage 60 of the park
+		// disables the axes itself and the park must go on to stage 100.
+		bGoHome := FALSE;
+		bGoto := FALSE;
+		bSlew := FALSE;
+		bInterupted := TRUE;
+		_ParkTelescope();
+		_HomeTelescope();
+		_GotoTelescope();
+		_SlewTelescope();
+		bInterupted := FALSE;
+		fbCovers.Close();
+		fbDome.Position := 180.0;
+		fbDome.Park();
+		IF fbFocus <> 0 THEN
+			fbFocus.Enable := FALSE;
+		END_IF
+		bPark := FALSE;
+		// #57: say what was commanded; with the E-stop pressed the cover and dome requests are dropped
+		IF bEstopTriggered THEN
+			TCSparkErrorEvent.OnMessage := 'Park refused: E-stop pressed, the covers and the dome cannot move. Release it, reset, then park again.';
+		ELSIF bError THEN
+			TCSparkErrorEvent.OnMessage := 'Park during an error: covers closed and dome parked, the mount was not moved. Reset, then park again.';
+		ELSE
+			TCSparkErrorEvent.OnMessage := 'Park with the axes off: covers closed and dome parked, the mount was not moved.';
+		END_IF
+		sParkEnd := 'ended without moving the mount';
+		bParkInError := TRUE;
+		TCS_command := E_TCSCommand.no_command;
 	// If lower presedence commands are ongoing, let them know they are interupted
-	IF bGoto OR bSlew OR bGoHome THEN
+	ELSIF bGoto OR bSlew OR bGoHome THEN
 		bGoHome := FALSE;
 		bGoto := FALSE;
 		bSlew := FALSE;
@@ -684,12 +754,13 @@ TCSgohomeEvent(	Trigger := bGoHome,
 				OnMessage := 'commencing',
 				OffMEssage := 'completed', 
 				Comm := fbComm);
-TCSparkEvent(	Trigger := bPark, 
+TCSparkEvent.OffMessage := sParkEnd;		// #57: "PARK completed" was also logged when the park was cancelled
+TCSparkEvent(	Trigger := bPark,
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'PARK %s',
 				OnMessage := 'commencing',
-				OffMEssage := 'completed', 
 				Comm := fbComm);
+sParkEnd := 'completed';
 TCSgotoEvent(	Trigger := bGoto, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'GOTO %s',
@@ -732,9 +803,20 @@ TCSreadyEvent(	Trigger := bReady,
 				FormatString := '%s',
 				OnMessage := 'IAG50cm startup finished', 
 				Comm := fbComm);
+TCSparkErrorEvent(	Trigger := bParkInError,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				OnMessage := 'Park during an error: covers closed and dome parked, the mount was not moved. Reset, then park again.',
+				Comm := fbComm);
+bParkInError := FALSE;
+TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
+				Level := ADSLOG_MSGTYPE_ERROR,
+				FormatString := '%s',
+				Comm := fbComm);
+bPowerBlocked := FALSE;
 TCSsoftErrorEvent(	Trigger := bSoftwareError,
 				Level := ADSLOG_MSGTYPE_ERROR,
-				FormatString := 'Command timeout error %s',	// 16 goto, 48 gohome, 64 slew (16#10, 16#30, 16#40)
+				FormatString := 'Command timeout error %s',	// 16 goto, 32 park, 48 gohome, 64 slew (16#10, 16#20, 16#30, 16#40)
 				OnMessage := UDINT_TO_STRING(nSoftwareErrorID),
 				OffMessage := 'reset',
 				Comm := fbComm);
@@ -1002,6 +1084,14 @@ VAR_INST
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_ParkTelescope := nStage;
+IF tonParkTimeout.Q THEN	// fed every scan in the body, like the goto/home/slew timeouts
+	bSoftwareError := TRUE;
+	nSoftwareErrorID := 16#20;
+	bPark := FALSE;
+	sParkEnd := 'timed out';
+	nStage := 0;
+	RETURN;
+END_IF
 IF bReset OR bError OR bStop OR bInterupted THEN
 	nStage := 0;
 	RETURN;
@@ -1014,15 +1104,8 @@ CASE nStage OF
 		IF fbFocus <> 0 THEN
 			fbFocus.Position := telescopeConfig.focusPark;
 		END_IF
-		IF bError THEN // emergency park
-			fbHourAngle.Enable := FALSE;
-			fbDeclination.Enable := FALSE;	
-			fbCovers.Close();
-			// send Dome position
-			fbDome.Position := 180.0;
-			fbDome.Park();	
-			nStage := 80;
-		END_IF
+		// (the former "emergency park" under IF bError never ran: the method returns on bError above, and the
+		// command is not even started while bError; a park during an error is handled in the arbitration)
 		IF NOT bBusy THEN
 			nStage := 10;
 		END_IF
@@ -1115,12 +1198,13 @@ CASE nStage OF
 		fbHourAngle.MoveAxis := FALSE;
 		fbDeclination.MoveAxis := FALSE;
 	80:
-		IF fbHourAngle.Enable OR fbDeclination.Enable THEN
-			nStage := 60;
-		END_IF
+		// (the former "IF an axis is enabled THEN nStage := 60" was overwritten by the line below and never took
+		// effect; nothing enables an axis while the park runs, _PowerOn is a different command)
 		fbCovers.Close();
-		fbFocus.Enable := FALSE;
-		nStage := 90;	
+		IF fbFocus <> 0 THEN
+			fbFocus.Enable := FALSE;
+		END_IF
+		nStage := 90;
 	90:
 		IF fbCovers.Closed THEN
 			nStage := 100;
@@ -1137,6 +1221,64 @@ nLastStage := nStage;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="_ResetErroredAxes" Id="{5e8a3c17-9b42-4d06-a1f3-6c0d7e92b4a8}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// #11: reset every axis that has an error, also a hidden one (nErrorID set with the error flag FALSE)
+METHOD PRIVATE _ResetErroredAxes
+VAR_INPUT
+	bAll	: BOOL;		// also reset axes that are not enabled (#55), the second pass after the acknowledge
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF fbHourAngle.Error OR fbHourAngle.nErrorID <> 0 OR (bAll AND NOT fbHourAngle.Enable) THEN
+	fbHourAngle.Reset();
+END_IF
+IF fbDeclination.Error OR fbDeclination.nErrorID <> 0 OR (bAll AND NOT fbDeclination.Enable) THEN
+	fbDeclination.Reset();
+END_IF
+IF fbFocus <> 0 AND_THEN (fbFocus.Error OR fbFocus.ErrorID <> 0 OR (bAll AND NOT fbFocus.Enable)) THEN
+	fbFocus.Reset();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_PowerOnBlockedReason" Id="{7c1e4b52-3a9d-4f60-b8e5-5d2f0a6c91e3}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// #39: the reason a power-on cannot start, as one line for the ADS log. First match wins.
+METHOD PRIVATE _PowerOnBlockedReason : STRING(120)
+VAR
+	sAxis		: STRING(8);
+	nId			: UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bEstopTriggered THEN
+	_PowerOnBlockedReason := 'Power-on blocked: E-stop pressed. Release it, then reset.';
+	RETURN;
+END_IF
+
+// the axis ids are used even when bError is FALSE (a hidden NC error, HA 16933 on 2026-10-12)
+IF fbHourAngle.nErrorID <> 0 THEN
+	sAxis := 'HA';
+	nId := fbHourAngle.nErrorID;
+ELSIF fbDeclination.nErrorID <> 0 THEN
+	sAxis := 'Dec';
+	nId := fbDeclination.nErrorID;
+ELSIF fbFocus <> 0 AND_THEN fbFocus.ErrorID <> 0 THEN
+	sAxis := 'Focus';
+	nId := fbFocus.ErrorID;
+END_IF
+
+IF nId <> 0 THEN
+	IF nId = 18000 OR nId = 19209 THEN
+		// drive hardware not ready / axis not ready: the drives are in STO until the safety is acknowledged
+		_PowerOnBlockedReason := CONCAT(CONCAT(CONCAT(CONCAT('Power-on blocked: safety not acknowledged (', sAxis), ' '), UDINT_TO_STRING(nId)), '). Reset the telescope (cabinet key or reset command).');
+	ELSE
+		_PowerOnBlockedReason := CONCAT(CONCAT(CONCAT(CONCAT('Power-on blocked: ', sAxis), ' error '), UDINT_TO_STRING(nId)), '. Reset the telescope.');
+	END_IF
+ELSIF bSoftwareError THEN
+	_PowerOnBlockedReason := CONCAT(CONCAT('Power-on blocked: command timeout error ', UDINT_TO_STRING(nSoftwareErrorID)), '. Reset the telescope.');
+ELSE
+	_PowerOnBlockedReason := 'Power-on blocked: telescope error. Reset the telescope.';
+END_IF]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="_PowerOn" Id="{1dafa267-4251-4a45-a8e2-ae0ece289894}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _PowerOn : USINT
 VAR_INPUT
@@ -1151,7 +1293,11 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF bError THEN
 	bPowerFailure := TRUE;
-	TCSpowerEvent.OnMessage := 'Generic error during power on occured.';
+	TCSpowerEvent.OnMessage := 'failed';
+	// #39: say why, on every refused request. bPowerFailure stays TRUE until a power-on succeeds, so it gives
+	// no new edge for the second request and logged nothing; this one-scan flag does.
+	TCSpowerBlockedEvent.OnMessage := _PowerOnBlockedReason();
+	bPowerBlocked := TRUE;
 	bPower := FALSE;
 ELSE
 	bPowerFailure := FALSE;		
@@ -1165,12 +1311,16 @@ END_IF
 
 CASE nStage OF
 	0:
-		bIsParked := FALSE;
-		IF bCoverAutoOpen THEN
-			// check if covers should automatic open
-			nStage := 10;
-		ELSE
-			nStage := 40;
+		// #55: wait for the axis reset that follows the safety acknowledge (at most 2.5 s); enabling the axes before
+		// it gave 18000 on HA and Dec
+		IF NOT bAxisResetAfterAck THEN
+			bIsParked := FALSE;
+			IF bCoverAutoOpen THEN
+				// check if covers should automatic open
+				nStage := 10;
+			ELSE
+				nStage := 40;
+			END_IF
 		END_IF
 	10:
 		// COVER MUST BE OPENED FOR A SUCCESSFUL WAKE & SHAKE COMMAND!
