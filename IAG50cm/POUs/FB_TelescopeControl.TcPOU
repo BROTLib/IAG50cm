@@ -453,6 +453,9 @@ IF tonHomePending.Q THEN
 END_IF
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
+	// #83: fire once. With the axes off or in error the park does not set bIsParked, so Q stayed TRUE and bPark was
+	// set again every scan (dropping Track/Goto/Slew/Home, re-commanding the dome). The timer counts again from now.
+	tonPowerTimeout(IN := FALSE);
 END_IF
 //----------------------------------------------------------------------------------------------		
 // set TCS_command according to state variables ordered by precedence
