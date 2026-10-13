@@ -76,6 +76,11 @@ pCover^.SetState(pCover^.fbCoverStoppingState);]]></ST>
         <ST><![CDATA[nStage := 0;
 tonDelta(IN:=FALSE);
 tonFullCycle(IN:=FALSE);
+// #71: release the relays at the end position (limit switches cut the motors, the covers are self-locking)
+pCover^._Motor1RelaisA := FALSE;
+pCover^._Motor1RelaisB := FALSE;
+pCover^._Motor2RelaisA := FALSE;
+pCover^._Motor2RelaisB := FALSE;
 pCover^._CoverState := E_MirrorCoverState.closed;
 pCover^.SetState(pCover^.fbCoverIdleState);]]></ST>
       </Implementation>

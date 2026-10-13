@@ -23,6 +23,10 @@ VAR
 	
 	ipState		: I_CoverState := fbCoverIdleState;
 	eCoverState	: E_MirrorCoverState := E_MirrorCoverState.closed;
+	// #71: TRUE only once an open or close cycle has completed since the PLC start. The initial "closed" is an
+	// assumption (the covers may be open after a restart), so a request is only ignored once the position is confirmed.
+	bEndPositionConfirmed : BOOL := FALSE;
+	bRequestIgnored : BOOL;
 	// Trigger
 	rtrigOpen		: R_TRIG;
 	rtrigClose		: R_TRIG;
@@ -33,6 +37,7 @@ VAR
 	fbCoverOpenEvent:	FB_EventLog;
 	fbCoverClosedEvent: FB_EventLog;
 	fbCoverEmergencyEvent: FB_EventLog;
+	fbCoverIgnoredEvent: FB_EventLog;
 	// Motor relais
 	bMotor1RelaisA	AT%Q*	: BOOL := FALSE;
 	bMotor1RelaisB	AT%Q*	: BOOL := FALSE;
@@ -45,6 +50,7 @@ END_VAR
       <ST><![CDATA[rtrigOpen(CLK := bOpen);
 rtrigClose(CLK := bClose);
 rtrigStop(CLK := bStop);
+bRequestIgnored := FALSE;
 
 IF bEmergency THEN
 	// requests made during the E-stop are dropped (flags cleared below, #15)
@@ -57,12 +63,21 @@ ELSE
 		ipState.StopCommand();
 	END_IF
 
+	// #71: a request for the position the covers are confirmed to be in does nothing (it ran a full 20 s cycle)
 	IF rtrigClose.Q THEN
-		ipState.CloseCommand();
+		IF eCoverState = E_MirrorCoverState.closed AND bEndPositionConfirmed THEN
+			bRequestIgnored := TRUE;
+		ELSE
+			ipState.CloseCommand();
+		END_IF
 	END_IF
 
 	IF rtrigOpen.Q THEN
-		ipState.OpenCommand();
+		IF eCoverState = E_MirrorCoverState.open AND bEndPositionConfirmed THEN
+			bRequestIgnored := TRUE;
+		ELSE
+			ipState.OpenCommand();
+		END_IF
 	END_IF
 END_IF
 
@@ -93,6 +108,11 @@ fbCoverClosedEvent(
 	Level := ADSLOG_MSGTYPE_HINT,
 	OnMessage := 'Mirror cover is closed.',
 	comm:= fbComm);
+fbCoverIgnoredEvent(
+	Trigger := bRequestIgnored,
+	Level := ADSLOG_MSGTYPE_HINT,
+	OnMessage := 'Mirror cover already in the requested end position, request ignored.',
+	comm:= fbComm);
 fbCoverEmergencyEvent(
 	Trigger := bEmergency,
 	Level := ADSLOG_MSGTYPE_WARN,
@@ -109,7 +129,8 @@ fbCoverEmergencyEvent(
 END_VAR
 ]]></Declaration>
         <Implementation>
-          <ST><![CDATA[eCoverState := _CoverState;]]></ST>
+          <ST><![CDATA[eCoverState := _CoverState;
+bEndPositionConfirmed := (_CoverState = E_MirrorCoverState.closed OR _CoverState = E_MirrorCoverState.open);]]></ST>
         </Implementation>
       </Set>
     </Property>

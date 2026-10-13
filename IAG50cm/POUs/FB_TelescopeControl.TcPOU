@@ -565,6 +565,12 @@ ELSIF bGoHome THEN
 			bStopping := TRUE;	// #43, only if the preempted command is the one moving
 		END_IF
 
+	ELSIF TCS_command <> E_TCSCommand.gohome AND NOT bStopped AND (TCS_command = E_TCSCommand.track OR fbHourAngle.Tracking OR fbDeclination.Tracking) THEN
+		// #72: a home during tracking waited for bStopped, which is never TRUE while the axes track, so it never
+		// ran (bGoHome stayed set) until a stop. End the tracking through the stop (#43); the home starts when the
+		// axes stand still.
+		bStopping := TRUE;
+
 	ELSE
 		IF bReady AND NOT bBusy AND bStopped THEN
 			bInterupted := FALSE;
