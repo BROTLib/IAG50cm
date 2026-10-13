@@ -1188,6 +1188,8 @@ CASE nStage OF
 		END_IF
 	60:
 		IF NOT fbHourAngle.Enable AND NOT fbDeclination.Enable THEN
+			// #66: request the close once; repeating it every scan latched bClose in FB_CoverControl
+			fbCovers.Close();
 			nStage := 80;
 		END_IF
 
@@ -1201,7 +1203,6 @@ CASE nStage OF
 	80:
 		// (the former "IF an axis is enabled THEN nStage := 60" was overwritten by the line below and never took
 		// effect; nothing enables an axis while the park runs, _PowerOn is a different command)
-		fbCovers.Close();
 		// #56: the focus move to focusPark starts at stage 0. A park from home does not move the mount, so the axes
 		// are off after about a second and the focus enable was removed while it was still moving (error 16992
 		// "Controller enable"). Wait until it has arrived or stopped (at most 60 s), then disable it.
