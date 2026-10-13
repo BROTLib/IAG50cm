@@ -47,30 +47,31 @@ rtrigClose(CLK := bClose);
 rtrigStop(CLK := bStop);
 
 IF bEmergency THEN
-	// drop requests made during the E-stop: left set, they would block the rising edge of every later request
-	bOpen := FALSE;
-	bClose := FALSE;
-	bStop := FALSE;
+	// requests made during the E-stop are dropped (flags cleared below, #15)
 	// stop only moving covers, so that closed/open covers keep their known state
 	IF eCoverState = E_MirrorCoverState.opening OR eCoverState = E_MirrorCoverState.closing THEN
 		ipState.StopCommand();
 	END_IF
 ELSE
 	IF rtrigStop.Q THEN
-		bStop := FALSE;
 		ipState.StopCommand();
 	END_IF
 
 	IF rtrigClose.Q THEN
-		bClose := FALSE;
 		ipState.CloseCommand();
 	END_IF
 
 	IF rtrigOpen.Q THEN
-		bOpen := FALSE;
 		ipState.OpenCommand();
 	END_IF
 END_IF
+
+// #66: requests are one-shot. They are consumed in this scan whether they produced an edge or not, so a caller that
+// repeats a request every scan (the park, stage 80) cannot leave a flag TRUE: left set, it would block the rising
+// edge of every later request.
+bOpen := FALSE;
+bClose := FALSE;
+bStop := FALSE;
 
 ipState.RunState();
 

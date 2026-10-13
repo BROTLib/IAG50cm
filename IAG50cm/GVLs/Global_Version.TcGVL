@@ -10,10 +10,10 @@ VAR_GLOBAL CONSTANT
 	stLibVersion_IAG50cm : ST_LibVersion := (
 		iMajor := 0,
 		iMinor := 3,
-		iBuild := 5,
+		iBuild := 7,
 		iRevision := 0,
 		nFlags := 1,
-		sVersion := '0.3.5'
+		sVersion := '0.3.7'
 	);
 END_VAR]]></Declaration>
   </GVL>
