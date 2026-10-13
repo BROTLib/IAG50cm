@@ -96,7 +96,9 @@ VAR
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
 	bUserStop			: BOOL;		// Stop() was called (one scan): aborts a running power-on, automatic stops do not (#27)
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
-	sParkEnd			: STRING(40) := 'completed';	// the park log line when bPark falls: completed, or why it ended (#57)
+	sParkEnd			: STRING(160) := 'completed';	// the park log line when bPark falls: completed, or why it ended (#57)
+	bParkLogged			: BOOL;		// bPark as the park event saw it last scan: PARK commencing is logged, an end line follows (#57)
+	sParkWhy			: STRING(160);	// what the emergency park commanded, for the park log lines (#57)
 	sHomeEnd			: STRING(40) := 'completed';	// the same for the home (#75)
 	bHomeCancelled		: BOOL;		// a pending home that never started was dropped (one scan): logs the reason (#75)
 	tonHomePending		: TON;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
@@ -517,7 +519,7 @@ ELSIF bStopping THEN
 
 ELSIF bPark THEN
 	bTrack := FALSE;
-	IF bError OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
+	IF bError OR bEstopTriggered OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
 		// Park during an error: the axes are disabled by the error and the park state machine aborts on bError, so
 		// bPark used to stay set and the park fired after the next Init() (or hung half way after a reset). Do what
 		// is safe without the mount: close the covers, park the dome, disable the focus, and drop the command. The
@@ -526,6 +528,8 @@ ELSIF bPark THEN
 		// enabled, so a park after a stopped power-on, or on a parked telescope, waited until a power-on or the
 		// 600 s timeout with the covers open. Not while a park is running (TCS_command park): stage 60 of the park
 		// disables the axes itself and the park must go on to stage 100.
+		// An E-stop (#57) aborts a running park at any stage: after stage 60 the axes are off and no NC error is raised,
+		// so bError stayed FALSE and the park waited at stage 90 for covers that cannot move, until the 600 s timeout.
 		bGoHome := FALSE;
 		sHomeEnd := 'cancelled by park';
 		bGoto := FALSE;
@@ -543,15 +547,53 @@ ELSIF bPark THEN
 			fbFocus.Enable := FALSE;
 		END_IF
 		bPark := FALSE;
-		// #57: say what was commanded; with the E-stop pressed the cover and dome requests are dropped
+		// #57: say what was commanded, not what was done. With the E-stop pressed the cover and dome requests are
+		// dropped; a dome in its latched error ignores the park.
 		IF bEstopTriggered THEN
-			TCSparkErrorEvent.OnMessage := 'Park refused: E-stop pressed, the covers and the dome cannot move. Release it, reset, then park again.';
-		ELSIF bError THEN
-			TCSparkErrorEvent.OnMessage := 'Park during an error: covers closed and dome parked, the mount was not moved. Reset, then park again.';
+			sParkWhy := 'E-stop pressed, the covers and the dome cannot move. Release it, reset, then park again.';
 		ELSE
-			TCSparkErrorEvent.OnMessage := 'Park with the axes off: covers closed and dome parked, the mount was not moved.';
+			IF fbCovers.Closed THEN
+				sParkWhy := 'covers closed, ';
+			ELSE
+				sParkWhy := 'covers closing, ';
+			END_IF
+			IF fbDome.Error THEN
+				sParkWhy := CONCAT(sParkWhy, 'the dome is in error and not parked, ');
+			ELSE
+				sParkWhy := CONCAT(sParkWhy, 'dome parking, ');
+			END_IF
+			IF bParkLogged THEN
+				sParkWhy := CONCAT(sParkWhy, 'the mount stopped short of the park position');
+			ELSE
+				sParkWhy := CONCAT(sParkWhy, 'the mount was not moved');
+			END_IF
+			IF bError THEN
+				sParkWhy := CONCAT(sParkWhy, '. Reset, then park again.');
+			ELSE
+				sParkWhy := CONCAT(sParkWhy, '.');
+			END_IF
 		END_IF
-		bParkInError := TRUE;
+		IF bParkLogged THEN
+			// A running park ends with ONE line, the PARK line, at WARN (E8 logged "PARK completed" and "Park refused").
+			IF bEstopTriggered THEN
+				sParkEnd := CONCAT('aborted: ', sParkWhy);
+			ELSIF bError THEN
+				sParkEnd := CONCAT('aborted by an error: ', sParkWhy);
+			ELSE
+				sParkEnd := CONCAT('ended with the axes off: ', sParkWhy);
+			END_IF
+			TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_WARN;
+		ELSE
+			// A request during an error or with the axes off was never logged: the separate WARN.
+			IF bEstopTriggered THEN
+				TCSparkErrorEvent.OnMessage := CONCAT('Park refused: ', sParkWhy);
+			ELSIF bError THEN
+				TCSparkErrorEvent.OnMessage := CONCAT('Park during an error: ', sParkWhy);
+			ELSE
+				TCSparkErrorEvent.OnMessage := CONCAT('Park with the axes off: ', sParkWhy);
+			END_IF
+			bParkInError := TRUE;
+		END_IF
 		TCS_command := E_TCSCommand.no_command;
 	// If lower presedence commands are ongoing, let them know they are interupted
 	ELSIF bGoto OR bSlew OR bGoHome THEN
@@ -795,7 +837,9 @@ TCSparkEvent(	Trigger := bPark,
 				FormatString := 'PARK %s',
 				OnMessage := 'commencing',
 				Comm := fbComm);
+bParkLogged := bPark;
 sParkEnd := 'completed';
+TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_HINT;
 TCSgotoEvent(	Trigger := bGoto, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'GOTO %s',
@@ -841,7 +885,7 @@ TCSreadyEvent(	Trigger := bReady,
 TCSparkErrorEvent(	Trigger := bParkInError,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
-				// OnMessage is set in the arbitration (three texts); a literal here overwrote it (#57)
+				// OnMessage is set in the arbitration (texts built from sParkWhy); a literal here overwrote it (#57)
 				Comm := fbComm);
 bParkInError := FALSE;
 TCShomeCancelEvent(	Trigger := bHomeCancelled,
