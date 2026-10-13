@@ -93,6 +93,7 @@ VAR
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
 	bUserStop			: BOOL;		// Stop() was called (one scan): aborts a running power-on, automatic stops do not (#27)
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
+	sParkEnd			: STRING(40) := 'completed';	// the park log line when bPark falls: completed, or why it ended (#57)
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
@@ -449,6 +450,7 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 		_PowerOn();		// bStop is set: resets its stage
 	ELSIF bPark THEN
 		bPark := FALSE;
+		sParkEnd := 'cancelled by stop';
 		_ParkTelescope();
 	ELSIF bGoto THEN
 		bGoto := FALSE;
@@ -468,6 +470,7 @@ ELSIF bPower THEN
 	// for covers that the power-on had just reopened.
 	IF bPark THEN
 		bPark := FALSE;
+		sParkEnd := 'cancelled by power-on';
 		bInterupted := TRUE;
 		_ParkTelescope();
 		bInterupted := FALSE;
@@ -487,11 +490,15 @@ ELSIF bStopping THEN
 
 ELSIF bPark THEN
 	bTrack := FALSE;
-	IF bError THEN
+	IF bError OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
 		// Park during an error: the axes are disabled by the error and the park state machine aborts on bError, so
 		// bPark used to stay set and the park fired after the next Init() (or hung half way after a reset). Do what
 		// is safe without the mount: close the covers, park the dome, disable the focus, and drop the command. The
 		// mount is not moved and bIsParked is not set.
+		// The same with the axes off (#54): the park command is dispatched only with bReady, which needs the axes
+		// enabled, so a park after a stopped power-on, or on a parked telescope, waited until a power-on or the
+		// 600 s timeout with the covers open. Not while a park is running (TCS_command park): stage 60 of the park
+		// disables the axes itself and the park must go on to stage 100.
 		bGoHome := FALSE;
 		bGoto := FALSE;
 		bSlew := FALSE;
@@ -508,6 +515,15 @@ ELSIF bPark THEN
 			fbFocus.Enable := FALSE;
 		END_IF
 		bPark := FALSE;
+		// #57: say what was commanded; with the E-stop pressed the cover and dome requests are dropped
+		IF bEstopTriggered THEN
+			TCSparkErrorEvent.OnMessage := 'Park refused: E-stop pressed, the covers and the dome cannot move. Release it, reset, then park again.';
+		ELSIF bError THEN
+			TCSparkErrorEvent.OnMessage := 'Park during an error: covers closed and dome parked, the mount was not moved. Reset, then park again.';
+		ELSE
+			TCSparkErrorEvent.OnMessage := 'Park with the axes off: covers closed and dome parked, the mount was not moved.';
+		END_IF
+		sParkEnd := 'ended without moving the mount';
 		bParkInError := TRUE;
 		TCS_command := E_TCSCommand.no_command;
 	// If lower presedence commands are ongoing, let them know they are interupted
@@ -738,12 +754,13 @@ TCSgohomeEvent(	Trigger := bGoHome,
 				OnMessage := 'commencing',
 				OffMEssage := 'completed', 
 				Comm := fbComm);
-TCSparkEvent(	Trigger := bPark, 
+TCSparkEvent.OffMessage := sParkEnd;		// #57: "PARK completed" was also logged when the park was cancelled
+TCSparkEvent(	Trigger := bPark,
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'PARK %s',
 				OnMessage := 'commencing',
-				OffMEssage := 'completed', 
 				Comm := fbComm);
+sParkEnd := 'completed';
 TCSgotoEvent(	Trigger := bGoto, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'GOTO %s',
@@ -1071,6 +1088,7 @@ IF tonParkTimeout.Q THEN	// fed every scan in the body, like the goto/home/slew 
 	bSoftwareError := TRUE;
 	nSoftwareErrorID := 16#20;
 	bPark := FALSE;
+	sParkEnd := 'timed out';
 	nStage := 0;
 	RETURN;
 END_IF
