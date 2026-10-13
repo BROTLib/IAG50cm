@@ -18,7 +18,7 @@
     <LibraryReferences>{ec693b73-ba10-4552-8093-a205a0d9c8b6}</LibraryReferences>
     <Released>false</Released>
     <CompilerDefines />
-    <ProjectVersion>0.3.3</ProjectVersion>
+    <ProjectVersion>0.3.4</ProjectVersion>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
