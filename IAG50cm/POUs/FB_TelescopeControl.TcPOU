@@ -430,10 +430,14 @@ tonPowerTimeout(IN := TCS_command = E_TCSCommand.no_command AND NOT bIsParked, P
 tonCommandTimeout();
 
 // MONETcommon#17: state-machine timeouts, checked in _GotoTelescope/_HomeTelescope/_SlewTelescope
-tonGotoTimeout(IN := bGoto, PT := T#600S);
-tonHomeTimeout(IN := bGoHome, PT := T#600S);
-tonSlewTimeout(IN := bSlew, PT := T#600S);
-tonParkTimeout(IN := bPark, PT := T#600S);
+// #75: count only while the command is the one being run (TCS_command is last scan's dispatch) and without an error.
+// Counting from the request, a command that never started (not ready, preempted) fired the timeout in the next
+// stop/park/reset after 600 s and latched an error, and with the horizon/pole auto-home setting bGoHome again every
+// scan the timer never dropped, so no reset cleared it.
+tonGotoTimeout(IN := bGoto AND TCS_command = E_TCSCommand.goto AND NOT bError, PT := T#600S);
+tonHomeTimeout(IN := bGoHome AND TCS_command = E_TCSCommand.gohome AND NOT bError, PT := T#600S);
+tonSlewTimeout(IN := bSlew AND TCS_command = E_TCSCommand.slew AND NOT bError, PT := T#600S);
+tonParkTimeout(IN := bPark AND TCS_command = E_TCSCommand.park AND NOT bError, PT := T#600S);
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
 END_IF
@@ -983,6 +987,7 @@ IF tonHomeTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
 	nSoftwareErrorID := 16#30;
 	bGoHome := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
 	nStage := 0;
+	RETURN;		// #75: like goto/slew/park; bError is recomputed next scan, do not run the stages on
 END_IF
 
 IF bReset OR bError OR bStop OR bInterupted THEN
