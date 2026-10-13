@@ -34,6 +34,9 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	// TRUE while the E-stop is triggered (MAIN: safetyHandling.estop): disables both axes, which only the next
 	// power-on enables again, and publishes STATUS.GLOBAL = 1
 	bEstopTriggered		: BOOL	:= FALSE;
+	// MAIN: safetyHandling.ackPending (previous scan). An E-stop was seen and no clean safety acknowledge has run
+	// since: the reset fires on it even without an error, and a power-on is refused (#59)
+	bSafetyAckPending	: BOOL	:= FALSE;
 	bMainReady			: BOOL	:= TRUE;
 	bCoverAutoOpen		: BOOL	:= TRUE;
 	fbFocus				: I_Focus;
@@ -182,7 +185,9 @@ bLocalMode := fbCabinet.LocalMode;
 
 // set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
 // #36: the request from Reset() must not be overwritten by the key state, so it has its own flag
-rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND bError, Q=>bReset);
+// #59: also while the safety acknowledge after an E-stop is pending, so a reset sent during the E-stop (which
+// clears the axis errors but skips the acknowledge) or after an E-stop without an axis error is not lost
+rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND (bError OR bSafetyAckPending), Q=>bReset);
 bResetRequest := FALSE;
 
 IF bReset THEN
@@ -1320,6 +1325,8 @@ IF nId <> 0 THEN
 	ELSE
 		_PowerOnBlockedReason := CONCAT(CONCAT(CONCAT(CONCAT('Power-on blocked: ', sAxis), ' error '), UDINT_TO_STRING(nId)), '. Reset the telescope.');
 	END_IF
+ELSIF bSafetyAckPending THEN
+	_PowerOnBlockedReason := 'Power-on blocked: safety not acknowledged after the E-stop. Reset the telescope (cabinet key or reset command).';
 ELSIF bSoftwareError THEN
 	_PowerOnBlockedReason := CONCAT(CONCAT('Power-on blocked: command timeout error ', UDINT_TO_STRING(nSoftwareErrorID)), '. Reset the telescope.');
 ELSE
@@ -1339,7 +1346,9 @@ VAR_INST
 	nLastStage	: USINT := 0;
 END_VAR]]></Declaration>
       <Implementation>
-        <ST><![CDATA[IF bError THEN
+        <ST><![CDATA[// #59: also refused while the safety acknowledge after an E-stop is pending. While the reset is running
+// (bAxisResetAfterAck) the power-on waits at stage 0 as before; the acknowledge ends before that wait does.
+IF bError OR (bSafetyAckPending AND NOT bAxisResetAfterAck) THEN
 	bPowerFailure := TRUE;
 	TCSpowerEvent.OnMessage := 'failed';
 	// #39: say why, on every refused request. bPowerFailure stays TRUE until a power-on succeeds, so it gives

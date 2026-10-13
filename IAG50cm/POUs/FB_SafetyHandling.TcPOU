@@ -53,6 +53,12 @@ VAR
 	ackDelay				: TON := (PT := T#1S);
 	AckLog, AckSkippedLog	: FB_EventLog;
 
+	// #59: an E-stop needs a safety acknowledge. The telescope reset fires on this flag as well as on an error,
+	// so the acknowledge is not lost when the axis errors are already cleared (or never latched).
+	rtrigEstop				: R_TRIG;
+	bEstopDuringAck			: BOOL;			// the E-stop was pressed while an acknowledge sequence ran
+	AckPendingLog			: FB_EventLog;
+
 	
 	ErrAckLog				: FB_EventLog;		// Errack logging
 	RestartLog				: FB_EventLog;		// restart logging
@@ -64,6 +70,7 @@ VAR_OUTPUT
 	error					: BOOL;		// error condition
 	state          			: BOOL;		// safety is okay
 	estop					: BOOL;		// Emergency_stop engaged
+	ackPending				: BOOL;		// E-stop seen, no clean acknowledge since (#59)
 END_VAR
 VAR_INPUT
 	// issue a remote restart
@@ -93,6 +100,13 @@ fbInfoEStop1(
 	sState		=> sStateEStop1, 
 	sDiag		=> sDiagEStop1);
 estop := sStateEStop1 <> 'RUN' AND initialStartUpStep = 100;
+
+// #59: every E-stop (also one held through the PLC start, estop is masked until the start-up is done) needs an
+// acknowledge. Cleared only by a clean sequence below; nothing is acknowledged automatically.
+rtrigEstop(CLK := estop);
+IF rtrigEstop.Q THEN
+	ackPending := TRUE;
+END_IF
 
 // No info for the safety inputs: they are the EL1918's own local inputs, not an FSoE connection,
 // so TwinSAFE offers no connection info data for them and stInfoSafetyIn stays unlinked (#34).
@@ -144,6 +158,9 @@ IF bAckRequest AND nAckStep = 0 AND NOT bAckSkipped THEN
 END_IF
 bAckRequest := FALSE;
 
+// an E-stop during the sequence spoils it: TwinSAFE gates the Restart on the E-stop input
+bEstopDuringAck := bEstopDuringAck OR (estop AND nAckStep <> 0);
+
 CASE nAckStep OF
 	1:
 		GVL_Safety.ErrAck := TRUE;
@@ -159,6 +176,10 @@ CASE nAckStep OF
 		IF ackDelay.Q THEN
 			ackDelay(IN := FALSE);
 			GVL_Safety.Restart := FALSE;
+			IF NOT bEstopDuringAck THEN
+				ackPending := FALSE;
+			END_IF
+			bEstopDuringAck := FALSE;
 			nAckStep := 0;
 		END_IF
 END_CASE
@@ -172,6 +193,13 @@ AckSkippedLog(
 	Trigger		:= bAckSkipped,
 	Level		:= ADSLOG_MSGTYPE_WARN,
 	OnMessage	:= 'Safety acknowledge skipped: E-stop pressed or safety start-up running.',
+	Comm		:= comm);
+AckPendingLog(
+	Trigger		:= ackPending,
+	Level		:= ADSLOG_MSGTYPE_WARN,
+	OnMessage	:= 'Safety acknowledge needed after the E-stop: release it, then reset the telescope.',
+	OffMessage	:= 'Safety acknowledged after the E-stop.',
+	OffLevel	:= ADSLOG_MSGTYPE_HINT,
 	Comm		:= comm);
 (*
 
