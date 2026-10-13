@@ -370,7 +370,7 @@ fbEq2Hor(
 IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
 	IF NOT bStopped AND NOT bGoHome THEN
 		bStop := TRUE;
-	ELSE
+	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
 	END_IF
 END_IF
@@ -378,7 +378,7 @@ END_IF
 IF (fDeclinationCurrent > (90.0 - fPoleZone)) OR (bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)))THEN
 	IF NOT bStopped AND NOT bGoHome THEN
 		bStop := TRUE;
-	ELSE
+	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
 	END_IF
 END_IF
