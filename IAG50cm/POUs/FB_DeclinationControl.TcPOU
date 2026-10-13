@@ -49,7 +49,7 @@ fbAxis(
 	Jog_Backwards 	:= bMoveNeg,
 	ActualPosition 	=> fActualPosition,
 	Error 			=> bAxisError,
-	ErrorID 		=> nErrorID,
+	ErrorID 		=> nAxisErrorID,		// was nErrorID: nAxisErrorID below was never written, so every Dec error read 0 (#55)
 	AxisRef 		:= axisRef);
 	
 fbLatchHome(
