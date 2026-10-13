@@ -134,6 +134,15 @@ IF (rtrigPark.Q) THEN
 	ipState.ParkCommand();
 END_IF
 
+// #83: requests are one-shot, like the covers (#66). They are consumed in this scan whether they produced an edge or
+// not: a caller repeating a request every scan gave a single edge and then left the flag TRUE, so no later request of
+// that kind had an edge until a PLC restart.
+bOpen := FALSE;
+bClose := FALSE;
+bReset := FALSE;
+bHome := FALSE;
+bPark := FALSE;
+
 ipState.RunState();
 
 IF eDomeRotationState = E_DomeRotationState.parked AND eDomeShutterState = E_RoofState.closed THEN
