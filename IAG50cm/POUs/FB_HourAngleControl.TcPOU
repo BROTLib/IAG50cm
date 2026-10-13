@@ -13,6 +13,8 @@ VAR
 	bLatchHomeError	: BOOL;
 	nAxisErrorID : UDINT;
 	nLatchHomeErrorID: UDINT;
+	bLatchHomeErrorHeld	: BOOL;		// #69: the homing error, held until the axis reset
+	nLatchHomeErrorIDHeld : UDINT;
 	fbLatchHome : FB_LatchHome;
 	omega 	: LREAL := 360.0 / 86164.099 * (PI/180.0); //sidereal velocity
 END_VAR
@@ -69,12 +71,26 @@ fbLatchHome(
 	ErrorID 			=> nLatchHomeErrorID);
 	
 
-bError := bLatchHomeError OR bAxisError;
+// #69: FB_LatchHome clears its error as soon as Execute falls, and Execute falls on bError, so the error lasted
+// one scan: the power-on was aborted, bError was FALSE again and no reset could fire. Hold it until the axis reset.
+IF bReset THEN
+	bLatchHomeErrorHeld := FALSE;
+	nLatchHomeErrorIDHeld := 0;
+END_IF
+IF bLatchHomeError THEN
+	bLatchHomeErrorHeld := TRUE;
+	nLatchHomeErrorIDHeld := nLatchHomeErrorID;
+END_IF
 
+bError := bLatchHomeErrorHeld OR bAxisError;
+
+// nErrorID is the current error: it used to keep stale values, so healthy axes were reset on every reset pass
 IF bAxisError THEN
 	nErrorID := nAxisErrorID;
-ELSIF bLatchHomeError THEN
-	nErrorID := nLatchHomeErrorID;
+ELSIF bLatchHomeErrorHeld THEN
+	nErrorID := nLatchHomeErrorIDHeld;
+ELSE
+	nErrorID := 0;
 END_IF
 	
 IF fbAxis.MoveDone OR bReset OR bError THEN

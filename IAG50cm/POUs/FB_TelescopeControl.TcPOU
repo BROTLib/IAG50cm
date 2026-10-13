@@ -1314,7 +1314,10 @@ ELSE
 END_IF
 
 _PowerOn := nStage;
-IF bReset OR bError OR bStop OR bInterupted THEN
+// #69: a power-on only runs while it is requested. Stage 100 clears bPower, but TCS_command stays poweron until
+// the go-home takes over, so _PowerOn kept being called and restarted its stages; the go-home then left nStage at
+// 10 or 20 and the next power=1 resumed there, skipping the wait for the safety acknowledge in stage 0.
+IF NOT bPower OR bReset OR bError OR bStop OR bInterupted THEN
 	nStage := 0;
 	RETURN;
 END_IF
@@ -1344,10 +1347,13 @@ CASE nStage OF
 		END_IF
 	40:
 		// enable hourangle, enable declination
-		fbHourAngle.Enable := TRUE;
-		fbDeclination.Enable := TRUE;
-		IF fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
-			nStage := 70;
+		// #69: never while the safety acknowledge runs (the drives are still in STO: 0x441C, then 4225 on HA)
+		IF NOT bAxisResetAfterAck THEN
+			fbHourAngle.Enable := TRUE;
+			fbDeclination.Enable := TRUE;
+			IF fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
+				nStage := 70;
+			END_IF
 		END_IF
 	70:
 		// if Focus, enable and calibrate
