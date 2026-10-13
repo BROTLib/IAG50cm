@@ -52,10 +52,11 @@ telescopeControl(
 	// was never wired, so STATUS.GLOBAL never reported the E-stop (BROTLib#10). safetyHandling runs below, so
 	// this is the previous cycle's value; the drives are cut by the safety circuit regardless.
 	bEstopTriggered	:= safetyHandling.estop,
+	bSafetyAckPending	:= safetyHandling.ackPending,	// previous cycle, like bEstopTriggered (#59)
 );
 
 //Safety
-// #11: a telescope reset (cabinet key or the reset command, only fires with an error) also gives the safety
+// #11: a telescope reset (cabinet key or the reset command, only fires with an error or a pending acknowledge after an E-stop, #59) also gives the safety
 // acknowledge, so the drives leave STO without the VISU
 IF telescopeControl.bSafetyAckRequest THEN
 	telescopeControl.bSafetyAckRequest := FALSE;
