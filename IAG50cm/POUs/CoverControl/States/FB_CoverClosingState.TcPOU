@@ -4,8 +4,8 @@
     <Declaration><![CDATA[FUNCTION_BLOCK FB_CoverClosingState EXTENDS FB_CoverState
 VAR
 	nStage			: UINT:= 0;
-	tonDelta		: TON := (PT:= pCover^.Delta);
-	tonFullCycle	: TON:= (PT:= pCover^.TimeToCycle );
+	tonDelta		: TON;		// PT is taken from pCover^.Delta at the start of each cycle (#76)
+	tonFullCycle	: TON;		// PT is taken from pCover^.TimeToCycle at the start of each cycle (#76)
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -29,6 +29,15 @@ pCover^.SetState(pCover^.fbCoverOpeningState);]]></ST>
 tonFullCycle();
 CASE nStage OF
 	0:
+		// #76: the cycle times were only read once, by the declaration initialisers, so the inputs of FB_CoverControl
+		// never reached the timers. Take them at the start of each cycle (not every scan: a change mid-cycle must not
+		// end it early).
+		tonDelta.PT := pCover^.Delta;
+		IF pCover^.TimeToCycle > T#0S THEN
+			tonFullCycle.PT := pCover^.TimeToCycle;
+		ELSE
+			tonFullCycle.PT := T#15S;	// 0 would declare the end position after one scan
+		END_IF
 		pCover^._CoverState := E_MirrorCoverState.closing;
 		tonDelta.IN := TRUE;
 		nStage := 1;

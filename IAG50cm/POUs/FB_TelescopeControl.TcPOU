@@ -94,6 +94,9 @@ VAR
 	bUserStop			: BOOL;		// Stop() was called (one scan): aborts a running power-on, automatic stops do not (#27)
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
 	sParkEnd			: STRING(40) := 'completed';	// the park log line when bPark falls: completed, or why it ended (#57)
+	sHomeEnd			: STRING(40) := 'completed';	// the same for the home (#75)
+	bHomeCancelled		: BOOL;		// a pending home that never started was dropped (one scan): logs the reason (#75)
+	tonHomePending		: TON;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
@@ -122,6 +125,7 @@ VAR
 	TCSCTOEvent,
 	TCSsoftErrorEvent,
 	TCSparkErrorEvent,
+	TCShomeCancelEvent,
 	TCSpowerBlockedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request)
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
@@ -430,10 +434,23 @@ tonPowerTimeout(IN := TCS_command = E_TCSCommand.no_command AND NOT bIsParked, P
 tonCommandTimeout();
 
 // MONETcommon#17: state-machine timeouts, checked in _GotoTelescope/_HomeTelescope/_SlewTelescope
-tonGotoTimeout(IN := bGoto, PT := T#600S);
-tonHomeTimeout(IN := bGoHome, PT := T#600S);
-tonSlewTimeout(IN := bSlew, PT := T#600S);
-tonParkTimeout(IN := bPark, PT := T#600S);
+// #75: count only while the command is the one being run (TCS_command is last scan's dispatch) and without an error.
+// Counting from the request, a command that never started (not ready, preempted) fired the timeout in the next
+// stop/park/reset after 600 s and latched an error, and with the horizon/pole auto-home setting bGoHome again every
+// scan the timer never dropped, so no reset cleared it.
+tonGotoTimeout(IN := bGoto AND TCS_command = E_TCSCommand.goto AND NOT bError, PT := T#600S);
+tonHomeTimeout(IN := bGoHome AND TCS_command = E_TCSCommand.gohome AND NOT bError, PT := T#600S);
+tonSlewTimeout(IN := bSlew AND TCS_command = E_TCSCommand.slew AND NOT bError, PT := T#600S);
+tonParkTimeout(IN := bPark AND TCS_command = E_TCSCommand.park AND NOT bError, PT := T#600S);
+// #75: a Home() that never starts (axes off, telescope not ready) left bGoHome set for good, swallowing Track() and
+// Slew(). Drop it after 2 min, with a log line, without an error. Not at once: the home that the power-on requests in
+// stage 100 can wait a few scans for bReady, and a stop from slew speed takes about 4 s. Not during a power-on.
+tonHomePending(IN := bGoHome AND TCS_command <> E_TCSCommand.gohome AND NOT bPower AND NOT bError, PT := T#2M);
+IF tonHomePending.Q THEN
+	bGoHome := FALSE;
+	sHomeEnd := 'cancelled: telescope not ready';
+	bHomeCancelled := TRUE;
+END_IF
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
 END_IF
@@ -461,6 +478,7 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 		_SlewTelescope();
 	ELSIF bGoHome THEN
 		bGoHome := FALSE;
+		sHomeEnd := 'cancelled by stop';
 		_HomeTelescope();
 	END_IF
 	TCS_command := E_TCSCommand.stop;
@@ -501,6 +519,7 @@ ELSIF bPark THEN
 		// 600 s timeout with the covers open. Not while a park is running (TCS_command park): stage 60 of the park
 		// disables the axes itself and the park must go on to stage 100.
 		bGoHome := FALSE;
+		sHomeEnd := 'cancelled by park';
 		bGoto := FALSE;
 		bSlew := FALSE;
 		bInterupted := TRUE;
@@ -529,6 +548,7 @@ ELSIF bPark THEN
 	// If lower presedence commands are ongoing, let them know they are interupted
 	ELSIF bGoto OR bSlew OR bGoHome THEN
 		bGoHome := FALSE;
+		sHomeEnd := 'cancelled by park';
 		bGoto := FALSE;
 		bSlew := FALSE;
 		bInterupted := TRUE;
@@ -754,12 +774,13 @@ TCSpowerEvent(	Trigger := bPowerFailure,
 				OffMessage := 'OK', 
 				Comm := fbComm);
 
+TCSgohomeEvent.OffMessage := sHomeEnd;		// #75: "GOHOME completed" was also logged when the home was cancelled or timed out
 TCSgohomeEvent(	Trigger := bGoHome, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'GOHOME %s',
 				OnMessage := 'commencing',
-				OffMEssage := 'completed', 
 				Comm := fbComm);
+sHomeEnd := 'completed';
 TCSparkEvent.OffMessage := sParkEnd;		// #57: "PARK completed" was also logged when the park was cancelled
 TCSparkEvent(	Trigger := bPark,
 				Level := ADSLOG_MSGTYPE_HINT,
@@ -815,6 +836,12 @@ TCSparkErrorEvent(	Trigger := bParkInError,
 				// OnMessage is set in the arbitration (three texts); a literal here overwrote it (#57)
 				Comm := fbComm);
 bParkInError := FALSE;
+TCShomeCancelEvent(	Trigger := bHomeCancelled,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				OnMessage := 'Home request dropped: the telescope was not ready for 2 min. Power on, then send the home again.',
+				Comm := fbComm);
+bHomeCancelled := FALSE;
 TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
 				Level := ADSLOG_MSGTYPE_ERROR,
 				FormatString := '%s',
@@ -982,7 +1009,9 @@ IF tonHomeTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
 	bSoftwareError := TRUE;		// #30
 	nSoftwareErrorID := 16#30;
 	bGoHome := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
+	sHomeEnd := 'timed out';
 	nStage := 0;
+	RETURN;		// #75: like goto/slew/park; bError is recomputed next scan, do not run the stages on
 END_IF
 
 IF bReset OR bError OR bStop OR bInterupted THEN
