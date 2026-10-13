@@ -222,15 +222,17 @@ END_IF
 
 // reset (#11): every errored axis in one go, not only the first one. The drives stay in STO until the safety
 // acknowledge (MAIN, bSafetyAckRequest: ErrAck 1 s, Restart 1 s), so the axes are reset again once it is done.
+// The second pass resets every axis that is errored or not enabled (#55): after an E-stop HA and Dec can have lost
+// their enable without latching an error, and then failed at the next power-on (18000) until they got a reset.
 IF bReset THEN
 	bSafetyAckRequest := TRUE;
 	bAxisResetAfterAck := TRUE;
-	_ResetErroredAxes();
+	_ResetErroredAxes(bAll := FALSE);
 END_IF
 tonAxisResetAfterAck(IN := bAxisResetAfterAck, PT := T#2500MS);
 IF tonAxisResetAfterAck.Q THEN
 	bAxisResetAfterAck := FALSE;
-	_ResetErroredAxes();
+	_ResetErroredAxes(bAll := TRUE);
 END_IF
 
 // fSlewTime
@@ -1204,15 +1206,18 @@ nLastStage := nStage;
     <Method Name="_ResetErroredAxes" Id="{5e8a3c17-9b42-4d06-a1f3-6c0d7e92b4a8}" FolderPath="internal methods\">
       <Declaration><![CDATA[// #11: reset every axis that has an error, also a hidden one (nErrorID set with the error flag FALSE)
 METHOD PRIVATE _ResetErroredAxes
+VAR_INPUT
+	bAll	: BOOL;		// also reset axes that are not enabled (#55), the second pass after the acknowledge
+END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[IF fbHourAngle.Error OR fbHourAngle.nErrorID <> 0 THEN
+        <ST><![CDATA[IF fbHourAngle.Error OR fbHourAngle.nErrorID <> 0 OR (bAll AND NOT fbHourAngle.Enable) THEN
 	fbHourAngle.Reset();
 END_IF
-IF fbDeclination.Error OR fbDeclination.nErrorID <> 0 THEN
+IF fbDeclination.Error OR fbDeclination.nErrorID <> 0 OR (bAll AND NOT fbDeclination.Enable) THEN
 	fbDeclination.Reset();
 END_IF
-IF fbFocus <> 0 AND_THEN (fbFocus.Error OR fbFocus.ErrorID <> 0) THEN
+IF fbFocus <> 0 AND_THEN (fbFocus.Error OR fbFocus.ErrorID <> 0 OR (bAll AND NOT fbFocus.Enable)) THEN
 	fbFocus.Reset();
 END_IF]]></ST>
       </Implementation>
@@ -1288,12 +1293,16 @@ END_IF
 
 CASE nStage OF
 	0:
-		bIsParked := FALSE;
-		IF bCoverAutoOpen THEN
-			// check if covers should automatic open
-			nStage := 10;
-		ELSE
-			nStage := 40;
+		// #55: wait for the axis reset that follows the safety acknowledge (at most 2.5 s); enabling the axes before
+		// it gave 18000 on HA and Dec
+		IF NOT bAxisResetAfterAck THEN
+			bIsParked := FALSE;
+			IF bCoverAutoOpen THEN
+				// check if covers should automatic open
+				nStage := 10;
+			ELSE
+				nStage := 40;
+			END_IF
 		END_IF
 	10:
 		// COVER MUST BE OPENED FOR A SUCCESSFUL WAKE & SHAKE COMMAND!
