@@ -23,6 +23,9 @@ VAR
 	calibrationEvent		: FB_Eventlog;
 END_VAR
 VAR PERSISTENT
+	// UNUSED since #44: the focus used to store its position here, but the stored position was never applied (the
+	// homing mode ignores it) and the focus encoder is absolute. Kept declared because removing a PERSISTENT variable
+	// changes the persistent data layout; remove it together with the next layout change.
 	fLastPosition			: LREAL := -1.0;
 END_VAR]]></Declaration>
     <Implementation>

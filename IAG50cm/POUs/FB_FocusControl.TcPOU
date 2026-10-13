@@ -23,8 +23,6 @@ END_IF
 IF fbAxis.Calibrated THEN
 	bHomeAxis := FALSE;
 	bCalibrated := fbAxis.Calibrated;
-	// the reference for the next homing (#20): there is no reference switch (#22)
-	fLastPosition := fActualPosition;
 	IF ABS(fPosition - fActualPosition) > fTolerance THEN
 			IF fbAxis.Ready AND NOT fbAxis.MoveDone THEN
 				// start a move on FALSE -> TRUE (BROTLib #63); bMoveAxis is cleared on MoveDone
@@ -101,20 +99,16 @@ HandleEvents();
 ]]></ST>
     </Implementation>
     <Method Name="_StartHoming" Id="{b0a48ed9-6cc9-4f17-be6a-c5242c1c697a}">
-      <Declaration><![CDATA[// The focus has no reference switch (#22): MC_ForceCalibration declares the current position to be the stored last
-// known position (fLastPosition, PERSISTENT in FB_AxisControl, written while calibrated; decision #20). Before the first
-// calibration there is none (-1): the target is used, which is telescopeConfig.focusHome after power-on, and a
-// warning is logged because that is a guess.
+      <Declaration><![CDATA[// The focus has no reference switch (#22) and needs none: its encoder is absolute (the NC axis has
+// ReferenceSystem ABSOLUTE and an Offset in the tsproj, the drive reports a multi-turn position), so the position
+// survives an activation (test T16, 2026-10-13). Homing only sets the calibrated flag: MC_ForceCalibration ignores
+// the reference position it is given and never changes the axis position. The zero point of the focus is the NC
+// encoder Offset in the tsproj, not anything in the PLC. The stored position of #20 (fLastPosition) was passed
+// here but never applied; #44.
 METHOD _StartHoming : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[IF fLastPosition >= 0.0 THEN
-	fbAxis.Home(fReference := fLastPosition);
-ELSE
-	fbAxis.Home(fReference := fPosition);
-	ADSLOGSTR(ADSLOG_MSGTYPE_WARN OR ADSLOG_MSGTYPE_LOG,
-		'Focus: no stored position, calibrated to the target %s (a guess, see IAG50cm#20)', LREAL_TO_STRING(fPosition));
-END_IF
+        <ST><![CDATA[fbAxis.Home(fReference := fActualPosition);		// ignored by MC_ForceCalibration
 _StartHoming := TRUE;
 ]]></ST>
       </Implementation>
