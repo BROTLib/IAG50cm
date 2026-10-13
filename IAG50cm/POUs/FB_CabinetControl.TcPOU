@@ -26,7 +26,10 @@ VAR
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[bCabinetError := NOT( bAuxiliaryContact24V OR bAuxiliaryContact48V OR bAuxiliaryContactHADEC OR bAuxiliaryContactFOCUS OR bCollectiveReport24VFuse);
+      <ST><![CDATA[// #10: error when ANY of the five is lost (it was NOT(a OR b OR ...), which only fired when all five dropped).
+// All five read TRUE parked, powered and at three E-stops (test T14, 2026-10-12/13), so none of them is FALSE in
+// normal operation. bState24VFuse is FALSE throughout and stays out of the expression.
+bCabinetError := NOT( bAuxiliaryContact24V AND bAuxiliaryContact48V AND bAuxiliaryContactHADEC AND bAuxiliaryContactFOCUS AND bCollectiveReport24VFuse);
 
 // if error -> LED on
 bOErrorLED := bTelescopeError;
