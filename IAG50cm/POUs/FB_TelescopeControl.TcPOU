@@ -182,7 +182,7 @@ IF NOT fbTime.bValid AND (bGoto OR bSlew OR bTrack) THEN
 END_IF
 
 // State of the Cabinet
-fbCabinet();
+fbCabinet(bEstop := bEstopTriggered, bSafetyAckPending := bSafetyAckPending);	// #93: error LED during E-stop / pending acknowledge
 bLocalMode := fbCabinet.LocalMode;
 
 // set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
