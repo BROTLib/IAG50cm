@@ -3,6 +3,8 @@
   <POU Name="FB_CabinetControl" Id="{94f0225c-1833-4eaa-8813-82b334d0ee64}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_CabinetControl
 VAR_INPUT
+	bEstop				: BOOL;	// E-stop pressed (telescope bEstopTriggered, previous scan) (#93)
+	bSafetyAckPending	: BOOL;	// safety acknowledge after an E-stop not yet run, drives still in STO (#93)
 END_VAR
 VAR_OUTPUT
 END_VAR
@@ -32,7 +34,9 @@ END_VAR
 bCabinetError := NOT( bAuxiliaryContact24V AND bAuxiliaryContact48V AND bAuxiliaryContactHADEC AND bAuxiliaryContactFOCUS AND bCollectiveReport24VFuse);
 
 // if error -> LED on
-bOErrorLED := bTelescopeError;
+// #93: also while the E-stop is pressed and until the safety acknowledge has run (the drives are in STO and a reset
+// is needed). Not part of bError, which would change the reset condition, the power-on block and STATUS.GLOBAL.
+bOErrorLED := bTelescopeError OR bEstop OR bSafetyAckPending;
 
 // if reset -> trigger reset
 rtrigReset(CLK:= bIReset,Q=>bReset);
