@@ -166,7 +166,9 @@ The heart of the application: a full telescope control system implementing
   for the two-line display and buttons; adjusts HA/Dec/focus **offsets** in
   small/big steps.
 - `FB_CabinetControl` — 24 V/48 V auxiliary contacts, fuse box reports, local/
-  remote mode switch, reset button, error LED (EL1808/EL1004/EL2004).
+  remote mode switch, reset button, error LED (EL1808/EL1004/EL2004). The error
+  LED is on with a telescope error, while the E-stop is pressed and until the
+  safety acknowledge has run, i.e. whenever a reset is needed (#93).
 
 ### Safety handling and pointing
 
