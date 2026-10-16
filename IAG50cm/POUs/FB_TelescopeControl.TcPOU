@@ -39,6 +39,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	bSafetyAckPending	: BOOL	:= FALSE;
 	bMainReady			: BOOL	:= TRUE;
 	bCoverAutoOpen		: BOOL	:= TRUE;
+    fStartupFocusTolerance : LREAL := 0.005; // match FB_FocusControl.fTolerance; align if that axis setting changes
 	fbFocus				: I_Focus;
 	fbCovers			: I_MirrorCovers;
 	fbDome				: I_Dome;
@@ -49,6 +50,12 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	telescopeConfig		: ST_TelescopeConfig;
 END_VAR
 VAR
+    fbStartupReadiness : BROTLib.FB_StartupReadiness;
+    bStartupStart : BOOL;
+    bStartupCalibrating : BOOL;
+    bStartupCompleted : BOOL;
+    bStartupAborted : BOOL;
+    fLastPublishedReadyState : LREAL := -3.0;
 	fbComm 				: I_Comm;
 	fbCabinet			: FB_CabinetControl;
 	
@@ -140,7 +147,7 @@ VAR
 END_VAR
 VAR_OUTPUT
 	bReady				: BOOL;		// TRUE, IF telescope can be operated 
-	fReadyState 		: LREAL := 0.0; // 0: Shut down, 1 powered on, -1 Error
+	fReadyState 		: LREAL := 0.0; // -1 error, 0 parked, 0.3 parking, 0.7 initializing, 0.8 calibrating/positioning, 1 startup complete
 	bIsParked			: BOOL := TRUE;		// telescope is parked
 	bIsPowered			: BOOL;		// telescope is powered on
 	bError				: BOOL;		// indicates an error on one of the components
@@ -169,7 +176,17 @@ VAR CONSTANT
 	fSiderialVelocity: LREAL := 360.0 / 86164.099;
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[// get the system time; fJd only follows the clock while the clock is valid (synced, see FB_AstroClock)
+      <ST><![CDATA[// Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
+bStartupStart := bPower;
+bStartupCalibrating := FALSE;
+bStartupCompleted := FALSE;
+bStartupAborted := FALSE;
+// A repeated request to an already online telescope must not restart calibration.
+IF bPower AND fbStartupReadiness.Initialized AND bReady THEN
+    bPower := FALSE;
+    bStartupStart := FALSE;
+END_IF
+// get the system time; fJd only follows the clock while the clock is valid (synced, see FB_AstroClock)
 fbTime();
 IF fbTime.bValid THEN
 	fJd := DateTime2JD(fbTime.time_RTCEX2);
@@ -182,7 +199,7 @@ IF NOT fbTime.bValid AND (bGoto OR bSlew OR bTrack) THEN
 END_IF
 
 // State of the Cabinet
-fbCabinet();
+fbCabinet(bEstop := bEstopTriggered, bSafetyAckPending := bSafetyAckPending);	// #93: error LED during E-stop / pending acknowledge
 bLocalMode := fbCabinet.LocalMode;
 
 // set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
@@ -193,6 +210,7 @@ rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND (bError OR bSafetyAckPe
 bResetRequest := FALSE;
 
 IF bReset THEN
+    bStartupAborted := TRUE;
 	bTestError := FALSE;
 	bSoftwareError := FALSE;
 	nSoftwareErrorID := 0;
@@ -454,6 +472,7 @@ tonParkTimeout(IN := bPark AND TCS_command = E_TCSCommand.park AND NOT bError, P
 // stage 100 can wait a few scans for bReady, and a stop from slew speed takes about 4 s. Not during a power-on.
 tonHomePending(IN := bGoHome AND TCS_command <> E_TCSCommand.gohome AND NOT bPower AND NOT bError, PT := T#2M);
 IF tonHomePending.Q THEN
+    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;
 	bGoHome := FALSE;
 	sHomeEnd := 'cancelled: telescope not ready';
 	bHomeCancelled := TRUE;
@@ -469,6 +488,7 @@ END_IF
 // #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
 // time) do not abort a running power-on, as before.
 IF bStop AND (bUserStop OR NOT bPower) THEN
+    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing OR bPower;
 	bTrack := FALSE;
 	bStopping := FALSE;
 
@@ -710,7 +730,6 @@ IF TCS_command <> eLastTimeoutCommand THEN
 END_IF
 
 IF TCS_command = E_TCSCommand.poweron THEN
-	fReadyState := 0.7;
 	_PowerOn();
 	tonCommandTimeout(IN := TCS_command = E_TCSCommand.poweron, PT := T#12H);
 	TCSCTOEvent.OnMessage := 'POWER';
@@ -719,7 +738,6 @@ ELSIF TCS_command = E_TCSCommand.stop THEN
 	tonCommandTimeout(IN := TCS_command = E_TCSCommand.stop, PT := T#30S);	// #40: a stop from slew speed takes about 4 s, a preempting stop can follow a long move
 	TCSCTOEvent.OnMessage := 'STOP';
 ELSIF TCS_command = E_TCSCommand.park THEN
-	fReadyState := 0.3;
 	_ParkTelescope();
 	tonCommandTimeout(IN := TCS_command = E_TCSCommand.park, PT := T#2M);
 	TCSCTOEvent.OnMessage := 'PARK';
@@ -768,14 +786,17 @@ bReady := bHomed AND
 bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy OR (fbFocus <> 0 AND_THEN fbFocus.Busy);
 //----------------------------------------------------------------------------------------------
 (* STATUS STATES*)
-//fReadyState (see also _PowerOn and _ParkTelescope calls above)
-IF bReady THEN
-	fReadyState := 1.0;
-ELSIF bError THEN
-	fReadyState := -1.0;
-ELSIF bIsParked THEN
-	fReadyState := 0.0;
-END_IF
+// Public completion is latched only by the final startup stage, never by mechanical bReady alone.
+fbStartupReadiness(
+    Start := bStartupStart,
+    Calibrating := bStartupCalibrating,
+    Completed := bStartupCompleted,
+    Aborted := bStartupAborted OR bEstopTriggered,
+    Error := bError OR bSoftwareError OR bPowerFailure OR bEstopTriggered,
+    Parked := bIsParked,
+    Parking := bPark AND NOT bPower,
+    Operational := bReady AND bMainReady AND NOT bEstopTriggered);
+fReadyState := fbStartupReadiness.ReadyState;
 //nMotionState
 IF bStopped THEN
 	nMotionState := 0;
@@ -801,6 +822,11 @@ IF bEstopTriggered THEN
 	fbDeclination.Enable := FALSE;
 END_IF
 //----------------------------------------------------------------------------------------------
+// The readiness field uses its existing topic and numeric format.
+IF fReadyState <> fLastPublishedReadyState AND fbComm <> 0 THEN
+    fbComm.Publish('telescope', 'dome', 'TELESCOPE.READY_STATE', LREAL_TO_STRING(fReadyState));
+    fLastPublishedReadyState := fReadyState;
+END_IF
 // send telemetry
 
 IF bSliding OR bTrack OR bTracking THEN
@@ -1057,7 +1083,8 @@ VAR_INST
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_HomeTelescope := nStage;
-IF tonHomeTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
+IF tonHomeTimeout.Q THEN
+    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;	// MONETcommon#17: fed every scan in the body
 	bSoftwareError := TRUE;		// #30
 	nSoftwareErrorID := 16#30;
 	bGoHome := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
@@ -1067,6 +1094,7 @@ IF tonHomeTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
 END_IF
 
 IF bReset OR bError OR bStop OR bInterupted THEN
+    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;
 	nStage := 0;
 	RETURN;
 END_IF
@@ -1099,9 +1127,7 @@ CASE nStage OF
 	// nStage 30: move Ha and then Dec
 	30:
 		fbHourAngle.MoveAxis := TRUE;
-		IF fbHourAngle.Busy THEN
-			nStage := 31;
-		END_IF
+        nStage := 31;
 	31:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
@@ -1111,9 +1137,7 @@ CASE nStage OF
 		END_IF
 	32:
 		fbDeclination.MoveAxis := TRUE;
-		IF fbDeclination.Busy THEN
-			nStage := 33;
-		END_IF
+        nStage := 33;
 	33:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
@@ -1124,9 +1148,7 @@ CASE nStage OF
 	// nStage 40: move Dec and then Ha
 	40:
 		fbDeclination.MoveAxis := TRUE;
-		IF fbDeclination.Busy THEN
-			nStage := 41;
-		END_IF
+        nStage := 41;
 	41:
 		IF NOT fbDeclination.Busy AND fbDeclination.MoveDone THEN
 			fbDeclination.MoveAxis := FALSE;
@@ -1136,9 +1158,7 @@ CASE nStage OF
 		END_IF
 	42:
 		fbHourAngle.MoveAxis := TRUE;
-		IF fbHourAngle.Busy THEN
-			nStage := 43;
-		END_IF
+        nStage := 43;
 	43:
 		IF NOT fbHourAngle.Busy AND fbHourAngle.MoveDone THEN
 			fbHourAngle.MoveAxis := FALSE;
@@ -1147,11 +1167,29 @@ CASE nStage OF
 		   nStage := 100;
 		END_IF
 	100:
-		fbFocus.Position := telescopeConfig.focusHome;
-		fRightAscension := fRightAscensionCurrentICRS;
-		fDeclination := fDeclinationCurrentICRS;
-		bGoHome := FALSE;
-		nStage := 0;
+        IF fbFocus <> 0 THEN
+            fbFocus.Position := telescopeConfig.focusHome;
+        END_IF
+        IF fbStartupReadiness.Initializing THEN
+            // Only initialization waits for its remaining focus work; manual Home semantics stay unchanged.
+            nStage := 110;
+        ELSE
+            fRightAscension := fRightAscensionCurrentICRS;
+            fDeclination := fDeclinationCurrentICRS;
+            bGoHome := FALSE;
+            nStage := 0;
+        END_IF
+    110:
+        // Compare with the effective target (the focus applies configured limits). Busy alone has an idle gap
+        // between assigning a target and the focus block starting its move. No sampled moving edge is required.
+        IF (fbFocus <> 0 AND_THEN (fbFocus.Calibrated AND fbFocus.Ready AND NOT fbFocus.Busy AND
+            ABS(fbFocus.Position - fbFocus.ActualPosition) <= fStartupFocusTolerance)) AND bReady AND bMainReady AND bStopped AND NOT bBusy THEN
+            fRightAscension := fRightAscensionCurrentICRS;
+            fDeclination := fDeclinationCurrentICRS;
+            bStartupCompleted := TRUE;
+            bGoHome := FALSE;
+            nStage := 0;
+        END_IF
 END_CASE
 
 HomeEvent(Trigger := nStage > nLastStage, FormatString := 'GOHOME progress: %s', OnMessage := USINT_TO_STRING(nStage), comm := fbComm);
@@ -1409,8 +1447,17 @@ _PowerOn := nStage;
 // the go-home takes over, so _PowerOn kept being called and restarted its stages; the go-home then left nStage at
 // 10 or 20 and the next power=1 resumed there, skipping the wait for the safety acknowledge in stage 0.
 IF NOT bPower OR bReset OR bError OR bStop OR bInterupted THEN
+    // After a successful handoff bPower is false but the home phase still owns startup.
+    IF bReset OR bError OR bStop OR bInterupted OR bPowerFailure THEN
+        bStartupAborted := TRUE;
+        bPower := FALSE;
+    END_IF
 	nStage := 0;
 	RETURN;
+END_IF
+
+IF nStage >= 40 THEN
+    bStartupCalibrating := TRUE;
 END_IF
 
 CASE nStage OF
@@ -2044,7 +2091,11 @@ END_VAR
       <Declaration><![CDATA[METHOD Init : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[bPower := TRUE;]]></ST>
+        <ST><![CDATA[IF NOT fbStartupReadiness.Initializing AND fReadyState <> 1.0 THEN
+    bPower := TRUE;
+    fReadyState := 0.7;
+END_IF
+Init := TRUE;]]></ST>
       </Implementation>
     </Method>
     <Method Name="Park" Id="{d8a2b837-9b51-4592-a9b7-5ddb1b1403bd}" FolderPath="command methods\">
