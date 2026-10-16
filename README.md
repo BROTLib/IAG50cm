@@ -291,3 +291,23 @@ directly into the application. Licenses: TC3 IoT Communication (TF6701) and
 TC3 Serial Communication (TF6340).
 
 **CI.** `.github/workflows/tcbuild.yml` builds `IAG50cm.sln` with TcBuild on every push (self-hosted runner, never on pull requests). A green run means the project compiles; TcBuild exit code 1 (built with warnings) counts as success. It only compiles; no tests run in CI.
+
+## Startup readiness (READY_STATE)
+
+Startup preparation reports 0.7, calibration and automatic startup positioning
+report 0.8, and 1.0 means the complete startup has finished. Internal mechanical
+readiness remains separate. An aborted partial startup is not online (-2 remains
+the existing unknown/not-operational value); errors and parking retain their
+existing values. Normal later slew/tracking remains online.
+
+This change requires BROTLib with `FB_StartupReadiness`. The IAG power-to-home
+handoff and any remaining startup-owned focus movement must finish before 1.0.
+The extra focus wait applies to initialization, not ordinary manual Home.
+
+Publish readiness on changes and at the existing stationary cadence. The new
+state uses the existing telemetry field and power-on commands. Update Python
+consumers for CALIBRATING/0.8 before firmware rollout. Hardware acceptance and
+firmware deployment are separate from building these changes.
+
+The startup focus wait uses `fStartupFocusTolerance` (default 0.005, matching
+`FB_FocusControl.fTolerance`); keep them aligned if the axis tolerance is changed.
