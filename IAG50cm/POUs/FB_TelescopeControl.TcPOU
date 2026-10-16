@@ -49,13 +49,13 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 
 	telescopeConfig		: ST_TelescopeConfig;
 END_VAR
+VAR
     fbStartupReadiness : BROTLib.FB_StartupReadiness;
     bStartupStart : BOOL;
     bStartupCalibrating : BOOL;
     bStartupCompleted : BOOL;
     bStartupAborted : BOOL;
     fLastPublishedReadyState : LREAL := -3.0;
-VAR
 	fbComm 				: I_Comm;
 	fbCabinet			: FB_CabinetControl;
 	
