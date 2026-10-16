@@ -39,7 +39,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	bSafetyAckPending	: BOOL	:= FALSE;
 	bMainReady			: BOOL	:= TRUE;
 	bCoverAutoOpen		: BOOL	:= TRUE;
-    fStartupFocusTolerance : LREAL := 0.005; // match the focus controller position tolerance
+    fStartupFocusTolerance : LREAL := 0.005; // match FB_FocusControl.fTolerance; align if that axis setting changes
 	fbFocus				: I_Focus;
 	fbCovers			: I_MirrorCovers;
 	fbDome				: I_Dome;
@@ -774,13 +774,13 @@ tonTrackingDelay(in := fbHourAngle.fbAxis.isTracking AND
 bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
 			(NOT fbDeclination.bEnable OR fbDeclination.fbAxis.StandStill);
 			
-bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated AND (fbFocus = 0 OR_ELSE fbFocus.Calibrated);
+bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated AND (fbFocus <> 0 AND_THEN fbFocus.Calibrated);
 			
 bReady := bHomed AND 
 	bIsPowered AND 
 	fbHourAngle.bEnable AND
 	fbDeclination.bEnable AND
-	(fbFocus = 0 OR_ELSE fbFocus.Enable) AND
+	(fbFocus <> 0 AND_THEN fbFocus.Enable) AND
     NOT bError;
 
 bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy OR (fbFocus <> 0 AND_THEN fbFocus.Busy);
@@ -1182,7 +1182,7 @@ CASE nStage OF
     110:
         // Compare with the effective target (the focus applies configured limits). Busy alone has an idle gap
         // between assigning a target and the focus block starting its move. No sampled moving edge is required.
-        IF (fbFocus = 0 OR_ELSE (fbFocus.Calibrated AND fbFocus.Ready AND NOT fbFocus.Busy AND
+        IF (fbFocus <> 0 AND_THEN (fbFocus.Calibrated AND fbFocus.Ready AND NOT fbFocus.Busy AND
             ABS(fbFocus.Position - fbFocus.ActualPosition) <= fStartupFocusTolerance)) AND bReady AND bMainReady AND bStopped AND NOT bBusy THEN
             fRightAscension := fRightAscensionCurrentICRS;
             fDeclination := fDeclinationCurrentICRS;

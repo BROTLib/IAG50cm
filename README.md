@@ -311,3 +311,7 @@ firmware deployment are separate from building these changes.
 
 The startup focus wait uses `fStartupFocusTolerance` (default 0.005, matching
 `FB_FocusControl.fTolerance`); keep them aligned if the axis tolerance is changed.
+
+The IAG50 focuser remains required for `bHomed` and `bReady`; a missing interface
+must not silently make the telescope online. The focus `Position` getter reads
+the controller's effective target after its configured limits have been applied.
