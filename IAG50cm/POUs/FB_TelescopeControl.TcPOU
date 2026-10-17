@@ -50,12 +50,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	telescopeConfig		: ST_TelescopeConfig;
 END_VAR
 VAR
-    fbStartupReadiness : BROTLib.FB_StartupReadiness;
-    bStartupStart : BOOL;
-    bStartupCalibrating : BOOL;
-    bStartupCompleted : BOOL;
-    bStartupAborted : BOOL;
-    fLastPublishedReadyState : LREAL := -3.0;
+    fbStartup : BROTLib.FB_StartupControl;
 	fbComm 				: I_Comm;
 	fbCabinet			: FB_CabinetControl;
 	
@@ -177,15 +172,8 @@ VAR CONSTANT
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[// Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
-bStartupStart := bPower;
-bStartupCalibrating := FALSE;
-bStartupCompleted := FALSE;
-bStartupAborted := FALSE;
-// A repeated request to an already online telescope must not restart calibration.
-IF bPower AND fbStartupReadiness.Initialized AND bReady THEN
-    bPower := FALSE;
-    bStartupStart := FALSE;
-END_IF
+// A repeated request to an already online telescope is dropped, it must not restart calibration.
+bPower := fbStartup.BeginScan(Power := bPower, Ready := bReady);
 // get the system time; fJd only follows the clock while the clock is valid (synced, see FB_AstroClock)
 fbTime();
 IF fbTime.bValid THEN
@@ -210,7 +198,7 @@ rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND (bError OR bSafetyAckPe
 bResetRequest := FALSE;
 
 IF bReset THEN
-    bStartupAborted := TRUE;
+    fbStartup.MarkAborted();
 	bTestError := FALSE;
 	bSoftwareError := FALSE;
 	nSoftwareErrorID := 0;
@@ -472,7 +460,7 @@ tonParkTimeout(IN := bPark AND TCS_command = E_TCSCommand.park AND NOT bError, P
 // stage 100 can wait a few scans for bReady, and a stop from slew speed takes about 4 s. Not during a power-on.
 tonHomePending(IN := bGoHome AND TCS_command <> E_TCSCommand.gohome AND NOT bPower AND NOT bError, PT := T#2M);
 IF tonHomePending.Q THEN
-    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;
+    fbStartup.MarkAbortedIfInitializing();
 	bGoHome := FALSE;
 	sHomeEnd := 'cancelled: telescope not ready';
 	bHomeCancelled := TRUE;
@@ -488,7 +476,7 @@ END_IF
 // #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
 // time) do not abort a running power-on, as before.
 IF bStop AND (bUserStop OR NOT bPower) THEN
-    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing OR bPower;
+    fbStartup.MarkAbortedIfStarting(Power := bPower);
 	bTrack := FALSE;
 	bStopping := FALSE;
 
@@ -787,16 +775,12 @@ bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy OR (fbFocus <> 0 A
 //----------------------------------------------------------------------------------------------
 (* STATUS STATES*)
 // Public completion is latched only by the final startup stage, never by mechanical bReady alone.
-fbStartupReadiness(
-    Start := bStartupStart,
-    Calibrating := bStartupCalibrating,
-    Completed := bStartupCompleted,
-    Aborted := bStartupAborted OR bEstopTriggered,
+fReadyState := fbStartup.Update(
     Error := bError OR bSoftwareError OR bPowerFailure OR bEstopTriggered,
     Parked := bIsParked,
     Parking := bPark AND NOT bPower,
-    Operational := bReady AND bMainReady AND NOT bEstopTriggered);
-fReadyState := fbStartupReadiness.ReadyState;
+    Operational := bReady AND bMainReady AND NOT bEstopTriggered,
+    AbortExtra := bEstopTriggered);
 //nMotionState
 IF bStopped THEN
 	nMotionState := 0;
@@ -823,9 +807,8 @@ IF bEstopTriggered THEN
 END_IF
 //----------------------------------------------------------------------------------------------
 // The readiness field uses its existing topic and numeric format.
-IF fReadyState <> fLastPublishedReadyState AND fbComm <> 0 THEN
+IF fbStartup.PublishDue(CommValid := fbComm <> 0, Heartbeat := FALSE) THEN
     fbComm.Publish('telescope', 'dome', 'TELESCOPE.READY_STATE', LREAL_TO_STRING(fReadyState));
-    fLastPublishedReadyState := fReadyState;
 END_IF
 // send telemetry
 
@@ -1084,7 +1067,7 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_HomeTelescope := nStage;
 IF tonHomeTimeout.Q THEN
-    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;	// MONETcommon#17: fed every scan in the body
+    fbStartup.MarkAbortedIfInitializing();	// MONETcommon#17: fed every scan in the body
 	bSoftwareError := TRUE;		// #30
 	nSoftwareErrorID := 16#30;
 	bGoHome := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
@@ -1094,7 +1077,7 @@ IF tonHomeTimeout.Q THEN
 END_IF
 
 IF bReset OR bError OR bStop OR bInterupted THEN
-    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;
+    fbStartup.MarkAbortedIfInitializing();
 	nStage := 0;
 	RETURN;
 END_IF
@@ -1170,7 +1153,7 @@ CASE nStage OF
         IF fbFocus <> 0 THEN
             fbFocus.Position := telescopeConfig.focusHome;
         END_IF
-        IF fbStartupReadiness.Initializing THEN
+        IF fbStartup.Initializing THEN
             // Only initialization waits for its remaining focus work; manual Home semantics stay unchanged.
             nStage := 110;
         ELSE
@@ -1186,7 +1169,7 @@ CASE nStage OF
             ABS(fbFocus.Position - fbFocus.ActualPosition) <= fStartupFocusTolerance)) AND bReady AND bMainReady AND bStopped AND NOT bBusy THEN
             fRightAscension := fRightAscensionCurrentICRS;
             fDeclination := fDeclinationCurrentICRS;
-            bStartupCompleted := TRUE;
+            fbStartup.MarkCompleted();
             bGoHome := FALSE;
             nStage := 0;
         END_IF
@@ -1449,7 +1432,7 @@ _PowerOn := nStage;
 IF NOT bPower OR bReset OR bError OR bStop OR bInterupted THEN
     // After a successful handoff bPower is false but the home phase still owns startup.
     IF bReset OR bError OR bStop OR bInterupted OR bPowerFailure THEN
-        bStartupAborted := TRUE;
+        fbStartup.MarkAborted();
         bPower := FALSE;
     END_IF
 	nStage := 0;
@@ -1457,7 +1440,7 @@ IF NOT bPower OR bReset OR bError OR bStop OR bInterupted THEN
 END_IF
 
 IF nStage >= 40 THEN
-    bStartupCalibrating := TRUE;
+    fbStartup.MarkCalibrating();
 END_IF
 
 CASE nStage OF
@@ -2091,7 +2074,8 @@ END_VAR
       <Declaration><![CDATA[METHOD Init : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[IF NOT fbStartupReadiness.Initializing AND fReadyState <> 1.0 THEN
+        <ST><![CDATA[// AcceptInit refuses while a startup runs or completed (also across a transient interlock, -2).
+IF fbStartup.AcceptInit() THEN
     bPower := TRUE;
     fReadyState := 0.7;
 END_IF
