@@ -71,6 +71,7 @@ VAR_OUTPUT
 	state          			: BOOL;		// safety is okay
 	estop					: BOOL;		// Emergency_stop engaged
 	ackPending				: BOOL;		// E-stop seen, no clean acknowledge since (#59)
+	bStartUpDone			: BOOL;		// the start-up ErrAck/Restart sequence is finished (#103)
 END_VAR
 VAR_INPUT
 	// issue a remote restart
@@ -149,6 +150,7 @@ CASE initialStartUpStep OF
 			initialStartUpStep := 100;
 		END_IF		
 END_CASE
+bStartUpDone := initialStartUpStep = 100;
 
 // #11: acknowledge on request. Ignored while the start-up runs, while a sequence runs, and while the E-stop is
 // pressed (the safety logic also gates the drive acknowledge on the E-stop input, so it would do nothing).
