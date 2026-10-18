@@ -12,6 +12,7 @@ VAR
 	domeControl		: FB_DomeControl(comm := comm);
 	pendantControl 	: FB_PendantControl(comm:=comm);
 	safetyHandling	: FB_SafetyHandling(comm:=comm);
+	rtrigStartUpDone: R_TRIG;
 	//search			: FB_RefMarkerSearch(); // use for searching for the Heideinhain encoder reference markers
 
 	
@@ -63,6 +64,11 @@ IF telescopeControl.bSafetyAckRequest THEN
 	safetyHandling.Acknowledge();
 END_IF
 safetyHandling();
+// #103: one axis reset pass once the safety start-up is done (the start-up only acknowledges the drives)
+rtrigStartUpDone(CLK := safetyHandling.bStartUpDone);
+IF rtrigStartUpDone.Q THEN
+	telescopeControl.bStartupAxisReset := TRUE;
+END_IF
 
 // Comm
 comm(	
