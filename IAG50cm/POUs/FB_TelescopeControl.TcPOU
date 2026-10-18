@@ -1472,7 +1472,11 @@ CASE nStage OF
 		IF NOT bAxisResetAfterAck THEN
 			fbHourAngle.Enable := TRUE;
 			fbDeclination.Enable := TRUE;
-			IF fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
+			// #100/#103: calibration alone is not enough. The NC keeps Homed through a Reset Cold while the drives are
+			// still in STO, so stages 40, 70 and 100 ran in consecutive scans before the enable failed (18000): stage 100
+			// set bIsPowered and the go-home, bReady pulsed ("startup finished") and the error left bIsPowered TRUE.
+			// Wait for the power status of both axes (MC_Power Status); an enable error ends the power-on above.
+			IF fbHourAngle.bReady AND fbDeclination.bReady AND fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
 				nStage := 70;
 			END_IF
 		END_IF
