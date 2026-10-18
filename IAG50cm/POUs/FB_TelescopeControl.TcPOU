@@ -16,6 +16,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	bStop				: BOOL;		// boolean, TRUE: Stop motion OF telescope immediately, set goto AND track TO FALSE. FALSE: Allow motion OF telescope again via track/goto).	
 	bReset				: BOOL;		// initiates reset on all axis
 	bSafetyAckRequest	: BOOL;		// set by a telescope reset, taken (and cleared) by MAIN which gives the safety acknowledge (#11)
+	bStartupAxisReset	: BOOL;		// set by MAIN once when the safety start-up is done: one axis reset pass like after the reset acknowledge (#103)
 	bAutoTrack			: BOOL := TRUE;	// automatic tracking after goto
 	fRightAscension		: LREAL :=  0.0;	//  right ascension, degrees, double	
 	fDeclination		: LREAL :=  0.0;	//  declination, degrees, double
@@ -246,6 +247,13 @@ END_IF
 // acknowledge (MAIN, bSafetyAckRequest: ErrAck 1 s, Restart 1 s), so the axes are reset again once it is done.
 // The second pass resets every axis that is errored or not enabled (#55): after an E-stop HA and Dec can have lost
 // their enable without latching an error, and then failed at the next power-on (18000) until they got a reset.
+// #103: the safety start-up (MAIN) acknowledges like the reset does, but nothing reset the axes afterwards. After a
+// Reset Cold the first enable then failed with 18000 until a reset=1 gave the second pass below. Experiment: run that
+// pass once after the start-up. It also holds the power-on at stages 0 and 40 for its 2.5 s, like after a reset.
+IF bStartupAxisReset THEN
+	bStartupAxisReset := FALSE;
+	bAxisResetAfterAck := TRUE;
+END_IF
 IF bReset THEN
 	bSafetyAckRequest := TRUE;
 	bAxisResetAfterAck := TRUE;
@@ -1491,7 +1499,11 @@ CASE nStage OF
 		IF NOT bAxisResetAfterAck THEN
 			fbHourAngle.Enable := TRUE;
 			fbDeclination.Enable := TRUE;
-			IF fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
+			// #100/#103: calibration alone is not enough. The NC keeps Homed through a Reset Cold while the drives are
+			// still in STO, so stages 40, 70 and 100 ran in consecutive scans before the enable failed (18000): stage 100
+			// set bIsPowered and the go-home, bReady pulsed ("startup finished") and the error left bIsPowered TRUE.
+			// Wait for the power status of both axes (MC_Power Status); an enable error ends the power-on above.
+			IF fbHourAngle.bReady AND fbDeclination.bReady AND fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
 				nStage := 70;
 			END_IF
 		END_IF

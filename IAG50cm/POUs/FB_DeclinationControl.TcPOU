@@ -29,7 +29,6 @@ END_IF
 
 IF fbAxis.Calibrated THEN
 	bHomeAxis := FALSE;
-	bCalibrated := fbAxis.Calibrated;
 END_IF
 
 IF bHomeAxis THEN
@@ -54,6 +53,10 @@ fbAxis(
 	ErrorID 		=> nAxisErrorID,		// was nErrorID: nAxisErrorID below was never written, so every Dec error read 0 (#55)
 	AxisRef 		:= axisRef);
 	
+// #100: follow the NC in both directions. The flag used to be set only while the axis was calibrated, so it stayed
+// TRUE after the NC dropped Homed and the power-on and bHomed trusted it.
+bCalibrated := fbAxis.Calibrated;
+
 fbLatchHome(
 	Axis				:= AxisRef,
 	Execute				:= bHomeAxis,
