@@ -9,7 +9,7 @@ code that is activated on the telescope. Run it by hand before opening the proje
 
 | Suite | Tests | What it checks |
 |---|---|---|
-| `FB_StopTransaction_Tests` | `FB_StopTransaction` | the #108/#117 stop: one `MC_Stop` per axis and stop transaction, also for a stop that never finishes or is rejected (no retrigger), an axis at standstill gets none, `Begin()` starts a new transaction, outputs are one-scan pulses, `bFinished` when the telescope is at rest |
+| `FB_StopTransaction_Tests` | `FB_StopTransaction` | the #108/#117 stop: one `MC_Stop` per axis and stop transaction, also for a stop that never finishes or is rejected (no retrigger); and the #98 settle condition before a home may start: the one-scan false standstill at the start of a stop does not settle it, every stopped axis must report Done, no motion lock (StateDWord bit 29) for 3 scans, a disabled axis counts as done, a lock restarts the count, `Begin()` / `Cancel()` |
 | `FB_HomeDropReason_Tests` | `FB_HomeDropReason` | the WARN and end-state text when a pending home is dropped after 2 min: not ready, stop did not finish, axes busy, and their priority |
 
 `FB_TelescopeControl._StopTelescope` and the `tonHomePending` block call these function blocks, so the paths that cannot
