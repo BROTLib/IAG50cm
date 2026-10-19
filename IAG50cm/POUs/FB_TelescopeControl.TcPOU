@@ -105,8 +105,8 @@ VAR
 	sHomeEnd			: STRING(40) := 'completed';	// the same for the home (#75)
 	bHomeCancelled		: BOOL;		// a pending home that never started was dropped (one scan): logs the reason (#75)
 	sHomeDropWhy		: STRING(160);	// why the pending home was dropped, for the WARN text (#108)
-	bHaStopRequested	: BOOL;		// #108: the HA axis was sent its stop in this stop transaction, never again
-	bDecStopRequested	: BOOL;		// #108: the same for Dec
+	fbStopTx			: FB_StopTransaction;	// #108/#120: one stop per axis and stop transaction
+	fbHomeDrop			: FB_HomeDropReason;	// #108/#120: why a pending home was dropped
 	tonHomePending		: TON;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
@@ -481,16 +481,9 @@ IF tonHomePending.Q THEN
     fbStartup.MarkAbortedIfInitializing();
 	bGoHome := FALSE;
 	// #108: say what was pending. "Not ready, power on" was also logged when a stop before the home had not finished.
-	IF NOT bReady THEN
-		sHomeEnd := 'cancelled: telescope not ready';
-		sHomeDropWhy := 'the telescope was not ready for 2 min. Power on, then send the home again.';
-	ELSIF TCS_command = E_TCSCommand.stop OR NOT bStopped THEN
-		sHomeEnd := 'cancelled: stop did not finish';
-		sHomeDropWhy := 'the stop before the home did not finish within 2 min. Send the stop, then the home again.';
-	ELSE
-		sHomeEnd := 'cancelled: axes busy';
-		sHomeDropWhy := 'the axes were busy for 2 min. Send the home again.';
-	END_IF
+	fbHomeDrop(bReady := bReady, bStopPending := TCS_command = E_TCSCommand.stop OR NOT bStopped);
+	sHomeEnd := fbHomeDrop.sEnd;
+	sHomeDropWhy := fbHomeDrop.sWhy;
 	bHomeCancelled := TRUE;
 END_IF
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
@@ -746,8 +739,7 @@ IF TCS_command <> eLastTimeoutCommand THEN
 	// #108: a stop transaction starts here and lasts as long as TCS_command stays stop (also through the wait of a
 	// gohome that preempted a track): each axis gets one stop in it
 	IF TCS_command = E_TCSCommand.stop THEN
-		bHaStopRequested := FALSE;
-		bDecStopRequested := FALSE;
+		fbStopTx.Begin();
 	END_IF
 END_IF
 
@@ -1910,17 +1902,17 @@ ELSE
 	// An axis that finishes a scan later than the other (HA outside its target window after 120 s of tracking) then
 	// never lined up with the other one, bStopped stayed FALSE and a gohome waiting for it was dropped. FB_AxisControl
 	// clears StopAxis on StopDone.
-	IF NOT bHaStopRequested AND NOT fbHourAngle.fbAxis.StandStill THEN
+	fbStopTx(	bHaStandStill := fbHourAngle.fbAxis.StandStill, bDecStandStill := fbDeclination.fbAxis.StandStill,
+				bStopped := bStopped);
+	IF fbStopTx.bStopHa THEN
 		fbHourAngle.StopAxis := TRUE;
-		bHaStopRequested := TRUE;
 	END_IF
 	
-	IF NOT bDecStopRequested AND NOT fbDeclination.fbAxis.StandStill THEN
+	IF fbStopTx.bStopDec THEN
 		fbDeclination.StopAxis := TRUE;
-		bDecStopRequested := TRUE;
 	END_IF	
 
-	IF bStopped THEN
+	IF fbStopTx.bFinished THEN
 		fbHourAngle.StopAxis := FALSE;
 		fbDeclination.StopAxis := FALSE;
 		_StopTelescope := FALSE;

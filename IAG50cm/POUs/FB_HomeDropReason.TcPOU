@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_HomeDropReason" Id="{f846a1df-d4f1-4564-853f-9cfd55832b9f}" SpecialFunc="None">
+    <Declaration><![CDATA[// Why a pending home was dropped after 2 min (#108): the text for the home end state and the WARN. Pure logic,
+// tested offline in IAG50cmTests (#120). Order matters: not ready wins over a stop that did not finish.
+FUNCTION_BLOCK FB_HomeDropReason
+VAR_INPUT
+	bReady			: BOOL;		// telescope ready
+	bStopPending	: BOOL;		// TCS_command is stop, or the telescope is not at rest
+END_VAR
+VAR_OUTPUT
+	sEnd			: STRING(40);
+	sWhy			: STRING(160);
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF NOT bReady THEN
+	sEnd := 'cancelled: telescope not ready';
+	sWhy := 'the telescope was not ready for 2 min. Power on, then send the home again.';
+ELSIF bStopPending THEN
+	sEnd := 'cancelled: stop did not finish';
+	sWhy := 'the stop before the home did not finish within 2 min. Send the stop, then the home again.';
+ELSE
+	sEnd := 'cancelled: axes busy';
+	sWhy := 'the axes were busy for 2 min. Send the home again.';
+END_IF
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

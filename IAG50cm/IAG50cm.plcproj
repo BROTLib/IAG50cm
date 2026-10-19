@@ -114,6 +114,12 @@
     <Compile Include="POUs\Functions\F_RoundLREAL.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FB_StopTransaction.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_HomeDropReason.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\PendantControl\FB_PendantControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
