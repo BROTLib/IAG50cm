@@ -111,6 +111,7 @@ VAR
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
+	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: TON;		// power on timeout
 	tonCommandTimeout		: TON;		// command timeout
@@ -137,7 +138,8 @@ VAR
 	TCSsoftErrorEvent,
 	TCSparkErrorEvent,
 	TCShomeCancelEvent,
-	TCSpowerBlockedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request)
+	TCSpowerBlockedEvent,
+	TCScommandRefusedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
 	
@@ -224,7 +226,12 @@ IF bReset THEN
 		fbDome.Reset();
 	END_IF
 	// reset the stages of all statemachine methods
-	bInterupted := TRUE; 
+	// #100: a goto/slew/track request that is still pending must not outlive the reset (the error clears them only
+	// while it lasts)
+	bGoto := FALSE;
+	bSlew := FALSE;
+	bTrack := FALSE;
+	bInterupted := TRUE;
 	_HomeTelescope();
 	_GotoTelescope();
 	_SlewTelescope();
@@ -935,6 +942,11 @@ TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
 				FormatString := '%s',
 				Comm := fbComm);
 bPowerBlocked := FALSE;
+TCScommandRefusedEvent(	Trigger := bCommandRefused,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				Comm := fbComm);
+bCommandRefused := FALSE;
 TCSsoftErrorEvent(	Trigger := bSoftwareError,
 				Level := ADSLOG_MSGTYPE_ERROR,
 				FormatString := 'Command timeout error %s',	// 16 goto, 32 park, 48 gohome, 64 slew (16#10, 16#20, 16#30, 16#40)
@@ -2215,7 +2227,14 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[THIS^.fElevation 	:= fAltitude;
+        <ST><![CDATA[// #100: not while the telescope is not ready (parked, powering on, error). The request used to stay latched and
+// fired unnoticed after the next power-on; a client sends init first and waits for ready.
+IF NOT bReady THEN
+	TCScommandRefusedEvent.OnMessage := 'Slew refused: telescope not ready. Power on (init) and wait until it is ready, then send the slew again.';
+	bCommandRefused := TRUE;
+	RETURN;
+END_IF
+THIS^.fElevation 	:= fAltitude;
 THIS^.fAzimuth 	:= fAzimuth;
 bRestartSlew	:= bSlew;	// #41: a slew is already running, replace its target
 bSlew		:= TRUE;]]></ST>
@@ -2238,7 +2257,13 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[THIS^.fRightAscension	:= fRightAscension;
+        <ST><![CDATA[// #100: see Slew(); a track request while the telescope is not ready is refused, not latched
+IF NOT bReady THEN
+	TCScommandRefusedEvent.OnMessage := 'Track refused: telescope not ready. Power on (init) and wait until it is ready, then send the track again.';
+	bCommandRefused := TRUE;
+	RETURN;
+END_IF
+THIS^.fRightAscension	:= fRightAscension;
 THIS^.fDeclination	:= fDeclination;
 bRestartGoto	:= bGoto;	// #41: a goto is already running, replace its target
 bGoto			:= TRUE;]]></ST>
