@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_HomeHold_Tests" Id="{6bb4a0fd-8b06-4947-b443-64dcd332a1b6}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_HomeHold, the no-new-homing-request after a stop in the calibration sweep (#113).
+FUNCTION_BLOCK FB_HomeHold_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[No_Hold_Without_Stop();
+Stop_While_Homing_Holds();
+Hold_Stays_After_Stop_Done();
+Stop_While_Not_Homing_Does_Not_Hold();
+Stop_While_Calibrated_Does_Not_Hold();
+Disable_Releases_The_Hold();
+Reset_Releases_The_Hold();
+]]></ST>
+    </Implementation>
+    <Method Name="No_Hold_Without_Stop" Id="{e618cb85-d147-45e8-af5c-d7c17a1c1091}">
+      <Declaration><![CDATA[METHOD PRIVATE No_Hold_Without_Stop
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('No_Hold_Without_Stop');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := FALSE, bReset := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'homing runs');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_While_Homing_Holds" Id="{5540370c-90bd-4706-bb24-be044a49aaec}">
+      <Declaration><![CDATA[METHOD PRIVATE Stop_While_Homing_Holds
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_While_Homing_Holds');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := FALSE, bReset := FALSE);
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := TRUE, bReset := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbHold.bHold, Message := 'held after the stop');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Hold_Stays_After_Stop_Done" Id="{de167aeb-f4f2-4ff9-b738-fd11f0c3ce0d}">
+      <Declaration><![CDATA[METHOD PRIVATE Hold_Stays_After_Stop_Done
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Hold_Stays_After_Stop_Done');
+// bStopAxis falls on StopDone, bHomeAxis is cleared by the hold: the hold must stay while the axis is enabled
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := FALSE, bReset := FALSE);
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := TRUE, bReset := FALSE);
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE);
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbHold.bHold, Message := 'still held');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_While_Not_Homing_Does_Not_Hold" Id="{50b1c3a5-a03d-446e-a1c8-3f2c2f006b58}">
+      <Declaration><![CDATA[METHOD PRIVATE Stop_While_Not_Homing_Does_Not_Hold
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_While_Not_Homing_Does_Not_Hold');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := TRUE, bReset := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'no sweep, no hold');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_While_Calibrated_Does_Not_Hold" Id="{d4107741-efd3-478e-8bb1-c6be2b97eeab}">
+      <Declaration><![CDATA[METHOD PRIVATE Stop_While_Calibrated_Does_Not_Hold
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_While_Calibrated_Does_Not_Hold');
+fbHold(bEnable := TRUE, bCalibrated := TRUE, bHoming := TRUE, bStopAxis := TRUE, bReset := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'calibrated');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Disable_Releases_The_Hold" Id="{aa073480-334e-4252-8f13-7e00f11f97a3}">
+      <Declaration><![CDATA[METHOD PRIVATE Disable_Releases_The_Hold
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Disable_Releases_The_Hold');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := FALSE, bReset := FALSE);
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := TRUE, bReset := FALSE);
+fbHold(bEnable := FALSE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'released');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := FALSE, bReset := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'homing again');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset_Releases_The_Hold" Id="{28edd587-aed6-409a-8338-2eccfa7208c5}">
+      <Declaration><![CDATA[METHOD PRIVATE Reset_Releases_The_Hold
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Reset_Releases_The_Hold');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := FALSE, bReset := FALSE);
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := TRUE, bStopAxis := TRUE, bReset := FALSE);
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := TRUE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'released by reset');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

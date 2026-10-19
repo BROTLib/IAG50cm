@@ -6,6 +6,8 @@ VAR
 	// TcUnit finds every FB_TestSuite instance by itself; it is enough to declare them here.
 	fbStopTransactionTests	: FB_StopTransaction_Tests;
 	fbHomeDropReasonTests	: FB_HomeDropReason_Tests;
+	fbHomeHoldTests			: FB_HomeHold_Tests;
+	fbSweepStopTests		: FB_SweepStop_Tests;
 END_VAR
 ]]></Declaration>
     <Implementation>

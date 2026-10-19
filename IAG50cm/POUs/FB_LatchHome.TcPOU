@@ -8,6 +8,7 @@ VAR_IN_OUT
 END_VAR
 VAR_INPUT
 	Execute					: BOOL;										(* B *)
+	StopActive				: BOOL;										(* #113: the axis is being stopped (stop requested or MC_Stop lock): abort the sequence *)
 
 	(* static parameters *)
 	Direction					: MC_Home_Direction;						(* E *)
@@ -89,6 +90,7 @@ VAR
 	fbExecute					: R_TRIG;
 	fbReady						: R_TRIG;
 	fbTimeOut					: TON;
+	fbLockWait					: TON;									(* #113: longest wait for the MC_Stop lock before MC_AbortHoming *)
 END_VAR
 
 ]]></Declaration>
@@ -96,6 +98,30 @@ END_VAR
       <ST><![CDATA[fbExecute(CLK:= Execute);
 
 RefSignal.TouchProbe := E_TouchProbe.TouchProbe1;
+
+// #113: nothing else stops this sequence (a step block ignores a falling Execute, and the state machine reads Execute
+// only in state 0). A stop of the axis, or Execute going away, aborts it: release the step blocks and go to the abort
+// state, which waits for the MC_Stop lock to clear.
+IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive) THEN
+	StepReferencePulseDetection(
+		Execute					:= FALSE,
+		Parameter				:= Parameter,
+		Axis					:= Axis);
+	MoveAxis(
+		Axis					:= Axis,
+		JogForward				:= FALSE,
+		JogBackwards			:= FALSE);
+	SetPos(
+		Execute					:= FALSE,
+		Axis					:= Axis);
+	StepFinishHoming(
+		Execute					:= FALSE,
+		Parameter				:= Parameter,
+		Axis					:= Axis);
+	iErrorId := 0;
+	nState := 20;
+END_IF
+fbLockWait(IN := nState = 20 AND StopActive AND NOT StepAbortHoming.Busy, PT := T#5S);
 
 CASE nState OF
 	0 :	(* init *)
@@ -359,41 +385,45 @@ CASE nState OF
 		END_IF
 
 	20:	(*Abort Homing*)
-		StepAbortHoming.Options.DisableDriveAccess := Options.DisableDriveAccess;
-
-		StepAbortHoming(
-			Axis				:= Axis, 
-			Parameter			:= Parameter, 
-			Execute				:= TRUE, 
-			Options				:= ); 
-
-		IF NOT StepAbortHoming.Busy AND StepAbortHoming.Done THEN
-			Busy 				:= FALSE;
-			IF iErrorId <> 0 THEN
-				Error	 			:= TRUE;
-				ErrorId				:= iErrorId;
-			ELSE
-				CommandAborted		:= TRUE;
-			END_IF
-		
-			StepAbortHoming(	
-				Execute					:= FALSE, 
-				Parameter				:= Parameter,
-				Axis					:= Axis);
-
-			nState := 0; 
-		ELSIF NOT StepAbortHoming.Busy AND StepAbortHoming.Error THEN
-			Busy := FALSE;
-			Error := TRUE;
-			ErrorID 		:= StepAbortHoming.ErrorID;
+		// #113: MC_Stop locks the axis for motion commands until it is done (StateDWord bit 29); MC_AbortHoming sent into the
+		// lock is rejected (17135) and the error disables both axes. Wait for the lock to clear, 5 s at most.
+		IF NOT StopActive OR fbLockWait.Q OR StepAbortHoming.Busy THEN
+			StepAbortHoming.Options.DisableDriveAccess := Options.DisableDriveAccess;
 
 			StepAbortHoming(
-				Execute					:= FALSE, 
-				Parameter				:= Parameter,
-				Axis					:= Axis);
+				Axis				:= Axis, 
+				Parameter			:= Parameter, 
+				Execute				:= TRUE, 
+				Options				:= ); 
 
-			nState := 0;
-		END_IF		
+			IF NOT StepAbortHoming.Busy AND StepAbortHoming.Done THEN
+				Busy 				:= FALSE;
+				IF iErrorId <> 0 THEN
+					Error	 			:= TRUE;
+					ErrorId				:= iErrorId;
+				ELSE
+					CommandAborted		:= TRUE;
+				END_IF
+		
+				StepAbortHoming(	
+					Execute					:= FALSE, 
+					Parameter				:= Parameter,
+					Axis					:= Axis);
+
+				nState := 0; 
+			ELSIF NOT StepAbortHoming.Busy AND StepAbortHoming.Error THEN
+				Busy := FALSE;
+				Error := TRUE;
+				ErrorID 		:= StepAbortHoming.ErrorID;
+
+				StepAbortHoming(
+					Execute					:= FALSE, 
+					Parameter				:= Parameter,
+					Axis					:= Axis);
+
+				nState := 0;
+			END_IF
+		END_IF
 
 END_CASE]]></ST>
     </Implementation>

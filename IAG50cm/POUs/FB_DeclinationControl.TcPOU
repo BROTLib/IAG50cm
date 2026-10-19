@@ -16,6 +16,7 @@ VAR
 	bLatchHomeErrorHeld	: BOOL;		// #69: the homing error, held until the axis reset
 	nLatchHomeErrorIDHeld : UDINT;
 	fbLatchHome : FB_LatchHome;
+	fbHomeHold : FB_HomeHold;		// #113: no homing request after a stop of the axis
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -23,11 +24,15 @@ END_VAR
 fPosition := LIMIT(fMinPosition, fPosition, fMaxPosition);
 
 
-IF bEnable AND NOT fbAxis.Calibrated THEN
+// #113: a stop during the calibration sweep must not be followed by a new homing request (bHomeAxis was set again every
+// scan while the axis is enabled and uncalibrated, so FB_LatchHome went on commanding the NC while MC_Stop held the lock)
+fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset);
+
+IF bEnable AND NOT fbAxis.Calibrated AND NOT fbHomeHold.bHold THEN
 	bHomeAxis := TRUE;
 END_IF
 
-IF fbAxis.Calibrated THEN
+IF fbAxis.Calibrated OR fbHomeHold.bHold THEN
 	bHomeAxis := FALSE;
 END_IF
 
@@ -60,6 +65,7 @@ bCalibrated := fbAxis.Calibrated;
 fbLatchHome(
 	Axis				:= AxisRef,
 	Execute				:= bHomeAxis,
+	StopActive			:= bStopAxis OR ((axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0),	// #113
 	Direction 			:= MC_Home_Direction.mcPositiveDirection,
 	Velocity 			:= 1.0,
 	Acceleration		:= 3.6,

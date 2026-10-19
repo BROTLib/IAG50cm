@@ -157,6 +157,7 @@ VAR_OUTPUT
 	bSliding			: BOOL;		//TRUE, IF telescope is in fast-MOVE phase (includes pole-swap)	
 	bTracking			: BOOL;		//TRUE, IF telescope is on tracking position AND currently tracking.	
 	bStopped			: BOOL;		//TRUE, IF telescope is AT rest.	
+	fbSweepStop			: FB_SweepStop;	// #113: switches the uncalibrated axes off after a stop in the calibration sweep
 	bSettled			: BOOL;		// #98: at rest AND no stop transaction running (every stopped axis reported Done, no motion lock): gate of every home/restart that follows a stop
 	fHourAngleCurrent	: LREAL;	// current position of the hour angle (without pointing and offset correction)
 	fDeclinationCurrent	: LREAL;	// current position of the declination (without pointing and offset correction)
@@ -505,7 +506,9 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 	// If the stop is during a movement, reset the stage of the movement first
 	IF bPower THEN
 		bPower := FALSE;
-		_PowerOn();		// bStop is set: resets its stage
+		IF _PowerOn() >= 40 THEN	// bStop is set: resets its stage; returns the stage it was in
+			fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
+		END_IF
 	ELSIF bPark THEN
 		bPark := FALSE;
 		sParkEnd := 'cancelled by stop';
@@ -794,13 +797,30 @@ bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND
 // is settled when every axis that was sent a stop reported Done and no axis has been locked for 3 scans.
 IF bReset OR bError OR bEstopTriggered THEN
 	fbStopTx.Cancel();
+	fbSweepStop.Cancel();
 END_IF
 fbStopTx.Monitor(	bStopped := bStopped,
 					bHaEnabled := fbHourAngle.bEnable, bDecEnabled := fbDeclination.bEnable,
 					bHaStopDone := fbHourAngle.fbAxis.StopDone, bDecStopDone := fbDeclination.fbAxis.StopDone,
 					bHaLocked := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
-					bDecLocked := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0);
+					bDecLocked := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
+					bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy);
 bSettled := bStopped AND NOT fbStopTx.bActive;
+
+// #113: a stop in the calibration sweep leaves the axes enabled and uncalibrated; once the stop has settled and the
+// homing is aborted, switch the uncalibrated axes off (the next power-on starts the sweep again), READY_STATE -2
+IF bPower THEN
+	fbSweepStop.Cancel();
+END_IF
+fbSweepStop(bSettled := bSettled,
+			bHaCalibrated := fbHourAngle.bCalibrated, bDecCalibrated := fbDeclination.bCalibrated,
+			bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy);
+IF fbSweepStop.bDisableHa THEN
+	fbHourAngle.Enable := FALSE;
+END_IF
+IF fbSweepStop.bDisableDec THEN
+	fbDeclination.Enable := FALSE;
+END_IF
 			
 bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated AND (fbFocus <> 0 AND_THEN fbFocus.Calibrated);
 			

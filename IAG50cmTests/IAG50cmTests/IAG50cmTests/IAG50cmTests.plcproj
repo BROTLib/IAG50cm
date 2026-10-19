@@ -33,6 +33,12 @@
     <Compile Include="POUs\FB_HomeDropReason_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FB_HomeHold_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_SweepStop_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -40,6 +46,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_HomeDropReason.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_HomeHold.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_SweepStop.TcPOU">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>

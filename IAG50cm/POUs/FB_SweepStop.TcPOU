@@ -1,0 +1,68 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_SweepStop" Id="{44b685fb-f9fe-49ee-838c-fcf86ea871ec}" SpecialFunc="None">
+    <Declaration><![CDATA[// A stop in the calibration sweep (#113): the axes stay enabled and uncalibrated, the sweep is aborted by the stop. Once the
+// stop has settled (for 3 scans) and no homing is running any more, the uncalibrated axes are switched off for one scan, so
+// the telescope ends like a stop in the covers phase (READY_STATE -2, no error) and the next power-on starts the sweep
+// again. Calibrated axes stay enabled. Pure logic, tested offline in IAG50cmTests.
+FUNCTION_BLOCK FB_SweepStop
+VAR_INPUT
+	bSettled		: BOOL;		// FB_TelescopeControl.bSettled: at rest and no stop transaction running
+	bHaCalibrated	: BOOL;
+	bDecCalibrated	: BOOL;
+	bHaHoming		: BOOL;		// FB_LatchHome.Busy
+	bDecHoming		: BOOL;
+END_VAR
+VAR_OUTPUT
+	bDisableHa		: BOOL;		// one scan
+	bDisableDec		: BOOL;
+END_VAR
+VAR
+	bPending		: BOOL;
+	nSettledScans	: UINT;
+END_VAR
+VAR CONSTANT
+	nConfirmScans	: UINT := 3;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[bDisableHa := FALSE;
+bDisableDec := FALSE;
+IF bPending THEN
+	IF bSettled AND NOT bHaHoming AND NOT bDecHoming THEN
+		IF nSettledScans < nConfirmScans THEN
+			nSettledScans := nSettledScans + 1;
+		END_IF
+	ELSE
+		nSettledScans := 0;
+	END_IF
+	IF nSettledScans >= nConfirmScans THEN
+		bDisableHa := NOT bHaCalibrated;
+		bDisableDec := NOT bDecCalibrated;
+		bPending := FALSE;
+	END_IF
+END_IF
+]]></ST>
+    </Implementation>
+    <Method Name="Arm" Id="{5fe552c7-8819-4f0f-b9e6-0ac14c6a0840}">
+      <Declaration><![CDATA[// A stop arrived in the calibration sweep (power-on stage 40 or later).
+METHOD Arm
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bPending := TRUE;
+nSettledScans := 0;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Cancel" Id="{0de7f038-45ed-4e19-b4e4-00c691302390}">
+      <Declaration><![CDATA[// Error, reset or a new power-on: nothing to switch off any more.
+METHOD Cancel
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bPending := FALSE;
+nSettledScans := 0;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
