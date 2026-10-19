@@ -1,0 +1,93 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_HomeDropReason_Tests" Id="{4daed8c0-06d2-4a65-8809-2852ddccc594}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_HomeDropReason, the text of the WARN when a pending home is dropped after 2 min (#108, #120).
+FUNCTION_BLOCK FB_HomeDropReason_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Not_Ready();
+Stop_Did_Not_Finish();
+Axes_Busy();
+Not_Ready_Wins_Over_Stop_Pending();
+Texts_Fit_Their_Strings();
+]]></ST>
+    </Implementation>
+    <Method Name="Not_Ready" Id="{a9657aca-baff-4717-a648-cd06a4eba7e3}">
+      <Declaration><![CDATA[METHOD PRIVATE Not_Ready
+VAR
+	fbHome	: FB_HomeDropReason;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Not_Ready');
+fbHome(bReady := FALSE, bStopPending := FALSE);
+AssertEquals_STRING(Expected := 'cancelled: telescope not ready', Actual := fbHome.sEnd, Message := 'sEnd');
+AssertEquals_STRING(Expected := 'the telescope was not ready for 2 min. Power on, then send the home again.', Actual := fbHome.sWhy, Message := 'sWhy');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_Did_Not_Finish" Id="{4e69dee9-4393-48e8-a5bc-a079723d3960}">
+      <Declaration><![CDATA[METHOD PRIVATE Stop_Did_Not_Finish
+VAR
+	fbHome	: FB_HomeDropReason;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_Did_Not_Finish');
+fbHome(bReady := TRUE, bStopPending := TRUE);
+AssertEquals_STRING(Expected := 'cancelled: stop did not finish', Actual := fbHome.sEnd, Message := 'sEnd');
+AssertEquals_STRING(Expected := 'the stop before the home did not finish within 2 min. Send the stop, then the home again.', Actual := fbHome.sWhy, Message := 'sWhy');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Axes_Busy" Id="{f7856cd2-1747-46e2-ad10-31b4efcc9c6c}">
+      <Declaration><![CDATA[METHOD PRIVATE Axes_Busy
+VAR
+	fbHome	: FB_HomeDropReason;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Axes_Busy');
+fbHome(bReady := TRUE, bStopPending := FALSE);
+AssertEquals_STRING(Expected := 'cancelled: axes busy', Actual := fbHome.sEnd, Message := 'sEnd');
+AssertEquals_STRING(Expected := 'the axes were busy for 2 min. Send the home again.', Actual := fbHome.sWhy, Message := 'sWhy');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Not_Ready_Wins_Over_Stop_Pending" Id="{cf1e3634-7b9c-4704-86e1-d32c0e469b5a}">
+      <Declaration><![CDATA[METHOD PRIVATE Not_Ready_Wins_Over_Stop_Pending
+VAR
+	fbHome	: FB_HomeDropReason;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Not_Ready_Wins_Over_Stop_Pending');
+fbHome(bReady := FALSE, bStopPending := TRUE);
+AssertEquals_STRING(Expected := 'cancelled: telescope not ready', Actual := fbHome.sEnd, Message := 'sEnd');
+AssertEquals_STRING(Expected := 'the telescope was not ready for 2 min. Power on, then send the home again.', Actual := fbHome.sWhy, Message := 'sWhy');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Texts_Fit_Their_Strings" Id="{b0897fb9-ab2f-4d21-a016-898e629d8a09}">
+      <Declaration><![CDATA[METHOD PRIVATE Texts_Fit_Their_Strings
+VAR
+	fbHome	: FB_HomeDropReason;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Texts_Fit_Their_Strings');
+fbHome(bReady := TRUE, bStopPending := TRUE);
+AssertEquals_BOOL(Expected := TRUE, Actual := LEN(fbHome.sEnd) < 40, Message := 'sEnd not cut off');
+AssertEquals_BOOL(Expected := TRUE, Actual := LEN(fbHome.sWhy) < 160, Message := 'sWhy not cut off');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

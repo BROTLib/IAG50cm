@@ -1,0 +1,255 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_StopTransaction_Tests" Id="{fb137325-2e79-42fd-bbe5-166df9f6bde0}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_StopTransaction, the one-MC_Stop-per-axis-and-transaction logic of FB_TelescopeControl._StopTelescope
+// (#108, #117). Each fbTx(...) call is one scan. A stop that is rejected, dropped or never reports Done keeps
+// StandStill FALSE: it must not be sent again within the transaction (#120).
+FUNCTION_BLOCK FB_StopTransaction_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis();
+Axis_At_Standstill_Is_Not_Stopped();
+Axis_That_Moves_Late_Is_Stopped_Once();
+Running_Stop_Is_Not_Retriggered_Per_Scan();
+Finished_When_Stopped();
+Outputs_Are_One_Scan_Pulses();
+New_Transaction_Sends_Stop_Again();
+Without_Begin_The_Stop_Is_Sent_Once();
+]]></ST>
+    </Implementation>
+    <Method Name="Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis" Id="{88a0bafa-f5d6-48ab-a2f4-f9e6d036332a}">
+      <Declaration><![CDATA[METHOD PRIVATE Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+	nDone	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis');
+fbTx.Begin();
+FOR i := 1 TO 300 DO
+	fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nHa, Message := 'nHa');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'nDec');
+AssertEquals_INT(Expected := 0, Actual := nDone, Message := 'nDone');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Axis_At_Standstill_Is_Not_Stopped" Id="{59a738a5-f6bc-4d1d-ab49-24de81e418fc}">
+      <Declaration><![CDATA[METHOD PRIVATE Axis_At_Standstill_Is_Not_Stopped
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+	nDone	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Axis_At_Standstill_Is_Not_Stopped');
+fbTx.Begin();
+FOR i := 1 TO 10 DO
+	fbTx(bHaStandStill := TRUE, bDecStandStill := FALSE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+AssertEquals_INT(Expected := 0, Actual := nHa, Message := 'nHa');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'nDec');
+AssertEquals_INT(Expected := 0, Actual := nDone, Message := 'nDone');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Axis_That_Moves_Late_Is_Stopped_Once" Id="{7a9a1ebc-faae-41ec-86c1-d1e28e0435d7}">
+      <Declaration><![CDATA[METHOD PRIVATE Axis_That_Moves_Late_Is_Stopped_Once
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+	nDone	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Axis_That_Moves_Late_Is_Stopped_Once');
+fbTx.Begin();
+FOR i := 1 TO 5 DO
+	fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+FOR i := 1 TO 20 DO
+	fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nHa, Message := 'nHa');
+AssertEquals_INT(Expected := 0, Actual := nDec, Message := 'nDec');
+AssertEquals_INT(Expected := 0, Actual := nDone, Message := 'nDone');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Running_Stop_Is_Not_Retriggered_Per_Scan" Id="{4c875b08-68f8-40e6-a03e-2f51b9f63daf}">
+      <Declaration><![CDATA[METHOD PRIVATE Running_Stop_Is_Not_Retriggered_Per_Scan
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+	nDone	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Running_Stop_Is_Not_Retriggered_Per_Scan');
+// a running MC_Stop reports StandStill FALSE; the old code asked again after every StopDone (#108)
+fbTx.Begin();
+FOR i := 1 TO 2 DO
+	fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+FOR i := 1 TO 2 DO
+	fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+FOR i := 1 TO 5 DO
+	fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nHa, Message := 'nHa');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'nDec');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Finished_When_Stopped" Id="{ee31e51a-76c1-4046-a4c2-047a67e8a34c}">
+      <Declaration><![CDATA[METHOD PRIVATE Finished_When_Stopped
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+	nDone	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Finished_When_Stopped');
+fbTx.Begin();
+FOR i := 1 TO 3 DO
+	fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+FOR i := 1 TO 1 DO
+	fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bStopped := TRUE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nDone, Message := 'nDone');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bFinished, Message := 'bFinished');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Outputs_Are_One_Scan_Pulses" Id="{a2528028-d570-4e57-8d82-b62e572097cf}">
+      <Declaration><![CDATA[METHOD PRIVATE Outputs_Are_One_Scan_Pulses
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+	nDone	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Outputs_Are_One_Scan_Pulses');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bStopHa, Message := 'first scan: bStopHa');
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bStopHa, Message := 'second scan: bStopHa');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bStopDec, Message := 'second scan: bStopDec');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="New_Transaction_Sends_Stop_Again" Id="{1025366c-8d5a-4651-b0c5-489c92b8dc40}">
+      <Declaration><![CDATA[METHOD PRIVATE New_Transaction_Sends_Stop_Again
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+	nDone	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('New_Transaction_Sends_Stop_Again');
+fbTx.Begin();
+FOR i := 1 TO 50 DO
+	fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+fbTx.Begin();
+FOR i := 1 TO 50 DO
+	fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+AssertEquals_INT(Expected := 2, Actual := nHa, Message := 'nHa');
+AssertEquals_INT(Expected := 2, Actual := nDec, Message := 'nDec');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Without_Begin_The_Stop_Is_Sent_Once" Id="{c790c713-51a6-4f17-94da-8bc85d8b0529}">
+      <Declaration><![CDATA[METHOD PRIVATE Without_Begin_The_Stop_Is_Sent_Once
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+	nDone	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Without_Begin_The_Stop_Is_Sent_Once');
+// no Begin: the first transaction needs none
+FOR i := 1 TO 50 DO
+	fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE, bStopped := FALSE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+	IF fbTx.bFinished THEN nDone := nDone + 1; END_IF
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nHa, Message := 'nHa');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'nDec');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

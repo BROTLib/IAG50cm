@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_StopTransaction" Id="{5a92265e-6a39-40df-a29a-dd046a1da95a}" SpecialFunc="None">
+    <Declaration><![CDATA[// One stop per axis and stop transaction (#108). FB_TelescopeControl._StopTelescope calls this every scan while it
+// stops the axes; a transaction lasts as long as TCS_command stays stop and is started with Begin(). Pure logic (no
+// axis access), so it is tested offline in IAG50cmTests (#120).
+FUNCTION_BLOCK FB_StopTransaction
+VAR_INPUT
+	bHaStandStill	: BOOL;		// HA axis at standstill (a running MC_Stop reports FALSE)
+	bDecStandStill	: BOOL;
+	bStopped		: BOOL;		// the whole telescope is at rest
+END_VAR
+VAR_OUTPUT
+	bStopHa			: BOOL;		// TRUE in the one scan in which the HA axis is to be sent its stop
+	bStopDec		: BOOL;
+	bFinished		: BOOL;		// the telescope is at rest: release both stop requests, the stop is done
+END_VAR
+VAR
+	bHaStopRequested	: BOOL;		// the HA axis was sent its stop in this transaction, never again
+	bDecStopRequested	: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[bStopHa := FALSE;
+bStopDec := FALSE;
+bFinished := FALSE;
+
+IF NOT bHaStopRequested AND NOT bHaStandStill THEN
+	bStopHa := TRUE;
+	bHaStopRequested := TRUE;
+END_IF
+
+IF NOT bDecStopRequested AND NOT bDecStandStill THEN
+	bStopDec := TRUE;
+	bDecStopRequested := TRUE;
+END_IF
+
+IF bStopped THEN
+	bFinished := TRUE;
+END_IF
+]]></ST>
+    </Implementation>
+    <Method Name="Begin" Id="{531e9405-351a-49d1-a616-de19bbf299ad}">
+      <Declaration><![CDATA[// Start a new stop transaction: each axis may be sent one stop again.
+METHOD Begin
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bHaStopRequested := FALSE;
+bDecStopRequested := FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
