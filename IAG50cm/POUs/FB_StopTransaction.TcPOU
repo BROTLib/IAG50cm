@@ -66,6 +66,7 @@ bActive := TRUE;
     <Method Name="Monitor" Id="{48fd0ac6-2d4c-4c9d-a1b6-2c75f44edc09}">
       <Declaration><![CDATA[// Call every scan. A transaction settles when every axis that was sent a stop has reported Done (a disabled axis
 // counts as done), the telescope is at rest and no enabled axis has been locked for nSettleScans scans.
+// A running calibration sweep (bHaHoming / bDecHoming) is aborted first (#113).
 METHOD Monitor
 VAR_INPUT
 	bStopped		: BOOL;		// the whole telescope is at rest
@@ -75,6 +76,8 @@ VAR_INPUT
 	bDecStopDone	: BOOL;
 	bHaLocked		: BOOL;		// MotionCommandsLocked (StateDWord bit 29) of the HA axis
 	bDecLocked		: BOOL;
+	bHaHoming		: BOOL;		// #113: the calibration sweep of the axis is still running or being aborted (FB_LatchHome.Busy)
+	bDecHoming		: BOOL;
 END_VAR
 ]]></Declaration>
       <Implementation>
@@ -96,7 +99,8 @@ IF bActive
 	AND bStopped
 	AND (NOT bHaStopRequested OR bHaDone OR NOT bHaEnabled)
 	AND (NOT bDecStopRequested OR bDecDone OR NOT bDecEnabled)
-	AND nClearScans >= nSettleScans THEN
+	AND nClearScans >= nSettleScans
+	AND NOT bHaHoming AND NOT bDecHoming THEN
 	bActive := FALSE;
 END_IF
 ]]></ST>

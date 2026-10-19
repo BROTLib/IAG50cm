@@ -1,0 +1,171 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_SweepStop_Tests" Id="{ae0811a0-07de-4121-bb40-416ce921270b}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_SweepStop, switching the uncalibrated axes off after a stop in the calibration sweep (#113).
+FUNCTION_BLOCK FB_SweepStop_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Disables_Uncalibrated_Axes_After_Three_Settled_Scans();
+Calibrated_Axis_Stays_Enabled();
+Waits_While_Homing_Runs();
+Not_Settled_Restarts_The_Count();
+No_Disable_Without_Arm();
+Disable_Is_A_One_Scan_Pulse();
+Cancel_Drops_The_Request();
+]]></ST>
+    </Implementation>
+    <Method Name="Disables_Uncalibrated_Axes_After_Three_Settled_Scans" Id="{45680a00-18a4-4788-9e68-873e3787f22d}">
+      <Declaration><![CDATA[METHOD PRIVATE Disables_Uncalibrated_Axes_After_Three_Settled_Scans
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Disables_Uncalibrated_Axes_After_Three_Settled_Scans');
+fbSw.Arm();
+FOR i := 1 TO 2 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'two scans: not yet');
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableHa, Message := 'HA off');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableDec, Message := 'Dec off');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Calibrated_Axis_Stays_Enabled" Id="{de6d524c-a539-4e2c-a08d-c0b739f42296}">
+      <Declaration><![CDATA[METHOD PRIVATE Calibrated_Axis_Stays_Enabled
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Calibrated_Axis_Stays_Enabled');
+fbSw.Arm();
+FOR i := 1 TO 3 DO
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'HA calibrated');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableDec, Message := 'Dec off');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Waits_While_Homing_Runs" Id="{4341cace-590f-4d1a-9d38-90d5d93b63d7}">
+      <Declaration><![CDATA[METHOD PRIVATE Waits_While_Homing_Runs
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Waits_While_Homing_Runs');
+fbSw.Arm();
+FOR i := 1 TO 50 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := TRUE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'HA homing busy');
+FOR i := 1 TO 50 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := TRUE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableDec, Message := 'Dec homing busy');
+FOR i := 1 TO 3 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableHa, Message := 'off when the homing is idle');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Not_Settled_Restarts_The_Count" Id="{16c76841-c3be-4715-a28a-cd0d9cfd6e71}">
+      <Declaration><![CDATA[METHOD PRIVATE Not_Settled_Restarts_The_Count
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Not_Settled_Restarts_The_Count');
+fbSw.Arm();
+FOR i := 1 TO 2 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+fbSw(bSettled := FALSE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 2 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'count restarted');
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableHa, Message := 'off');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="No_Disable_Without_Arm" Id="{99ce0184-c5eb-4ee8-b433-6fc478582d46}">
+      <Declaration><![CDATA[METHOD PRIVATE No_Disable_Without_Arm
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('No_Disable_Without_Arm');
+FOR i := 1 TO 20 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'not armed');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableDec, Message := 'not armed');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Disable_Is_A_One_Scan_Pulse" Id="{238880f9-cf37-4d08-94aa-95129d981330}">
+      <Declaration><![CDATA[METHOD PRIVATE Disable_Is_A_One_Scan_Pulse
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Disable_Is_A_One_Scan_Pulse');
+fbSw.Arm();
+FOR i := 1 TO 3 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableHa, Message := 'pulse');
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'only once');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableDec, Message := 'only once');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Cancel_Drops_The_Request" Id="{852635e7-cb64-48be-8436-c0f348566caa}">
+      <Declaration><![CDATA[METHOD PRIVATE Cancel_Drops_The_Request
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Cancel_Drops_The_Request');
+fbSw.Arm();
+FOR i := 1 TO 2 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+fbSw.Cancel();
+FOR i := 1 TO 10 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'cancelled');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

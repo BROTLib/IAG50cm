@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_HomeHold" Id="{699c20a0-de31-426e-bfe6-d1aae4182b5c}" SpecialFunc="None">
+    <Declaration><![CDATA[// No new homing request after a stop of the axis (#113). The axis blocks used to set bHomeAxis again every scan while the
+// axis is enabled and uncalibrated, so a stop in the calibration sweep did not end the sweep: FB_LatchHome went on
+// commanding the NC while MC_Stop held the axis locked (error 17135, both axes disabled). A stop request while the axis
+// is homing holds the request until the axis is disabled or reset. Pure logic, tested offline in IAG50cmTests.
+FUNCTION_BLOCK FB_HomeHold
+VAR_INPUT
+	bEnable		: BOOL;		// the axis is enabled
+	bCalibrated	: BOOL;
+	bHoming		: BOOL;		// bHomeAxis: the calibration sweep is requested
+	bStopAxis	: BOOL;		// a stop of the axis is requested (cleared on StopDone)
+	bReset		: BOOL;
+END_VAR
+VAR_OUTPUT
+	bHold		: BOOL;		// do not request homing
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF bStopAxis AND bHoming AND NOT bCalibrated THEN
+	bHold := TRUE;
+END_IF
+IF NOT bEnable OR bReset THEN
+	bHold := FALSE;
+END_IF
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>
