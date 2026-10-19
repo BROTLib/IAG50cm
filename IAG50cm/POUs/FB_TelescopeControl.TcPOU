@@ -157,6 +157,7 @@ VAR_OUTPUT
 	bSliding			: BOOL;		//TRUE, IF telescope is in fast-MOVE phase (includes pole-swap)	
 	bTracking			: BOOL;		//TRUE, IF telescope is on tracking position AND currently tracking.	
 	bStopped			: BOOL;		//TRUE, IF telescope is AT rest.	
+	bSettled			: BOOL;		// #98: at rest AND no stop transaction running (every stopped axis reported Done, no motion lock): gate of every home/restart that follows a stop
 	fHourAngleCurrent	: LREAL;	// current position of the hour angle (without pointing and offset correction)
 	fDeclinationCurrent	: LREAL;	// current position of the declination (without pointing and offset correction)
 	fRightAscensionCurrentICRS	: LREAL;	// true position of the right ascension (without pointing and offset correction) nut, aberr and precess corrected
@@ -399,7 +400,7 @@ fbEq2Hor(
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
 // (also gated on fPointingSafeAltitude so tracking never lingers in the pointing model's chaotic zone)
 IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
-	IF NOT bStopped AND NOT bGoHome THEN
+	IF NOT bSettled AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
@@ -407,7 +408,7 @@ IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
 END_IF
 // If the Telescope goes into the forbidden polezone (e.g. while tracking, stop and gohome)
 IF (fDeclinationCurrent > (90.0 - fPoleZone)) OR (bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)))THEN
-	IF NOT bStopped AND NOT bGoHome THEN
+	IF NOT bSettled AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
@@ -481,7 +482,7 @@ IF tonHomePending.Q THEN
     fbStartup.MarkAbortedIfInitializing();
 	bGoHome := FALSE;
 	// #108: say what was pending. "Not ready, power on" was also logged when a stop before the home had not finished.
-	fbHomeDrop(bReady := bReady, bStopPending := TCS_command = E_TCSCommand.stop OR NOT bStopped);
+	fbHomeDrop(bReady := bReady, bStopPending := TCS_command = E_TCSCommand.stop OR NOT bSettled);
 	sHomeEnd := fbHomeDrop.sEnd;
 	sHomeDropWhy := fbHomeDrop.sWhy;
 	bHomeCancelled := TRUE;
@@ -542,7 +543,7 @@ ELSIF bStopping THEN
 	// command (its method would keep the axes going), so run the stop until the axes stand still. The pending
 	// command is picked up below in the next scan.
 	TCS_command := E_TCSCommand.stop;
-	IF bStopped THEN
+	IF bSettled THEN
 		bStopping := FALSE;
 	END_IF
 
@@ -664,14 +665,14 @@ ELSIF bGoHome THEN
 			bStopping := TRUE;	// #43, only if the preempted command is the one moving
 		END_IF
 
-	ELSIF TCS_command <> E_TCSCommand.gohome AND NOT bStopped AND (TCS_command = E_TCSCommand.track OR fbHourAngle.Tracking OR fbDeclination.Tracking) THEN
+	ELSIF TCS_command <> E_TCSCommand.gohome AND NOT bSettled AND (TCS_command = E_TCSCommand.track OR fbHourAngle.Tracking OR fbDeclination.Tracking) THEN
 		// #72: a home during tracking waited for bStopped, which is never TRUE while the axes track, so it never
 		// ran (bGoHome stayed set) until a stop. End the tracking through the stop (#43); the home starts when the
 		// axes stand still.
 		bStopping := TRUE;
 
 	ELSE
-		IF bReady AND NOT bBusy AND bStopped THEN
+		IF bReady AND NOT bBusy AND bSettled THEN
 			bInterupted := FALSE;
 			TCS_command := E_TCSCommand.gohome;
 		END_IF
@@ -787,6 +788,19 @@ tonTrackingDelay(in := fbHourAngle.fbAxis.isTracking AND
 
 bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
 			(NOT fbDeclination.bEnable OR fbDeclination.fbAxis.StandStill);
+
+// #98: bStopped is TRUE for one scan at the start of every stop, before MC_Stop has taken hold (StandStill is still
+// TRUE), and a home commanded while MC_Stop locks the axis (StateDWord bit 29) fails with 17135. A stop transaction
+// is settled when every axis that was sent a stop reported Done and no axis has been locked for 3 scans.
+IF bReset OR bError OR bEstopTriggered THEN
+	fbStopTx.Cancel();
+END_IF
+fbStopTx.Monitor(	bStopped := bStopped,
+					bHaEnabled := fbHourAngle.bEnable, bDecEnabled := fbDeclination.bEnable,
+					bHaStopDone := fbHourAngle.fbAxis.StopDone, bDecStopDone := fbDeclination.fbAxis.StopDone,
+					bHaLocked := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
+					bDecLocked := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0);
+bSettled := bStopped AND NOT fbStopTx.bActive;
 			
 bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated AND (fbFocus <> 0 AND_THEN fbFocus.Calibrated);
 			
@@ -1114,7 +1128,7 @@ IF bReset OR bError OR bStop OR bInterupted THEN
 END_IF
 CASE nStage OF
 	0:	
-		IF bReady AND bStopped AND NOT bBusy THEN
+		IF bReady AND bSettled AND NOT bBusy THEN
 			nStage := 10;
 		END_IF
 	10:
@@ -1902,8 +1916,7 @@ ELSE
 	// An axis that finishes a scan later than the other (HA outside its target window after 120 s of tracking) then
 	// never lined up with the other one, bStopped stayed FALSE and a gohome waiting for it was dropped. FB_AxisControl
 	// clears StopAxis on StopDone.
-	fbStopTx(	bHaStandStill := fbHourAngle.fbAxis.StandStill, bDecStandStill := fbDeclination.fbAxis.StandStill,
-				bStopped := bStopped);
+	fbStopTx(	bHaStandStill := fbHourAngle.fbAxis.StandStill, bDecStandStill := fbDeclination.fbAxis.StandStill);
 	IF fbStopTx.bStopHa THEN
 		fbHourAngle.StopAxis := TRUE;
 	END_IF

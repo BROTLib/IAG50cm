@@ -1,29 +1,39 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_StopTransaction" Id="{5a92265e-6a39-40df-a29a-dd046a1da95a}" SpecialFunc="None">
-    <Declaration><![CDATA[// One stop per axis and stop transaction (#108). FB_TelescopeControl._StopTelescope calls this every scan while it
-// stops the axes; a transaction lasts as long as TCS_command stays stop and is started with Begin(). Pure logic (no
-// axis access), so it is tested offline in IAG50cmTests (#120).
+    <Declaration><![CDATA[// One stop per axis and stop transaction (#108), and the transaction is only settled when it is really over (#98).
+// FB_TelescopeControl._StopTelescope calls the body while it stops the axes (request logic); Monitor() runs every
+// scan and decides when the stop has settled: every axis that was sent a stop has reported Done, the telescope is at
+// rest, and no axis has been locked for motion commands (MC_Stop, StateDWord bit 29) for 3 scans. A transaction is
+// started with Begin(). The capture of 2026-10-19 showed StandStill TRUE for one scan before the stop takes hold
+// (bStopped alone released the home too early, HA error 17135). Pure logic (no axis access), tested offline in
+// IAG50cmTests (#120, #98).
 FUNCTION_BLOCK FB_StopTransaction
 VAR_INPUT
 	bHaStandStill	: BOOL;		// HA axis at standstill (a running MC_Stop reports FALSE)
 	bDecStandStill	: BOOL;
-	bStopped		: BOOL;		// the whole telescope is at rest
 END_VAR
 VAR_OUTPUT
 	bStopHa			: BOOL;		// TRUE in the one scan in which the HA axis is to be sent its stop
 	bStopDec		: BOOL;
-	bFinished		: BOOL;		// the telescope is at rest: release both stop requests, the stop is done
+	bFinished		: BOOL;		// the stop has settled: release both stop requests, the stop is done
+	bActive			: BOOL;		// a transaction was begun and has not settled yet (homes and restarts wait for it)
 END_VAR
 VAR
 	bHaStopRequested	: BOOL;		// the HA axis was sent its stop in this transaction, never again
 	bDecStopRequested	: BOOL;
+	bHaDone				: BOOL;		// the HA axis reported StopDone in this transaction
+	bDecDone			: BOOL;
+	nClearScans			: UINT;		// consecutive scans without a motion lock
+	bAtRest				: BOOL;		// bStopped as seen by the last Monitor() call
+END_VAR
+VAR CONSTANT
+	nSettleScans		: UINT := 3;	// 30 ms at the 10 ms task
 END_VAR
 ]]></Declaration>
     <Implementation>
       <ST><![CDATA[bStopHa := FALSE;
 bStopDec := FALSE;
-bFinished := FALSE;
 
 IF NOT bHaStopRequested AND NOT bHaStandStill THEN
 	bStopHa := TRUE;
@@ -35,9 +45,8 @@ IF NOT bDecStopRequested AND NOT bDecStandStill THEN
 	bDecStopRequested := TRUE;
 END_IF
 
-IF bStopped THEN
-	bFinished := TRUE;
-END_IF
+// settled (or no transaction running, as before #98): finished as soon as the telescope is at rest
+bFinished := NOT bActive AND bAtRest;
 ]]></ST>
     </Implementation>
     <Method Name="Begin" Id="{531e9405-351a-49d1-a616-de19bbf299ad}">
@@ -47,6 +56,58 @@ METHOD Begin
       <Implementation>
         <ST><![CDATA[bHaStopRequested := FALSE;
 bDecStopRequested := FALSE;
+bHaDone := FALSE;
+bDecDone := FALSE;
+nClearScans := 0;
+bActive := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitor" Id="{48fd0ac6-2d4c-4c9d-a1b6-2c75f44edc09}">
+      <Declaration><![CDATA[// Call every scan. A transaction settles when every axis that was sent a stop has reported Done (a disabled axis
+// counts as done), the telescope is at rest and no enabled axis has been locked for nSettleScans scans.
+METHOD Monitor
+VAR_INPUT
+	bStopped		: BOOL;		// the whole telescope is at rest
+	bHaEnabled		: BOOL;
+	bDecEnabled		: BOOL;
+	bHaStopDone		: BOOL;		// StopDone pulse of the HA axis
+	bDecStopDone	: BOOL;
+	bHaLocked		: BOOL;		// MotionCommandsLocked (StateDWord bit 29) of the HA axis
+	bDecLocked		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bHaStopDone THEN
+	bHaDone := TRUE;
+END_IF
+IF bDecStopDone THEN
+	bDecDone := TRUE;
+END_IF
+
+IF (bHaEnabled AND bHaLocked) OR (bDecEnabled AND bDecLocked) THEN
+	nClearScans := 0;
+ELSIF nClearScans < nSettleScans THEN
+	nClearScans := nClearScans + 1;
+END_IF
+
+bAtRest := bStopped;
+IF bActive
+	AND bStopped
+	AND (NOT bHaStopRequested OR bHaDone OR NOT bHaEnabled)
+	AND (NOT bDecStopRequested OR bDecDone OR NOT bDecEnabled)
+	AND nClearScans >= nSettleScans THEN
+	bActive := FALSE;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Cancel" Id="{738c7907-e27e-47d5-be26-0ad891eee46f}">
+      <Declaration><![CDATA[// Forget a running transaction (error, reset): nothing waits for it any more.
+METHOD Cancel
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bActive := FALSE;
 ]]></ST>
       </Implementation>
     </Method>
