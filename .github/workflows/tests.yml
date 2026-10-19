@@ -1,7 +1,7 @@
 name: Tests
 
 # Runs the IAG50cmTests TcUnit suites (offline tests of the stop logic, #120) on the shared self-hosted runner:
-# builds the test project (it compiles the tested function blocks straight from IAG50cm/POUs) and runs it on the
+# builds the test project (it holds git-ignored copies of the tested function blocks from IAG50cm/POUs, made by the first step) and runs it on the
 # user-mode runtime (see IAG50cmTests/README.md). Needs no library install: the tests use no BROTLib code.
 #
 # runs-on is a self-hosted runner and most of these repos are public. Therefore: `push` only, NEVER
@@ -28,6 +28,12 @@ jobs:
     runs-on: [self-hosted, twincat, windows]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # XAE cannot link files from outside the project folder, so the test project holds (git-ignored) copies of
+      # the tested function blocks; copy them from IAG50cm/POUs, the code that is activated on the telescope.
+      - name: Copy tested function blocks
+        shell: powershell
+        run: .\IAG50cmTests\tools\Sync-Sources.ps1
 
       # The PLC needs a license. The 7-day trial is renewed by hand; fail with a clear message instead of a
       # cryptic activation error once it has run out, or when a license the tests need is not in it.

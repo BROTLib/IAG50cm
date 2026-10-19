@@ -1,8 +1,9 @@
 # IAG50cmTests
 
 TcUnit tests for pure-logic function blocks of the IAG50cm application (IAG50cm#120). A separate PLC project, so no
-test code ends up in the telescope project. It compiles the tested files straight from `IAG50cm/POUs` (linked, not
-copied), so the tests always run against the code that is activated on the telescope.
+test code ends up in the telescope project. It holds copies of the tested files from `IAG50cm/POUs` (XAE cannot link files from outside the project folder). They are
+git-ignored and made by `tools/Sync-Sources.ps1`, which CI runs before the build, so the tests always run against the
+code that is activated on the telescope. Run it by hand before opening the project in XAE.
 
 ## What is covered
 
@@ -23,6 +24,7 @@ Same as BROTLibTests (see `BROTLib/BROTLibTests/README.md`): TcUnit must be inst
 and licensed.
 
 ```
+powershell -File tools\Sync-Sources.ps1
 TcBuild build IAG50cmTests.sln
 powershell -File tools\Run-Tests.ps1
 ```

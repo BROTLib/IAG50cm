@@ -36,13 +36,11 @@
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="..\..\..\IAG50cm\POUs\FB_StopTransaction.TcPOU">
+    <Compile Include="POUs\FB_StopTransaction.TcPOU">
       <SubType>Code</SubType>
-      <Link>POUs\FB_StopTransaction.TcPOU</Link>
     </Compile>
-    <Compile Include="..\..\..\IAG50cm\POUs\FB_HomeDropReason.TcPOU">
+    <Compile Include="POUs\FB_HomeDropReason.TcPOU">
       <SubType>Code</SubType>
-      <Link>POUs\FB_HomeDropReason.TcPOU</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>

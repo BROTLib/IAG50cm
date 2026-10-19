@@ -1,0 +1,3 @@
+# Copies of IAG50cm/POUs, made by tools/Sync-Sources.ps1 (CI runs it before the build)
+FB_StopTransaction.TcPOU
+FB_HomeDropReason.TcPOU
