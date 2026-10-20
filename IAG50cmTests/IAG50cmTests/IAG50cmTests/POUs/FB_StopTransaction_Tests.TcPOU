@@ -1,0 +1,741 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_StopTransaction_Tests" Id="{fb137325-2e79-42fd-bbe5-166df9f6bde0}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_StopTransaction, the stop logic of FB_TelescopeControl._StopTelescope: one MC_Stop per axis and
+// transaction (#108, #117) and the settle condition before a home may start (#98). One step() is one scan:
+// the request logic, then Monitor(), in the order the telescope calls them. A stop that is rejected, dropped or
+// never reports Done keeps StandStill FALSE: it must not be sent again within the transaction (#120).
+FUNCTION_BLOCK FB_StopTransaction_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis();
+Axis_At_Standstill_Is_Not_Stopped();
+Running_Stop_Is_Not_Retriggered_Per_Scan();
+First_Standstill_Sample_Does_Not_Settle();
+Settles_After_Done_And_Three_Clear_Scans();
+Lock_Restarts_The_Clear_Count();
+Missing_Done_Never_Settles();
+Done_In_Different_Scans();
+Disabled_Axis_Counts_As_Done();
+Axis_Without_Stop_Needs_No_Done();
+Not_At_Rest_Never_Settles();
+Done_Before_The_Transaction_Is_Ignored();
+New_Transaction_Sends_Stop_Again();
+Cancel_Releases_The_Wait();
+Without_Begin_Finishes_When_At_Rest();
+Not_Settled_While_Homing_Runs();
+Homing_Abort_After_Lock_Settles();
+Outputs_Are_One_Scan_Pulses();
+]]></ST>
+    </Implementation>
+    <Method Name="Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis" Id="{a44efb43-09ce-47be-9280-43477da45e79}">
+      <Declaration><![CDATA[METHOD PRIVATE Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis');
+fbTx.Begin();
+FOR i := 1 TO 300 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nHa, Message := 'HA stops sent');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'Dec stops sent');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'still active');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bFinished, Message := 'not finished');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Axis_At_Standstill_Is_Not_Stopped" Id="{f868158a-5f7d-420c-a2b5-037092b4287c}">
+      <Declaration><![CDATA[METHOD PRIVATE Axis_At_Standstill_Is_Not_Stopped
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Axis_At_Standstill_Is_Not_Stopped');
+fbTx.Begin();
+FOR i := 1 TO 10 DO
+fbTx(bHaStandStill := TRUE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_INT(Expected := 0, Actual := nHa, Message := 'HA stops sent');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'Dec stops sent');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Running_Stop_Is_Not_Retriggered_Per_Scan" Id="{533f75d5-e8bf-4cf6-b95b-87b2b4a9d432}">
+      <Declaration><![CDATA[METHOD PRIVATE Running_Stop_Is_Not_Retriggered_Per_Scan
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Running_Stop_Is_Not_Retriggered_Per_Scan');
+// a running MC_Stop reports StandStill FALSE; the old code asked again after every StopDone (#108)
+fbTx.Begin();
+FOR i := 1 TO 2 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+FOR i := 1 TO 2 DO
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+FOR i := 1 TO 5 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nHa, Message := 'HA stops sent');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'Dec stops sent');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="First_Standstill_Sample_Does_Not_Settle" Id="{cfc8f9c0-f15d-4435-ae1e-6a68fe9ed551}">
+      <Declaration><![CDATA[METHOD PRIVATE First_Standstill_Sample_Does_Not_Settle
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('First_Standstill_Sample_Does_Not_Settle');
+// 2026-10-19 capture (#98): the scan after MC_Stop.Execute still has StandStill TRUE, bStopped is TRUE once
+// before the stop takes hold and the axes lock; this must not end the transaction
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'after the false standstill sample');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bFinished, Message := 'not finished after the false sample');
+FOR i := 1 TO 3 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := TRUE, bDecLocked := TRUE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'during the lock');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Settles_After_Done_And_Three_Clear_Scans" Id="{d47d128b-41c9-4738-8ac1-7572101f3f1d}">
+      <Declaration><![CDATA[METHOD PRIVATE Settles_After_Done_And_Three_Clear_Scans
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Settles_After_Done_And_Three_Clear_Scans');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := TRUE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'two clear scans: not yet');
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'three clear scans: settled');
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bFinished, Message := 'finished');
+AssertEquals_INT(Expected := 1, Actual := nHa, Message := 'HA stops sent');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'Dec stops sent');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Lock_Restarts_The_Clear_Count" Id="{171a8a58-9ece-40bd-a347-2ebcfd53af0c}">
+      <Declaration><![CDATA[METHOD PRIVATE Lock_Restarts_The_Clear_Count
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Lock_Restarts_The_Clear_Count');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := TRUE, bDecStopDone := TRUE, bHaLocked := TRUE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 10 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := TRUE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'locked: active');
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'two scans after the lock: active');
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'three scans after the lock: settled');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Missing_Done_Never_Settles" Id="{8e262666-f0de-40a1-a488-838f90d88111}">
+      <Declaration><![CDATA[METHOD PRIVATE Missing_Done_Never_Settles
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Missing_Done_Never_Settles');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 100 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'HA never reported Done');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bFinished, Message := 'not finished');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Done_In_Different_Scans" Id="{1db482f8-3eb8-4f5e-867e-bd8e6bc517b1}">
+      <Declaration><![CDATA[METHOD PRIVATE Done_In_Different_Scans
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Done_In_Different_Scans');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 5 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'HA still missing');
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := TRUE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 2 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'settled after both Done');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Disabled_Axis_Counts_As_Done" Id="{bd18d748-b5a5-4104-beec-d05f41d5dd64}">
+      <Declaration><![CDATA[METHOD PRIVATE Disabled_Axis_Counts_As_Done
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Disabled_Axis_Counts_As_Done');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 5 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := FALSE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'settled');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Axis_Without_Stop_Needs_No_Done" Id="{6f222041-3542-457e-bedf-050f4891261d}">
+      <Declaration><![CDATA[METHOD PRIVATE Axis_Without_Stop_Needs_No_Done
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Axis_Without_Stop_Needs_No_Done');
+fbTx.Begin();
+FOR i := 1 TO 2 DO
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'two scans');
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'settled after three clear scans');
+AssertEquals_INT(Expected := 0, Actual := nHa, Message := 'HA stops sent');
+AssertEquals_INT(Expected := 0, Actual := nDec, Message := 'Dec stops sent');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Not_At_Rest_Never_Settles" Id="{bdea2b78-3312-41b6-b471-c78bf207214b}">
+      <Declaration><![CDATA[METHOD PRIVATE Not_At_Rest_Never_Settles
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Not_At_Rest_Never_Settles');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 50 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := TRUE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'not at rest');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Done_Before_The_Transaction_Is_Ignored" Id="{29954a4f-0795-432f-b588-99b0201cd29a}">
+      <Declaration><![CDATA[METHOD PRIVATE Done_Before_The_Transaction_Is_Ignored
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Done_Before_The_Transaction_Is_Ignored');
+fbTx.Begin();
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := TRUE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 20 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'a new transaction needs its own Done');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="New_Transaction_Sends_Stop_Again" Id="{5199921b-ad4b-464a-9f70-46ce24682232}">
+      <Declaration><![CDATA[METHOD PRIVATE New_Transaction_Sends_Stop_Again
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('New_Transaction_Sends_Stop_Again');
+fbTx.Begin();
+FOR i := 1 TO 50 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+fbTx.Begin();
+FOR i := 1 TO 50 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_INT(Expected := 2, Actual := nHa, Message := 'HA stops sent');
+AssertEquals_INT(Expected := 2, Actual := nDec, Message := 'Dec stops sent');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'active again');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Cancel_Releases_The_Wait" Id="{a530c6ab-32f3-4658-a413-0103ac1baaed}">
+      <Declaration><![CDATA[METHOD PRIVATE Cancel_Releases_The_Wait
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Cancel_Releases_The_Wait');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'active');
+fbTx.Cancel();
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'cancelled');
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bFinished, Message := 'finished at rest');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Without_Begin_Finishes_When_At_Rest" Id="{5eadadcf-aef8-4cf4-80a6-d5b2277b4355}">
+      <Declaration><![CDATA[METHOD PRIVATE Without_Begin_Finishes_When_At_Rest
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Without_Begin_Finishes_When_At_Rest');
+// no transaction (as before #98): one stop per axis, finished as soon as the telescope is at rest
+FOR i := 1 TO 50 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nHa, Message := 'HA stops sent');
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'Dec stops sent');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bFinished, Message := 'moving');
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bFinished, Message := 'at rest');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Not_Settled_While_Homing_Runs" Id="{80e3f06f-66c9-4b67-b947-b459afe274ff}">
+      <Declaration><![CDATA[METHOD PRIVATE Not_Settled_While_Homing_Runs
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Not_Settled_While_Homing_Runs');
+// #113: a calibration sweep that is still being aborted keeps the transaction open
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := TRUE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+FOR i := 1 TO 20 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := TRUE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'HA homing still busy');
+FOR i := 1 TO 20 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := TRUE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'Dec homing still busy');
+FOR i := 1 TO 3 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'settled when the homing is idle');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Homing_Abort_After_Lock_Settles" Id="{a56077e7-1c6c-4b24-ab98-cfe74ea651a5}">
+      <Declaration><![CDATA[METHOD PRIVATE Homing_Abort_After_Lock_Settles
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Homing_Abort_After_Lock_Settles');
+// #113: stop in the sweep, the homing is aborted after the lock has cleared, only then the transaction ends
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := TRUE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := TRUE, bDecHoming := TRUE);
+FOR i := 1 TO 5 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := TRUE, bDecHoming := TRUE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bActive, Message := 'abort running');
+FOR i := 1 TO 3 DO
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'abort done, settled');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Outputs_Are_One_Scan_Pulses" Id="{120a66d6-8bd3-427e-aa6b-7c253aee6c69}">
+      <Declaration><![CDATA[METHOD PRIVATE Outputs_Are_One_Scan_Pulses
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nHa		: INT;
+	nDec	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Outputs_Are_One_Scan_Pulses');
+fbTx.Begin();
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bStopHa, Message := 'first scan: bStopHa');
+fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bStopHa, Message := 'second scan: bStopHa');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bStopDec, Message := 'second scan: bStopDec');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

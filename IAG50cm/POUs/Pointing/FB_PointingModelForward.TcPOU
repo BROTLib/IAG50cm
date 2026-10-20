@@ -35,6 +35,7 @@ VAR
 	sin_lat	: LREAL;
 	cos_lat : LREAL;
 	sin_alt : LREAL;
+	sin_alt_rate : LREAL;
 	cos_alt : LREAL;
 END_VAR
 VAR CONSTANT
@@ -58,10 +59,17 @@ sin_lat := SIN(lat);
 cos_lat := COS(lat);
 
 // alt difference estimation (WITHOUT Nutation, Aberation, Presession)
-sin_alt := SIN(dec) * sin_lat + COS(dec) * cos_lat * cos_TAU;
-alt := ASIN(sin_alt);
-cos_alt := COS(alt);
-alt_diff := -omega * (1/SQRT(1 - sin_alt*sin_alt)) * COS(dec) * cos_lat * SIN(tau);
+sin_alt := sin_DEC * sin_lat + cos_DEC * cos_lat * cos_TAU;
+sin_alt := LIMIT(-1.0, sin_alt, 1.0);	// rounding can give 1 + 2.2E-16 at the zenith, ASIN of that is NaN (#4)
+alt := ASIN(sin_alt);					// diagnostics only, not used below
+cos_alt := SQRT(1.0 - sin_alt * sin_alt);	// = COS(alt) >= 0
+// d(sin alt)/dt = cos(alt) * d(alt)/dt. Finite everywhere; d(alt)/dt itself is 0/0 at the zenith (#4)
+sin_alt_rate := -omega * cos_DEC * cos_lat * sin_TAU;
+IF cos_alt > 1.0E-9 THEN
+	alt_diff := sin_alt_rate / cos_alt;	// diagnostics only, not used below
+ELSE
+	alt_diff := 0.0;
+END_IF
 
 // ### TAU offset ###
 off_tau_esti := - C_mAl_tau * ((cos_TAU * sin_DEC) / cos_DEC);
@@ -76,7 +84,7 @@ off_tau_esti := off_tau_esti - C_NP_tau * (sin_DEC / cos_DEC);
 track_tau_esti := c_mal_tau * omega * ((sin_TAU * sin_DEC) / cos_DEC);
 track_tau_esti := track_tau_esti + c_mel_tau * omega * ((cos_TAU * sin_DEC) / cos_DEC);
 track_tau_esti := track_tau_esti + c_refr_tau * omega * ((cos_TAU * cos_lat) / (sin_alt * cos_DEC)); // 1ST derivative term
-track_tau_esti := track_tau_esti - c_refr_tau * alt_diff * cos_alt * ((sin_TAU * cos_lat) / (sin_alt*sin_alt * cos_DEC)); // 2nd term
+track_tau_esti := track_tau_esti - c_refr_tau * sin_alt_rate * ((sin_TAU * cos_lat) / (sin_alt*sin_alt * cos_DEC)); // 2nd term
 track_tau_esti := track_tau_esti + c_flex_tau * omega * ((cos_TAU * cos_lat) / cos_DEC);
 
 
@@ -90,9 +98,9 @@ off_dec_esti := off_dec_esti - C_Flex_dec * ((sin_lat - sin_alt * sin_DEC) / cos
 
 track_dec_esti := c_mal_dec * omega * cos_TAU;
 track_dec_esti := track_dec_esti - c_mel_dec * omega * sin_TAU;
-track_dec_esti := track_dec_esti - c_refr_dec * alt_diff * ((cos_alt * sin_DEC) / (cos_DEC * sin_alt));//# 1ST term
-track_dec_esti := track_dec_esti - c_refr_dec * alt_diff * cos_alt * ((sin_lat - sin_alt * sin_DEC) / (cos_DEC * sin_alt*sin_alt)); //# 2nd derivative term
-track_dec_esti := track_dec_esti + c_flex_dec * alt_diff * ((cos_alt * sin_DEC) / cos_DEC);
+track_dec_esti := track_dec_esti - c_refr_dec * sin_alt_rate * (sin_DEC / (cos_DEC * sin_alt));//# 1ST term
+track_dec_esti := track_dec_esti - c_refr_dec * sin_alt_rate * ((sin_lat - sin_alt * sin_DEC) / (cos_DEC * sin_alt*sin_alt)); //# 2nd derivative term
+track_dec_esti := track_dec_esti + c_flex_dec * sin_alt_rate * (sin_DEC / cos_DEC);
 
 HourAngle_correction	:= off_tau_esti;
 Declination_correction	:= off_dec_esti;

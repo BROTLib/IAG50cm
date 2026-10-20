@@ -16,6 +16,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	bStop				: BOOL;		// boolean, TRUE: Stop motion OF telescope immediately, set goto AND track TO FALSE. FALSE: Allow motion OF telescope again via track/goto).	
 	bReset				: BOOL;		// initiates reset on all axis
 	bSafetyAckRequest	: BOOL;		// set by a telescope reset, taken (and cleared) by MAIN which gives the safety acknowledge (#11)
+	bStartupAxisReset	: BOOL;		// set by MAIN once when the safety start-up is done: one axis reset pass like after the reset acknowledge (#103)
 	bAutoTrack			: BOOL := TRUE;	// automatic tracking after goto
 	fRightAscension		: LREAL :=  0.0;	//  right ascension, degrees, double	
 	fDeclination		: LREAL :=  0.0;	//  declination, degrees, double
@@ -50,12 +51,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	telescopeConfig		: ST_TelescopeConfig;
 END_VAR
 VAR
-    fbStartupReadiness : BROTLib.FB_StartupReadiness;
-    bStartupStart : BOOL;
-    bStartupCalibrating : BOOL;
-    bStartupCompleted : BOOL;
-    bStartupAborted : BOOL;
-    fLastPublishedReadyState : LREAL := -3.0;
+    fbStartup : BROTLib.FB_StartupControl;
 	fbComm 				: I_Comm;
 	fbCabinet			: FB_CabinetControl;
 	
@@ -108,10 +104,14 @@ VAR
 	sParkWhy			: STRING(160);	// what the emergency park commanded, for the park log lines (#57)
 	sHomeEnd			: STRING(40) := 'completed';	// the same for the home (#75)
 	bHomeCancelled		: BOOL;		// a pending home that never started was dropped (one scan): logs the reason (#75)
+	sHomeDropWhy		: STRING(160);	// why the pending home was dropped, for the WARN text (#108)
+	fbStopTx			: FB_StopTransaction;	// #108/#120: one stop per axis and stop transaction
+	fbHomeDrop			: FB_HomeDropReason;	// #108/#120: why a pending home was dropped
 	tonHomePending		: TON;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
+	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: TON;		// power on timeout
 	tonCommandTimeout		: TON;		// command timeout
@@ -138,7 +138,8 @@ VAR
 	TCSsoftErrorEvent,
 	TCSparkErrorEvent,
 	TCShomeCancelEvent,
-	TCSpowerBlockedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request)
+	TCSpowerBlockedEvent,
+	TCScommandRefusedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
 	
@@ -156,6 +157,8 @@ VAR_OUTPUT
 	bSliding			: BOOL;		//TRUE, IF telescope is in fast-MOVE phase (includes pole-swap)	
 	bTracking			: BOOL;		//TRUE, IF telescope is on tracking position AND currently tracking.	
 	bStopped			: BOOL;		//TRUE, IF telescope is AT rest.	
+	fbSweepStop			: FB_SweepStop;	// #113: switches the uncalibrated axes off after a stop in the calibration sweep
+	bSettled			: BOOL;		// #98: at rest AND no stop transaction running (every stopped axis reported Done, no motion lock): gate of every home/restart that follows a stop
 	fHourAngleCurrent	: LREAL;	// current position of the hour angle (without pointing and offset correction)
 	fDeclinationCurrent	: LREAL;	// current position of the declination (without pointing and offset correction)
 	fRightAscensionCurrentICRS	: LREAL;	// true position of the right ascension (without pointing and offset correction) nut, aberr and precess corrected
@@ -177,15 +180,8 @@ VAR CONSTANT
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[// Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
-bStartupStart := bPower;
-bStartupCalibrating := FALSE;
-bStartupCompleted := FALSE;
-bStartupAborted := FALSE;
-// A repeated request to an already online telescope must not restart calibration.
-IF bPower AND fbStartupReadiness.Initialized AND bReady THEN
-    bPower := FALSE;
-    bStartupStart := FALSE;
-END_IF
+// A repeated request to an already online telescope is dropped, it must not restart calibration.
+bPower := fbStartup.BeginScan(Power := bPower, Ready := bReady);
 // get the system time; fJd only follows the clock while the clock is valid (synced, see FB_AstroClock)
 fbTime();
 IF fbTime.bValid THEN
@@ -210,7 +206,7 @@ rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND (bError OR bSafetyAckPe
 bResetRequest := FALSE;
 
 IF bReset THEN
-    bStartupAborted := TRUE;
+    fbStartup.MarkAborted();
 	bTestError := FALSE;
 	bSoftwareError := FALSE;
 	nSoftwareErrorID := 0;
@@ -232,7 +228,12 @@ IF bReset THEN
 		fbDome.Reset();
 	END_IF
 	// reset the stages of all statemachine methods
-	bInterupted := TRUE; 
+	// #100: a goto/slew/track request that is still pending must not outlive the reset (the error clears them only
+	// while it lasts)
+	bGoto := FALSE;
+	bSlew := FALSE;
+	bTrack := FALSE;
+	bInterupted := TRUE;
 	_HomeTelescope();
 	_GotoTelescope();
 	_SlewTelescope();
@@ -255,6 +256,13 @@ END_IF
 // acknowledge (MAIN, bSafetyAckRequest: ErrAck 1 s, Restart 1 s), so the axes are reset again once it is done.
 // The second pass resets every axis that is errored or not enabled (#55): after an E-stop HA and Dec can have lost
 // their enable without latching an error, and then failed at the next power-on (18000) until they got a reset.
+// #103: the safety start-up (MAIN) acknowledges like the reset does, but nothing reset the axes afterwards. After a
+// Reset Cold the first enable then failed with 18000 until a reset=1 gave the second pass below. Experiment: run that
+// pass once after the start-up. It also holds the power-on at stages 0 and 40 for its 2.5 s, like after a reset.
+IF bStartupAxisReset THEN
+	bStartupAxisReset := FALSE;
+	bAxisResetAfterAck := TRUE;
+END_IF
 IF bReset THEN
 	bSafetyAckRequest := TRUE;
 	bAxisResetAfterAck := TRUE;
@@ -393,7 +401,7 @@ fbEq2Hor(
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
 // (also gated on fPointingSafeAltitude so tracking never lingers in the pointing model's chaotic zone)
 IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
-	IF NOT bStopped AND NOT bGoHome THEN
+	IF NOT bSettled AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
@@ -401,7 +409,7 @@ IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
 END_IF
 // If the Telescope goes into the forbidden polezone (e.g. while tracking, stop and gohome)
 IF (fDeclinationCurrent > (90.0 - fPoleZone)) OR (bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)))THEN
-	IF NOT bStopped AND NOT bGoHome THEN
+	IF NOT bSettled AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
@@ -472,9 +480,12 @@ tonParkTimeout(IN := bPark AND TCS_command = E_TCSCommand.park AND NOT bError, P
 // stage 100 can wait a few scans for bReady, and a stop from slew speed takes about 4 s. Not during a power-on.
 tonHomePending(IN := bGoHome AND TCS_command <> E_TCSCommand.gohome AND NOT bPower AND NOT bError, PT := T#2M);
 IF tonHomePending.Q THEN
-    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;
+    fbStartup.MarkAbortedIfInitializing();
 	bGoHome := FALSE;
-	sHomeEnd := 'cancelled: telescope not ready';
+	// #108: say what was pending. "Not ready, power on" was also logged when a stop before the home had not finished.
+	fbHomeDrop(bReady := bReady, bStopPending := TCS_command = E_TCSCommand.stop OR NOT bSettled);
+	sHomeEnd := fbHomeDrop.sEnd;
+	sHomeDropWhy := fbHomeDrop.sWhy;
 	bHomeCancelled := TRUE;
 END_IF
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
@@ -488,14 +499,16 @@ END_IF
 // #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
 // time) do not abort a running power-on, as before.
 IF bStop AND (bUserStop OR NOT bPower) THEN
-    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing OR bPower;
+    fbStartup.MarkAbortedIfStarting(Power := bPower);
 	bTrack := FALSE;
 	bStopping := FALSE;
 
 	// If the stop is during a movement, reset the stage of the movement first
 	IF bPower THEN
 		bPower := FALSE;
-		_PowerOn();		// bStop is set: resets its stage
+		IF _PowerOn() >= 40 THEN	// bStop is set: resets its stage; returns the stage it was in
+			fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
+		END_IF
 	ELSIF bPark THEN
 		bPark := FALSE;
 		sParkEnd := 'cancelled by stop';
@@ -533,7 +546,7 @@ ELSIF bStopping THEN
 	// command (its method would keep the axes going), so run the stop until the axes stand still. The pending
 	// command is picked up below in the next scan.
 	TCS_command := E_TCSCommand.stop;
-	IF bStopped THEN
+	IF bSettled THEN
 		bStopping := FALSE;
 	END_IF
 
@@ -655,14 +668,14 @@ ELSIF bGoHome THEN
 			bStopping := TRUE;	// #43, only if the preempted command is the one moving
 		END_IF
 
-	ELSIF TCS_command <> E_TCSCommand.gohome AND NOT bStopped AND (TCS_command = E_TCSCommand.track OR fbHourAngle.Tracking OR fbDeclination.Tracking) THEN
+	ELSIF TCS_command <> E_TCSCommand.gohome AND NOT bSettled AND (TCS_command = E_TCSCommand.track OR fbHourAngle.Tracking OR fbDeclination.Tracking) THEN
 		// #72: a home during tracking waited for bStopped, which is never TRUE while the axes track, so it never
 		// ran (bGoHome stayed set) until a stop. End the tracking through the stop (#43); the home starts when the
 		// axes stand still.
 		bStopping := TRUE;
 
 	ELSE
-		IF bReady AND NOT bBusy AND bStopped THEN
+		IF bReady AND NOT bBusy AND bSettled THEN
 			bInterupted := FALSE;
 			TCS_command := E_TCSCommand.gohome;
 		END_IF
@@ -727,6 +740,11 @@ bUserStop := FALSE;
 IF TCS_command <> eLastTimeoutCommand THEN
 	tonCommandTimeout(IN := FALSE);
 	eLastTimeoutCommand := TCS_command;
+	// #108: a stop transaction starts here and lasts as long as TCS_command stays stop (also through the wait of a
+	// gohome that preempted a track): each axis gets one stop in it
+	IF TCS_command = E_TCSCommand.stop THEN
+		fbStopTx.Begin();
+	END_IF
 END_IF
 
 IF TCS_command = E_TCSCommand.poweron THEN
@@ -773,6 +791,36 @@ tonTrackingDelay(in := fbHourAngle.fbAxis.isTracking AND
 
 bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
 			(NOT fbDeclination.bEnable OR fbDeclination.fbAxis.StandStill);
+
+// #98: bStopped is TRUE for one scan at the start of every stop, before MC_Stop has taken hold (StandStill is still
+// TRUE), and a home commanded while MC_Stop locks the axis (StateDWord bit 29) fails with 17135. A stop transaction
+// is settled when every axis that was sent a stop reported Done and no axis has been locked for 3 scans.
+IF bReset OR bError OR bEstopTriggered THEN
+	fbStopTx.Cancel();
+	fbSweepStop.Cancel();
+END_IF
+fbStopTx.Monitor(	bStopped := bStopped,
+					bHaEnabled := fbHourAngle.bEnable, bDecEnabled := fbDeclination.bEnable,
+					bHaStopDone := fbHourAngle.fbAxis.StopDone, bDecStopDone := fbDeclination.fbAxis.StopDone,
+					bHaLocked := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
+					bDecLocked := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
+					bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy);
+bSettled := bStopped AND NOT fbStopTx.bActive;
+
+// #113: a stop in the calibration sweep leaves the axes enabled and uncalibrated; once the stop has settled and the
+// homing is aborted, switch the uncalibrated axes off (the next power-on starts the sweep again), READY_STATE -2
+IF bPower THEN
+	fbSweepStop.Cancel();
+END_IF
+fbSweepStop(bSettled := bSettled,
+			bHaCalibrated := fbHourAngle.bCalibrated, bDecCalibrated := fbDeclination.bCalibrated,
+			bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy);
+IF fbSweepStop.bDisableHa THEN
+	fbHourAngle.Enable := FALSE;
+END_IF
+IF fbSweepStop.bDisableDec THEN
+	fbDeclination.Enable := FALSE;
+END_IF
 			
 bHomed := fbHourAngle.bCalibrated AND fbDeclination.bCalibrated AND (fbFocus <> 0 AND_THEN fbFocus.Calibrated);
 			
@@ -787,16 +835,12 @@ bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy OR (fbFocus <> 0 A
 //----------------------------------------------------------------------------------------------
 (* STATUS STATES*)
 // Public completion is latched only by the final startup stage, never by mechanical bReady alone.
-fbStartupReadiness(
-    Start := bStartupStart,
-    Calibrating := bStartupCalibrating,
-    Completed := bStartupCompleted,
-    Aborted := bStartupAborted OR bEstopTriggered,
+fReadyState := fbStartup.Update(
     Error := bError OR bSoftwareError OR bPowerFailure OR bEstopTriggered,
     Parked := bIsParked,
     Parking := bPark AND NOT bPower,
-    Operational := bReady AND bMainReady AND NOT bEstopTriggered);
-fReadyState := fbStartupReadiness.ReadyState;
+    Operational := bReady AND bMainReady AND NOT bEstopTriggered,
+    AbortExtra := bEstopTriggered);
 //nMotionState
 IF bStopped THEN
 	nMotionState := 0;
@@ -823,9 +867,8 @@ IF bEstopTriggered THEN
 END_IF
 //----------------------------------------------------------------------------------------------
 // The readiness field uses its existing topic and numeric format.
-IF fReadyState <> fLastPublishedReadyState AND fbComm <> 0 THEN
+IF fbStartup.PublishDue(CommValid := fbComm <> 0, Heartbeat := FALSE) THEN
     fbComm.Publish('telescope', 'dome', 'TELESCOPE.READY_STATE', LREAL_TO_STRING(fReadyState));
-    fLastPublishedReadyState := fReadyState;
 END_IF
 // send telemetry
 
@@ -917,7 +960,7 @@ bParkInError := FALSE;
 TCShomeCancelEvent(	Trigger := bHomeCancelled,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
-				OnMessage := 'Home request dropped: the telescope was not ready for 2 min. Power on, then send the home again.',
+				OnMessage := CONCAT('Home request dropped: ', sHomeDropWhy),
 				Comm := fbComm);
 bHomeCancelled := FALSE;
 TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
@@ -925,6 +968,11 @@ TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
 				FormatString := '%s',
 				Comm := fbComm);
 bPowerBlocked := FALSE;
+TCScommandRefusedEvent(	Trigger := bCommandRefused,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				Comm := fbComm);
+bCommandRefused := FALSE;
 TCSsoftErrorEvent(	Trigger := bSoftwareError,
 				Level := ADSLOG_MSGTYPE_ERROR,
 				FormatString := 'Command timeout error %s',	// 16 goto, 32 park, 48 gohome, 64 slew (16#10, 16#20, 16#30, 16#40)
@@ -1084,7 +1132,7 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[_HomeTelescope := nStage;
 IF tonHomeTimeout.Q THEN
-    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;	// MONETcommon#17: fed every scan in the body
+    fbStartup.MarkAbortedIfInitializing();	// MONETcommon#17: fed every scan in the body
 	bSoftwareError := TRUE;		// #30
 	nSoftwareErrorID := 16#30;
 	bGoHome := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
@@ -1094,13 +1142,13 @@ IF tonHomeTimeout.Q THEN
 END_IF
 
 IF bReset OR bError OR bStop OR bInterupted THEN
-    bStartupAborted := bStartupAborted OR fbStartupReadiness.Initializing;
+    fbStartup.MarkAbortedIfInitializing();
 	nStage := 0;
 	RETURN;
 END_IF
 CASE nStage OF
 	0:	
-		IF bReady AND bStopped AND NOT bBusy THEN
+		IF bReady AND bSettled AND NOT bBusy THEN
 			nStage := 10;
 		END_IF
 	10:
@@ -1170,7 +1218,7 @@ CASE nStage OF
         IF fbFocus <> 0 THEN
             fbFocus.Position := telescopeConfig.focusHome;
         END_IF
-        IF fbStartupReadiness.Initializing THEN
+        IF fbStartup.Initializing THEN
             // Only initialization waits for its remaining focus work; manual Home semantics stay unchanged.
             nStage := 110;
         ELSE
@@ -1186,7 +1234,7 @@ CASE nStage OF
             ABS(fbFocus.Position - fbFocus.ActualPosition) <= fStartupFocusTolerance)) AND bReady AND bMainReady AND bStopped AND NOT bBusy THEN
             fRightAscension := fRightAscensionCurrentICRS;
             fDeclination := fDeclinationCurrentICRS;
-            bStartupCompleted := TRUE;
+            fbStartup.MarkCompleted();
             bGoHome := FALSE;
             nStage := 0;
         END_IF
@@ -1449,7 +1497,7 @@ _PowerOn := nStage;
 IF NOT bPower OR bReset OR bError OR bStop OR bInterupted THEN
     // After a successful handoff bPower is false but the home phase still owns startup.
     IF bReset OR bError OR bStop OR bInterupted OR bPowerFailure THEN
-        bStartupAborted := TRUE;
+        fbStartup.MarkAborted();
         bPower := FALSE;
     END_IF
 	nStage := 0;
@@ -1457,7 +1505,7 @@ IF NOT bPower OR bReset OR bError OR bStop OR bInterupted THEN
 END_IF
 
 IF nStage >= 40 THEN
-    bStartupCalibrating := TRUE;
+    fbStartup.MarkCalibrating();
 END_IF
 
 CASE nStage OF
@@ -1489,7 +1537,11 @@ CASE nStage OF
 		IF NOT bAxisResetAfterAck THEN
 			fbHourAngle.Enable := TRUE;
 			fbDeclination.Enable := TRUE;
-			IF fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
+			// #100/#103: calibration alone is not enough. The NC keeps Homed through a Reset Cold while the drives are
+			// still in STO, so stages 40, 70 and 100 ran in consecutive scans before the enable failed (18000): stage 100
+			// set bIsPowered and the go-home, bReady pulsed ("startup finished") and the error left bIsPowered TRUE.
+			// Wait for the power status of both axes (MC_Power Status); an enable error ends the power-on above.
+			IF fbHourAngle.bReady AND fbDeclination.bReady AND fbHourAngle.Calibrated AND fbDeclination.Calibrated THEN
 				nStage := 70;
 			END_IF
 		END_IF
@@ -1879,20 +1931,21 @@ ELSIF fbHourAngle.MoveAxis = TRUE OR  fbDeclination.MoveAxis = TRUE THEN
 	fbHourAngle.MoveAxis := FALSE;
 	fbDeclination.MoveAxis := FALSE;
 ELSE
-	// Only issue Axis stop commands if they are moving
-	IF NOT fbHourAngle.fbAxis.StandStill THEN
+	// Only issue Axis stop commands if they are moving, and only one per axis and stop transaction (#108): a running
+	// MC_Stop reports StandStill FALSE, so asking again after every StopDone restarted it about 33 times per second.
+	// An axis that finishes a scan later than the other (HA outside its target window after 120 s of tracking) then
+	// never lined up with the other one, bStopped stayed FALSE and a gohome waiting for it was dropped. FB_AxisControl
+	// clears StopAxis on StopDone.
+	fbStopTx(	bHaStandStill := fbHourAngle.fbAxis.StandStill, bDecStandStill := fbDeclination.fbAxis.StandStill);
+	IF fbStopTx.bStopHa THEN
 		fbHourAngle.StopAxis := TRUE;
-	ELSE
-		fbHourAngle.StopAxis := FALSE;
 	END_IF
 	
-	IF NOT fbDeclination.fbAxis.StandStill THEN
+	IF fbStopTx.bStopDec THEN
 		fbDeclination.StopAxis := TRUE;
-	ELSE
-		fbDeclination.StopAxis := FALSE;
 	END_IF	
 
-	IF bStopped THEN
+	IF fbStopTx.bFinished THEN
 		fbHourAngle.StopAxis := FALSE;
 		fbDeclination.StopAxis := FALSE;
 		_StopTelescope := FALSE;
@@ -2091,7 +2144,8 @@ END_VAR
       <Declaration><![CDATA[METHOD Init : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[IF NOT fbStartupReadiness.Initializing AND fReadyState <> 1.0 THEN
+        <ST><![CDATA[// AcceptInit refuses while a startup runs or completed (also across a transient interlock, -2).
+IF fbStartup.AcceptInit() THEN
     bPower := TRUE;
     fReadyState := 0.7;
 END_IF
@@ -2126,6 +2180,19 @@ RaDec.Declination		:= fDeclinationCalc;]]></ST>
         <ST><![CDATA[bResetRequest := TRUE;]]></ST>
       </Implementation>
     </Method>
+    <Property Name="ReadyState" Id="{e6813a30-c227-4a62-a1fe-92138ff55729}" FolderPath="properties\">
+      <Declaration><![CDATA[// READY_STATE as published on TELESCOPE.READY_STATE; BROTLib.FB_Comm_MQTT_Influx accepts the focus command only at 1 (BROTLib#74)
+PROPERTY ReadyState : LREAL
+]]></Declaration>
+      <Get Name="Get" Id="{4b91fc1d-55a3-4123-8f16-1d45dde7ec9c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ReadyState := fReadyState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
     <Property Name="RightAscension" Id="{fbe599ea-0c8f-4d80-a746-e4e19f11c40d}" FolderPath="properties\">
       <Declaration><![CDATA[{warning 'add property implementation'}
 PROPERTY RightAscension : LREAL
@@ -2198,7 +2265,14 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[THIS^.fElevation 	:= fAltitude;
+        <ST><![CDATA[// #100: not while the telescope is not ready (parked, powering on, error). The request used to stay latched and
+// fired unnoticed after the next power-on; a client sends init first and waits for ready.
+IF NOT bReady THEN
+	TCScommandRefusedEvent.OnMessage := 'Slew refused: telescope not ready. Power on (init) and wait until it is ready, then send the slew again.';
+	bCommandRefused := TRUE;
+	RETURN;
+END_IF
+THIS^.fElevation 	:= fAltitude;
 THIS^.fAzimuth 	:= fAzimuth;
 bRestartSlew	:= bSlew;	// #41: a slew is already running, replace its target
 bSlew		:= TRUE;]]></ST>
@@ -2221,7 +2295,13 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[THIS^.fRightAscension	:= fRightAscension;
+        <ST><![CDATA[// #100: see Slew(); a track request while the telescope is not ready is refused, not latched
+IF NOT bReady THEN
+	TCScommandRefusedEvent.OnMessage := 'Track refused: telescope not ready. Power on (init) and wait until it is ready, then send the track again.';
+	bCommandRefused := TRUE;
+	RETURN;
+END_IF
+THIS^.fRightAscension	:= fRightAscension;
 THIS^.fDeclination	:= fDeclination;
 bRestartGoto	:= bGoto;	// #41: a goto is already running, replace its target
 bGoto			:= TRUE;]]></ST>

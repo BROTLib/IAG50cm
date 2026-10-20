@@ -6,6 +6,11 @@
 #
 # Requires: gh (GitHub CLI), already authenticated.
 #
+# Close TwinCAT XAE before running (it locks the installed libraries), and afterwards
+# check in the Library Manager that the placeholder (e.g. BROTLib, *) resolves to the
+# version just installed -- XAE can keep resolving an older one; if so, set the
+# resolution to the new version explicitly.
+#
 # -TcProfile is auto-discovered if not given explicitly, by reading TcVersion from
 # this repo's own .tsproj (e.g. TcVersion="3.1.4024.66" -> profile
 # "TwinCAT PLC Control_Build_4024.66") and matching it against this machine's
@@ -87,7 +92,10 @@ foreach ($lib in $Libraries) {
 
     Write-Host "  Installed: $($installedVersions -join ', '); latest: $latestVersion -- updating"
 
+    # Start from an empty folder: RepTool installs everything in it, so leftovers
+    # from earlier runs would be reinstalled (and the wrong file name reported).
     $tempDir = Join-Path $env:TEMP "libupdate-$lib"
+    if (Test-Path $tempDir) { Remove-Item -Recurse -Force -Path $tempDir }
     New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
     gh release download $latestTag -R "BROTLib/$lib" -p "*.library" -D $tempDir --clobber
 
