@@ -31,4 +31,4 @@ TcBuild build IAG50cmTests.sln
 powershell -File tools\Run-Tests.ps1
 ```
 
-CI: `.github/workflows/tests.yml` does this on every push (self-hosted runner, same queue as BROTLib's tests).
+CI: `.github/workflows/tcbuild.yml` does this on every push (self-hosted runner, same queue as BROTLib's tests).
