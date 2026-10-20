@@ -2180,6 +2180,19 @@ RaDec.Declination		:= fDeclinationCalc;]]></ST>
         <ST><![CDATA[bResetRequest := TRUE;]]></ST>
       </Implementation>
     </Method>
+    <Property Name="ReadyState" Id="{e6813a30-c227-4a62-a1fe-92138ff55729}" FolderPath="properties\">
+      <Declaration><![CDATA[// READY_STATE as published on TELESCOPE.READY_STATE; BROTLib.FB_Comm_MQTT_Influx accepts the focus command only at 1 (BROTLib#74)
+PROPERTY ReadyState : LREAL
+]]></Declaration>
+      <Get Name="Get" Id="{4b91fc1d-55a3-4123-8f16-1d45dde7ec9c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ReadyState := fReadyState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
     <Property Name="RightAscension" Id="{fbe599ea-0c8f-4d80-a746-e4e19f11c40d}" FolderPath="properties\">
       <Declaration><![CDATA[{warning 'add property implementation'}
 PROPERTY RightAscension : LREAL
