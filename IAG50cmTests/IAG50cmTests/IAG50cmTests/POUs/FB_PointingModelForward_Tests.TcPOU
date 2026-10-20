@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_PointingModelForward_Tests" Id="{88bf79e3-f7f3-454d-be5e-7c7cc042f0fe}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_PointingModelForward at the zenith (#4): finite outputs, continuity, unchanged values elsewhere.
+FUNCTION_BLOCK FB_PointingModelForward_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Zenith_Is_Finite();
+Zenith_Velocity_Is_Sidereal();
+Near_Zenith_Is_Continuous();
+Reference_Points_Unchanged();
+]]></ST>
+    </Implementation>
+    <Method Name="Zenith_Is_Finite" Id="{8f719b3b-2e7e-46c0-961a-87bf874a4574}">
+      <Declaration><![CDATA[METHOD PRIVATE Zenith_Is_Finite
+VAR
+	fbModel	: FB_PointingModelForward;
+	i		: INT;
+	j		: INT;
+	fLat	: LREAL;
+	fHa		: LREAL;
+	bOk		: BOOL := TRUE;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Zenith_Is_Finite');
+// Dec = Lat, HA ~ 0, every latitude in 0.5 deg steps: sin_alt rounds to 1 + 2.2E-16 or exactly 1.0 for many of them (#4).
+// ST has no ISNAN: ABS(x) < 1E3 is FALSE for NaN and Inf (the outputs are a few deg or deg/s at most)
+FOR i := -179 TO 179 DO
+	fLat := INT_TO_LREAL(i) * 0.5;
+	FOR j := -1 TO 1 DO
+		fHa := INT_TO_LREAL(j) * 1.0E-6;
+		fbModel(HourAngle := fHa, Declination := fLat, Latitude := fLat);
+		bOk := bOk AND (ABS(fbModel.HourAngle_correction) < 1.0E3) AND (ABS(fbModel.Declination_correction) < 1.0E3)
+			AND (ABS(fbModel.HourAngle_velocity) < 1.0E3) AND (ABS(fbModel.Declination_velocity) < 1.0E3);
+	END_FOR
+END_FOR
+AssertTrue(Condition := bOk, Message := 'all outputs finite at the zenith');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Zenith_Velocity_Is_Sidereal" Id="{e45ac4fb-e136-436a-9636-a34ee20b895a}">
+      <Declaration><![CDATA[METHOD PRIVATE Zenith_Velocity_Is_Sidereal
+VAR
+	fbModel	: FB_PointingModelForward;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Zenith_Velocity_Is_Sidereal');
+// at the site zenith the HA velocity is close to sidereal (0.0039 deg/s) and the Dec velocity is small, no jump (#4)
+fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378);
+AssertEquals_LREAL(Expected := 0.003906120536459564, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity');
+AssertEquals_LREAL(Expected := 0.0000671134505799, Actual := fbModel.Declination_velocity, Delta := 1.0E-9, Message := 'Dec velocity');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Near_Zenith_Is_Continuous" Id="{e2032857-e82c-4c61-a470-643cdd298aa4}">
+      <Declaration><![CDATA[METHOD PRIVATE Near_Zenith_Is_Continuous
+VAR
+	fbModel	: FB_PointingModelForward;
+	fHaVelZenith	: LREAL;
+	fDecVelZenith	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Near_Zenith_Is_Continuous');
+fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378);
+fHaVelZenith := fbModel.HourAngle_velocity;
+fDecVelZenith := fbModel.Declination_velocity;
+fbModel(HourAngle := 1.0E-3, Declination := 51.5592378, Latitude := 51.5592378);
+AssertEquals_LREAL(Expected := fHaVelZenith, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-6, Message := 'HA velocity, HA offset');
+AssertEquals_LREAL(Expected := fDecVelZenith, Actual := fbModel.Declination_velocity, Delta := 1.0E-6, Message := 'Dec velocity, HA offset');
+fbModel(HourAngle := 0.0, Declination := 51.5592378 - 1.0E-3, Latitude := 51.5592378);
+AssertEquals_LREAL(Expected := fHaVelZenith, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-6, Message := 'HA velocity, Dec offset');
+AssertEquals_LREAL(Expected := fDecVelZenith, Actual := fbModel.Declination_velocity, Delta := 1.0E-6, Message := 'Dec velocity, Dec offset');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reference_Points_Unchanged" Id="{db1a8278-856e-4db0-91d0-3c2e27da78f1}">
+      <Declaration><![CDATA[METHOD PRIVATE Reference_Points_Unchanged
+VAR
+	fbModel	: FB_PointingModelForward;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Reference_Points_Unchanged');
+// reference values from testing/check_pointing_zenith.py, site latitude
+fbModel(HourAngle := 20.0, Declination := 40.0, Latitude := 51.5592378);
+AssertEquals_LREAL(Expected := 0.2519851785590655, Actual := fbModel.HourAngle_correction, Delta := 1.0E-9, Message := 'HA correction 1');
+AssertEquals_LREAL(Expected := -0.21403018480072264, Actual := fbModel.Declination_correction, Delta := 1.0E-9, Message := 'Dec correction 1');
+AssertEquals_LREAL(Expected := 0.004006846115724003, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity 1');
+AssertEquals_LREAL(Expected := 0.00016906699168115099, Actual := fbModel.Declination_velocity, Delta := 1.0E-9, Message := 'Dec velocity 1');
+fbModel(HourAngle := -35.0, Declination := 10.0, Latitude := 51.5592378);
+AssertEquals_LREAL(Expected := 0.3090530046351645, Actual := fbModel.HourAngle_correction, Delta := 1.0E-9, Message := 'HA correction 2');
+AssertEquals_LREAL(Expected := -0.19901388936334252, Actual := fbModel.Declination_correction, Delta := 1.0E-9, Message := 'Dec correction 2');
+AssertEquals_LREAL(Expected := 0.00406630604072863, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity 2');
+AssertEquals_LREAL(Expected := -0.0001359293011053651, Actual := fbModel.Declination_velocity, Delta := 1.0E-9, Message := 'Dec velocity 2');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
