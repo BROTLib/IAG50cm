@@ -14,3 +14,8 @@ foreach ($n in 'FB_StopTransaction', 'FB_HomeDropReason', 'FB_HomeHold', 'FB_Swe
   Copy-Item (Join-Path $repo "IAG50cm\POUs\$n.TcPOU") $dest -Force
   Write-Host "Copied $n.TcPOU"
 }
+# FB_PointingModelForward reads the fitted coefficients from GVL_Pointing
+Copy-Item (Join-Path $repo 'IAG50cm\POUs\Pointing\FB_PointingModelForward.TcPOU') $dest -Force
+Write-Host 'Copied FB_PointingModelForward.TcPOU'
+Copy-Item (Join-Path $repo 'IAG50cm\GVLs\GVL_Pointing.TcGVL') $dest -Force
+Write-Host 'Copied GVL_Pointing.TcGVL'

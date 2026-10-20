@@ -39,6 +39,9 @@
     <Compile Include="POUs\FB_SweepStop_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FB_PointingModelForward_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -52,6 +55,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_SweepStop.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_PointingModelForward.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\GVL_Pointing.TcGVL">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>

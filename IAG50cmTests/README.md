@@ -13,6 +13,7 @@ code that is activated on the telescope. Run it by hand before opening the proje
 | `FB_HomeDropReason_Tests` | `FB_HomeDropReason` | the WARN and end-state text when a pending home is dropped after 2 min: not ready, stop did not finish, axes busy, and their priority |
 | `FB_HomeHold_Tests` | `FB_HomeHold` | #113: a stop while the calibration sweep runs holds the homing request until the axis is disabled or reset |
 | `FB_SweepStop_Tests` | `FB_SweepStop` | #113: after a stop in the sweep the uncalibrated axes are switched off once the stop has settled and no homing runs (3 scans); calibrated axes stay; `Arm()` / `Cancel()` |
+| `FB_PointingModelForward_Tests` | `FB_PointingModelForward` | #4: all outputs finite at the zenith (Dec = Lat, every latitude, HA 0 and +-1E-6 deg), velocities continuous around it, and reference values elsewhere (also in `testing/check_pointing_zenith.py`) |
 
 `FB_TelescopeControl._StopTelescope` and the `tonHomePending` block call these function blocks, so the paths that cannot
 be reached on the real axes (a stop that never reports Done, a stuck stop behind a `gohome`) are tested here.
