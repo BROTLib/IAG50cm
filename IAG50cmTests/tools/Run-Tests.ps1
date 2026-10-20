@@ -103,7 +103,9 @@ try {
         Start-Sleep -Seconds 3
         Get-Process TcXaeShell -ErrorAction SilentlyContinue | Where-Object { $xaeOwn -contains $_.Id } | ForEach-Object {
             Write-Warning "XAE instance $($_.Id) did not quit; killing it."
-            Stop-Process -Id $_.Id -Force
+            # the instance can exit between Get-Process and here; $ErrorActionPreference = 'Stop' would turn that
+            # into a failed run before any test ran
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
         }
     }
 
