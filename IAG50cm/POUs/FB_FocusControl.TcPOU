@@ -9,6 +9,8 @@ VAR_INPUT
 END_VAR
 VAR
 	mqttTimer 			: TON := (PT:=T#5S);
+	fbFollower			: BROTLib.FB_MoveFollower;	// starts, re-targets and holds the move to fPosition (MONETcommon#122)
+	bHoldOnStop			: BOOL;		// Stop() was called: the target becomes the position reached at StopDone
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -20,20 +22,40 @@ IF bEnable AND NOT fbAxis.Calibrated THEN
 	THIS^.HomeAxis := TRUE;		// starts _StartHoming on FALSE -> TRUE
 END_IF
 
+// a new target during a move restarts it, MoveDone, abort, error and stop end it (MONETcommon#122); the inputs are
+// what fbAxis reported in its last call. The enable comes from the telescope, so bNeedEnable is not used.
+fbFollower(
+	fTarget		:= fPosition,
+	fActual		:= fActualPosition,
+	fTolerance	:= fTolerance,
+	bActive		:= fbAxis.Calibrated,
+	bReady		:= fbAxis.Ready AND NOT fbAxis.MoveDone,
+	bMoveDone	:= fbAxis.MoveDone,
+	bAborted	:= fbAxis.CommandAborted,
+	bError		:= bError,
+	bStopDone	:= fbAxis.StopDone);
+
+// Stop(): hold the position reached when the stop is done
+IF bHoldOnStop AND (fbAxis.StopDone OR fbAxis.StandStill) THEN
+	bHoldOnStop := FALSE;
+	IF fbAxis.Calibrated THEN
+		fPosition := fActualPosition;
+	END_IF
+END_IF
+
+// after an error a reset must not resume the old move by itself
+IF bError AND fbAxis.Calibrated THEN
+	fPosition := fActualPosition;
+END_IF
+
 IF fbAxis.Calibrated THEN
 	bHomeAxis := FALSE;
 	bCalibrated := fbAxis.Calibrated;
-	IF ABS(fPosition - fActualPosition) > fTolerance THEN
-			IF fbAxis.Ready AND NOT fbAxis.MoveDone THEN
-				// start a move on FALSE -> TRUE (BROTLib #63); bMoveAxis is cleared on MoveDone
-				IF NOT bMoveAxis THEN
-					fbAxis.MoveTo();
-				END_IF
-				bMoveAxis := TRUE;
-			ELSE
-				bMoveAxis := FALSE;
-			END_IF;
-	END_IF;
+	// MoveTo() starts the move, and again when the target changed during the move
+	IF fbFollower.bStartMove THEN
+		fbAxis.MoveTo();
+	END_IF
+	bMoveAxis := fbFollower.bMoving;
 END_IF
 
 
@@ -54,7 +76,7 @@ fbAxis(
 	ErrorID 		=> nErrorID,
 	AxisRef 		:= axisRef);
 	
-IF fbAxis.MoveDone OR bReset OR bError THEN
+IF bReset OR bError THEN
 	bMoveAxis := FALSE;
 END_IF
 
@@ -113,6 +135,46 @@ _StartHoming := TRUE;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="Stop" Id="{98d93a6c-4403-4356-bbdb-b56033b51151}">
+      <Declaration><![CDATA[// Stop a running focus move (MC_Stop) and hold the position reached: the target becomes the actual position at
+// StopDone, so the automatic positioning does not restart the move. A new Position afterwards moves again.
+// Returns TRUE when an MC_Stop was requested. MONETcommon#122.
+METHOD Stop : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbFollower.Stop();
+fbAxis.CancelMove();
+IF fbAxis.Ready AND NOT fbAxis.StandStill THEN
+	Stop := fbAxis.Stop();
+	bHoldOnStop := TRUE;
+ELSIF fbAxis.Calibrated THEN
+	fPosition := fActualPosition;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MinPosition" Id="{a790c09f-bba1-4982-bf5e-4717bf5dcf3c}">
+      <Declaration><![CDATA[PROPERTY PUBLIC MinPosition : LREAL]]></Declaration>
+      <Get Name="Get" Id="{80125d84-4e21-4ed8-90ce-1bee30ba5628}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MinPosition := fMinPosition;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="MaxPosition" Id="{b7ca1d71-8a33-4200-a4eb-b6f18035b9ea}">
+      <Declaration><![CDATA[PROPERTY PUBLIC MaxPosition : LREAL]]></Declaration>
+      <Get Name="Get" Id="{a3a5dd9b-f8be-48ed-b6a6-23a99c594e54}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MaxPosition := fMaxPosition;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
     <Method Name="HandleEvents" Id="{375f50c9-e6ea-4fcd-9fab-a26147b70ce8}">
       <Declaration><![CDATA[METHOD PRIVATE HandleEvents : BOOL
 VAR_INPUT
