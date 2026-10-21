@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_IagRig_Tests" Id="{025b1431-32ec-40da-b85c-6251e6da9130}" SpecialFunc="None">
+    <Declaration><![CDATA[// Spike S0 of the telescope state machine plan (BROTLib specs/plans/2026-10-21-telescope-state-machine-unification.md, step 0.3):
+// can the real IAG50cm FB_TelescopeControl run on axis mocks that subclass FB_HourAngleControl/FB_DeclinationControl? The
+// unlinked cabinet contacts read FALSE, which is a cabinet error and therefore a telescope error in every test: the rig sets
+// them TRUE through pointers each scan (no production change).
+FUNCTION_BLOCK FB_IagRig_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+	fbComm			: FB_NullComm;
+	fbHa			: FB_HourAngleMock(comm := fbComm);
+	fbDec			: FB_DeclinationMock(comm := fbComm);
+	fbFocus			: FB_FocusMock;
+	fbCovers		: FB_CoversMock;
+	fbDome			: FB_DomeMock;
+	fbTel			: FB_TelescopeControl(comm := fbComm);
+	pBool			: POINTER TO BOOL;
+END_VAR
+VAR CONSTANT
+	telescopeConfig	: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0,
+											 houranglePark := 0.0, declinationPark := 52.0, focusPark := 16.3,
+											 hourangleHome := 0.0, declinationHome := 52.0, focusHome := 16.3,
+											 name := 'Emmy Noether', diameter := 0.5, cabinet := 'Beckhoff', manufacturer := 'test',
+											 mountOptions := 'HA-DEC', mount := 'HA_DEC');
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Mock_Axis_Move_Reports_MoveDone();
+Rig_Instantiates_Iag_Telescope();
+]]></ST>
+    </Implementation>
+    <Method Name="CabinetOk" Id="{699e7a68-ae3e-4ca6-a078-6186c9636217}">
+      <Declaration><![CDATA[METHOD PRIVATE CabinetOk
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// the five contacts the cabinet error is made of (FB_CabinetControl, #10)
+pBool := ADR(fbTel.fbCabinet.bAuxiliaryContact24V);		pBool^ := TRUE;
+pBool := ADR(fbTel.fbCabinet.bAuxiliaryContact48V);		pBool^ := TRUE;
+pBool := ADR(fbTel.fbCabinet.bAuxiliaryContactHADEC);	pBool^ := TRUE;
+pBool := ADR(fbTel.fbCabinet.bAuxiliaryContactFOCUS);	pBool^ := TRUE;
+pBool := ADR(fbTel.fbCabinet.bCollectiveReport24VFuse);	pBool^ := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Mock_Axis_Move_Reports_MoveDone" Id="{2eb5324e-4ba0-4868-844c-32eec5f731e0}">
+      <Declaration><![CDATA[METHOD PRIVATE Mock_Axis_Move_Reports_MoveDone
+VAR
+	i			: INT;
+	bSeenDone	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Mock_Axis_Move_Reports_MoveDone');
+fbHa.bEnable := TRUE;
+FOR i := 1 TO 10 DO
+	fbHa();
+END_FOR
+AssertTrue(Condition := fbHa.Ready, Message := 'enabled mock axis is ready');
+AssertTrue(Condition := fbHa.Calibrated, Message := 'an enabled mock axis homes itself, like the real body');
+
+fbHa.Position := 30.0;
+fbHa.MoveAxis := TRUE;
+FOR i := 1 TO 20 DO
+	fbHa();
+	IF fbHa.MoveDone THEN
+		bSeenDone := TRUE;
+	END_IF
+END_FOR
+AssertTrue(Condition := bSeenDone, Message := 'MoveDone was reported');
+AssertFalse(Condition := fbHa.MoveAxis, Message := 'the move level is cleared on MoveDone');
+AssertEquals_LREAL(Expected := 30.0, Actual := fbHa.ActualPosition, Delta := 0.001, Message := 'position is the target');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Rig_Instantiates_Iag_Telescope" Id="{33e815fc-9b4f-4be7-b565-b4e9f5be61c2}">
+      <Declaration><![CDATA[METHOD PRIVATE Rig_Instantiates_Iag_Telescope
+VAR
+	i	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Rig_Instantiates_Iag_Telescope');
+FOR i := 1 TO 10 DO
+	CabinetOk();
+	fbTel(
+		fbHourAngle := fbHa,
+		fbDeclination := fbDec,
+		fbFocus := fbFocus,
+		fbDome := fbDome,
+		fbCovers := fbCovers,
+		telescopeConfig := telescopeConfig);
+	fbHa();
+	fbDec();
+END_FOR
+AssertFalse(Condition := fbTel.bError, Message := 'telescope on mock axes reports no error');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

@@ -2,7 +2,7 @@ name: TcBuild
 
 # Compiles IAG50cm.sln and runs the IAG50cmTests TcUnit suites (offline tests of the stop logic, #120) on the
 # shared self-hosted runner: builds the test project (it holds git-ignored copies of the tested function blocks
-# from IAG50cm/POUs, made by Sync-Sources.ps1; the tests use no BROTLib code, so no library install) and runs it
+# from IAG50cm/POUs, made by Sync-Sources.ps1; the telescope rig compiles against the pinned BROTLib, installed by the step below) and runs it
 # on the user-mode runtime (see IAG50cmTests/README.md). One job, so one runner slot per push.
 #
 # runs-on is a self-hosted runner and most of these repos are public. Therefore: `push` only, NEVER
