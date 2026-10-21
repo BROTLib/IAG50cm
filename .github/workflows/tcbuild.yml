@@ -42,6 +42,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: read     # tools/Find-TestedTree.ps1 lists earlier runs; a private repo (this one) needs it
       statuses: write   # the commit status below
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
