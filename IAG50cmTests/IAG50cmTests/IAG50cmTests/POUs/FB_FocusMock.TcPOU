@@ -13,6 +13,7 @@ VAR
 	fPos	: LREAL;
 	fTarget	: LREAL;
 	fVel	: LREAL;
+	nStop	: INT;		// number of Stop() calls
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -22,6 +23,37 @@ END_IF
 fPos := fTarget;
 ]]></ST>
     </Implementation>
+    <Method Name="Stop" Id="{23bdd15b-5914-43f8-a4ab-1ddba78da4a7}">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nStop := nStop + 1;
+Stop := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MinPosition" Id="{5d6ac3d9-931e-465f-85f9-3defb9d0eb84}">
+      <Declaration><![CDATA[PROPERTY MinPosition : LREAL]]></Declaration>
+      <Get Name="Get" Id="{088902ba-9239-4fb9-8d7a-53d6f6cd726c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MinPosition := -1.0E6;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="MaxPosition" Id="{278fefd5-d20e-4b37-8369-b61d776d023f}">
+      <Declaration><![CDATA[PROPERTY MaxPosition : LREAL]]></Declaration>
+      <Get Name="Get" Id="{dcffa58f-8457-49a9-a82b-e5d4f2db68f5}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MaxPosition := 1.0E6;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
     <Method Name="Reset" Id="{14e9fc07-28bd-416d-89a8-915cece929c7}">
       <Declaration><![CDATA[METHOD Reset : BOOL
 ]]></Declaration>
