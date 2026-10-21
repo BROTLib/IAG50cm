@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DeclinationMock" Id="{1cd21724-ef66-4330-9536-d805df2339cc}" SpecialFunc="None">
+    <Declaration><![CDATA[// Mock of FB_DeclinationControl for the telescope state machine tests (BROTLib plan 2026-10-21-telescope-state-machine-unification D1).
+FUNCTION_BLOCK FB_DeclinationMock EXTENDS FB_DeclinationControl
+VAR
+	fbCore	: FB_AxisMockCore;
+	pBool	: POINTER TO BOOL;
+	pLreal	: POINTER TO LREAL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// No SUPER^(): the real body (MC_* blocks, FB_LatchHome, AXIS_REF) does not run. The real property setters (MoveAxis ->
+// fbAxis.MoveTo(), StopAxis -> fbAxis.Stop(), HomeAxis) stay, so the telescope sees the real command interface. The real body
+// homes an enabled, uncalibrated axis by itself; the model does the same (bHome := bEnable). The model writes what the
+// telescope reads: the base outputs and, through pointers (FB_Axis outputs are not writable from outside), the nested fbAxis outputs.
+fbCore(bEnable := bEnable, bHome := bEnable, bMove := bMoveAxis, fTarget := fPosition);
+
+pBool := ADR(fbAxis.Ready);			pBool^ := fbCore.bReady;
+pBool := ADR(fbAxis.Calibrated);	pBool^ := fbCore.bCalibrated;
+pBool := ADR(fbAxis.HomeDone);		pBool^ := fbCore.bCalibrated;
+pBool := ADR(fbAxis.HomeActive);	pBool^ := fbCore.bHoming;
+pBool := ADR(fbAxis.Homing);		pBool^ := fbCore.bHoming;
+pBool := ADR(fbAxis.InMotion);		pBool^ := fbCore.bInMotion;
+pBool := ADR(fbAxis.StandStill);	pBool^ := fbCore.bStandStill;
+pBool := ADR(fbAxis.MoveDone);		pBool^ := fbCore.bMoveDone;
+pBool := ADR(fbAxis.Busy);			pBool^ := fbCore.bInMotion OR fbCore.bHoming;
+pLreal := ADR(fbAxis.ActualPosition);	pLreal^ := fbCore.fPosition;
+
+bReady := fbCore.bReady AND fbCore.bStandStill;
+bCalibrated := fbCore.bCalibrated;
+fActualPosition := fbCore.fPosition;
+
+// the real control body clears the level on MoveDone
+IF fbCore.bMoveDone THEN
+	bMoveAxis := FALSE;
+END_IF
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

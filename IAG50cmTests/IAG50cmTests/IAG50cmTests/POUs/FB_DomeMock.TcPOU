@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DomeMock" Id="{74b5e9c4-aee8-474a-82a8-2fd18e1b13fe}" SpecialFunc="None">
+    <Declaration><![CDATA[// Mock of the dome (I_Dome): the commands only count, nothing moves.
+FUNCTION_BLOCK FB_DomeMock IMPLEMENTS BROTLib.I_Dome
+VAR
+	bFailed		: BOOL;
+	bIsParked	: BOOL := TRUE;
+	bIsTracking	: BOOL;
+	fPos		: LREAL;
+	eShutter	: BROTLib.E_RoofState;
+	nParkCalls	: UINT;
+	nTrackCalls	: UINT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+]]></ST>
+    </Implementation>
+    <Method Name="Close" Id="{2129f179-031c-4f16-bd66-db81fa9b1005}">
+      <Declaration><![CDATA[METHOD Close : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Close := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Open" Id="{20583fa2-bb60-4421-a846-f8ae6a5b394d}">
+      <Declaration><![CDATA[METHOD Open : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Open := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Park" Id="{612c7cbe-c374-40fc-aee3-0dd3942dd3aa}">
+      <Declaration><![CDATA[METHOD Park : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nParkCalls := nParkCalls + 1;
+bIsParked := TRUE;
+bIsTracking := FALSE;
+Park := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset" Id="{07dd30a6-7dd2-47ae-bbb3-5c4ccb3770b5}">
+      <Declaration><![CDATA[METHOD Reset : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bFailed := FALSE;
+Reset := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop" Id="{5177b14e-dec0-4c85-bd3d-17b5bcaca6c1}">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stop := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StopTrack" Id="{f6d30648-cb35-4ad5-b22a-d2bb57129016}">
+      <Declaration><![CDATA[METHOD StopTrack : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bIsTracking := FALSE;
+StopTrack := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Track" Id="{f8ee75c3-d379-4942-94af-1349be030839}">
+      <Declaration><![CDATA[METHOD Track : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nTrackCalls := nTrackCalls + 1;
+bIsParked := FALSE;
+bIsTracking := TRUE;
+Track := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Capabilities" Id="{03a7f995-12ef-4a2c-b156-e33d3ea8554b}">
+      <Declaration><![CDATA[PROPERTY Capabilities : INT]]></Declaration>
+      <Get Name="Get" Id="{8e33c849-7617-492e-ae36-d0ede0ddb282}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Capabilities := 0;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Error" Id="{4f30c872-0f26-4bbf-b89c-0da617b5700b}">
+      <Declaration><![CDATA[PROPERTY Error : BOOL]]></Declaration>
+      <Get Name="Get" Id="{d7f504c5-464f-4ef2-9a67-f4eb5c50992a}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Error := bFailed;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ErrorID" Id="{ae8fbed9-2924-4324-a9dd-698112f6333d}">
+      <Declaration><![CDATA[PROPERTY ErrorID : UDINT]]></Declaration>
+      <Get Name="Get" Id="{202c93bd-bfa5-4566-9582-4063ab8d4e4a}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ErrorID := 0;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Parked" Id="{1d6f7c32-a789-4e79-9546-3a29a10b5397}">
+      <Declaration><![CDATA[PROPERTY Parked : BOOL]]></Declaration>
+      <Get Name="Get" Id="{18b6ee3c-221c-4155-97ff-83a4f1618aa8}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Parked := bIsParked;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Position" Id="{224850c9-b26e-42a4-9a47-7d0c92bee7ff}">
+      <Declaration><![CDATA[PROPERTY Position : LREAL]]></Declaration>
+      <Get Name="Get" Id="{b641347a-8ff8-445e-a2b6-dcee8fb3761a}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Position := fPos;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{b7b0b915-5512-4dca-bf2e-a75edf053aed}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[fPos := Position;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="RotState" Id="{1c9ce2fb-354e-47d0-8b14-4858c85f7387}">
+      <Declaration><![CDATA[PROPERTY RotState : BROTLib.E_DomeRotationState]]></Declaration>
+      <Get Name="Get" Id="{164b626b-44f4-4a14-8d2a-602ac13d2afa}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[RotState := BROTLib.E_DomeRotationState.idle;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ShutterState" Id="{fe66c2d3-1a0b-4cb6-a946-327c65b64388}">
+      <Declaration><![CDATA[PROPERTY ShutterState : BROTLib.E_RoofState]]></Declaration>
+      <Get Name="Get" Id="{2b0a14fe-3f82-4bce-8df3-40c70fb2665e}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ShutterState := eShutter;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{277f1e06-73aa-4701-8b4d-5b60b2264ac8}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[eShutter := ShutterState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Tracking" Id="{e46826cf-7133-4a7a-9ba5-ef975eb49554}">
+      <Declaration><![CDATA[PROPERTY Tracking : BOOL]]></Declaration>
+      <Get Name="Get" Id="{4e56767f-2f6e-4f66-8b83-c7a9c0367dfe}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Tracking := bIsTracking;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>
