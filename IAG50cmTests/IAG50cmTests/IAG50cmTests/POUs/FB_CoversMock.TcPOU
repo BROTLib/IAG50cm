@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_CoversMock" Id="{012aa109-a307-4f4a-912d-8723ceeda833}" SpecialFunc="None">
+    <Declaration><![CDATA[// Mock of the mirror covers (I_MirrorCovers): Open/Close take effect at once.
+FUNCTION_BLOCK FB_CoversMock IMPLEMENTS BROTLib.I_MirrorCovers
+VAR
+	bOpened		: BOOL;
+	bClosed		: BOOL := TRUE;
+	bFailed		: BOOL;
+	nOpenCalls	: UINT;
+	nCloseCalls	: UINT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+]]></ST>
+    </Implementation>
+    <Method Name="Open" Id="{13845e21-9c3e-4dac-b959-05571002f911}">
+      <Declaration><![CDATA[METHOD Open : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bOpened := TRUE;
+bClosed := FALSE;
+nOpenCalls := nOpenCalls + 1;
+Open := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Close" Id="{656096ac-ec16-41d0-b289-34747ce3f99b}">
+      <Declaration><![CDATA[METHOD Close : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bOpened := FALSE;
+bClosed := TRUE;
+nCloseCalls := nCloseCalls + 1;
+Close := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset" Id="{4ff33918-9b37-404a-9749-6f3afb8baa3c}">
+      <Declaration><![CDATA[METHOD Reset : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bFailed := FALSE;
+Reset := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Opened" Id="{fba570be-a0a2-4e23-9865-61e4da490848}">
+      <Declaration><![CDATA[PROPERTY Opened : BOOL]]></Declaration>
+      <Get Name="Get" Id="{d58103d1-991b-4192-8a45-f3aa4cebda72}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Opened := bOpened;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Closed" Id="{7625856f-be1f-47bf-b814-ccb6a41d741b}">
+      <Declaration><![CDATA[PROPERTY Closed : BOOL]]></Declaration>
+      <Get Name="Get" Id="{d7e43db7-68e3-4543-9de8-f14deb00cbeb}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Closed := bClosed;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Error" Id="{a5ed7b97-9402-4c8f-9ba4-5e6a096dcc20}">
+      <Declaration><![CDATA[PROPERTY Error : BOOL]]></Declaration>
+      <Get Name="Get" Id="{e0c06a2c-4379-42ec-b938-ee5f2578c49c}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Error := bFailed;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>
