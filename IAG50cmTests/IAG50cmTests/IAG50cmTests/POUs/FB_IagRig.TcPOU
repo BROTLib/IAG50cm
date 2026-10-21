@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_IagRig" Id="{f911297a-7486-47f1-9f44-b3154b341e1d}" SpecialFunc="None">
+    <Declaration><![CDATA[// The IAG50cm telescope on mock axes, scanned in the MAIN order (axes, then the telescope; IAG50cm/POUs/MAIN.TcPOU).
+// One Scan() is one PLC scan. The scenario tests own one rig each (VAR_INST of the test method) and call Scan() once per
+// PLC cycle: the astronomical clock needs a real NT_GetTime round trip (up to about 5 s) before FB_TelescopeControl accepts a
+// goto/slew/track, so a rig is not usable before ClockValid. Everything else counts scans, not time.
+// Plan: BROTLib specs/plans/2026-10-21-telescope-state-machine-unification.md (D1, step 2).
+FUNCTION_BLOCK FB_IagRig
+VAR
+	fbComm			: FB_NullComm;
+	fbHa			: FB_HourAngleMock(comm := fbComm);
+	fbDec			: FB_DeclinationMock(comm := fbComm);
+	fbFocus			: FB_FocusMock;
+	fbCovers		: FB_CoversMock;
+	fbDome			: FB_DomeMock;
+	fbTel			: FB_TelescopeControl(comm := fbComm);
+	pBool			: POINTER TO BOOL;
+	nScans			: UDINT;
+END_VAR
+VAR CONSTANT
+	telescopeConfig	: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0,
+											 houranglePark := 0.0, declinationPark := 52.0, focusPark := 16.3,
+											 hourangleHome := 0.0, declinationHome := 52.0, focusHome := 16.3,
+											 name := 'Emmy Noether', diameter := 0.5, cabinet := 'Beckhoff', manufacturer := 'test',
+											 mountOptions := 'HA-DEC', mount := 'HA_DEC');
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[
+]]></ST>
+    </Implementation>
+    <Method Name="Scan" Id="{fa6422ce-24fd-4aeb-b8a7-2d38ea6a1e96}">
+      <Declaration><![CDATA[METHOD Scan
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// the five contacts the cabinet error is made of (FB_CabinetControl, #10); unlinked they read FALSE
+pBool := ADR(fbTel.fbCabinet.bAuxiliaryContact24V);		pBool^ := TRUE;
+pBool := ADR(fbTel.fbCabinet.bAuxiliaryContact48V);		pBool^ := TRUE;
+pBool := ADR(fbTel.fbCabinet.bAuxiliaryContactHADEC);	pBool^ := TRUE;
+pBool := ADR(fbTel.fbCabinet.bAuxiliaryContactFOCUS);	pBool^ := TRUE;
+pBool := ADR(fbTel.fbCabinet.bCollectiveReport24VFuse);	pBool^ := TRUE;
+
+fbHa();
+fbDec();
+fbFocus();
+fbTel(
+	fbHourAngle := fbHa,
+	fbDeclination := fbDec,
+	fbFocus := fbFocus,
+	fbDome := fbDome,
+	fbCovers := fbCovers,
+	telescopeConfig := telescopeConfig);
+nScans := nScans + 1;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ClockValid" Id="{a65ae0e9-65c9-4b55-8f9e-7139e8ee047a}">
+      <Declaration><![CDATA[PROPERTY ClockValid : BOOL]]></Declaration>
+      <Get Name="Get" Id="{b2e5b616-98ac-4ad2-8d2b-76302ac69731}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ClockValid := fbTel.fbTime.bValid;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Online" Id="{dbe83508-7e2e-403f-9bf0-c4cf26a65310}">
+      <Declaration><![CDATA[PROPERTY Online : BOOL]]></Declaration>
+      <Get Name="Get" Id="{69a3b469-7b54-4fd0-894e-68b9927ea365}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Online := fbTel.ReadyState = 1.0;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagStopDuringSlew_Tests" Id="{5b3e06cb-4ef6-40a7-b073-cc1380feb139}" SpecialFunc="None">
+    <Declaration><![CDATA[// Characterization of FB_TelescopeControl (IAG50cm) for a stop during a slew, on mock axes (plan step 2, IAG50cmTests README).
+// These tests pin what the code does today, with the line of the behaviour in a comment; they are not a specification. Every
+// test owns a rig and runs over many PLC cycles (VAR_INST of the method, one Scan() per cycle); TcUnit calls all test methods
+// every cycle, so the rigs warm up their clocks in parallel. A step that does not happen within its cycle budget fails the
+// test with a message instead of hanging the run.
+FUNCTION_BLOCK IagStopDuringSlew_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Stop_During_Slew_One_Stop_For_The_Moving_Axis();
+Stop_Drops_The_Move_Before_Sending_The_Axis_Stop();
+Stop_Clears_The_Slew_And_Settles();
+]]></ST>
+    </Implementation>
+    <Method Name="Stop_During_Slew_One_Stop_For_The_Moving_Axis" Id="{aefa6ac1-f109-4163-a897-dbd0b91ae7dc}">
+      <Declaration><![CDATA[// #108: one MC_Stop per axis that is not at rest, none for an axis at rest. The IAG slew moves one axis at a time
+// (_SlewTelescope stages 30..33 / 40..43), so only one axis is moving when the stop comes.
+METHOD PRIVATE Stop_During_Slew_One_Stop_For_The_Moving_Axis
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bHaMoving	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_During_Slew_One_Stop_For_The_Moving_Axis');
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0), then slew
+	IF rig.Online THEN
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// wait until one axis is moving (the slew moves HA and Dec one after the other)
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		bHaMoving := rig.fbHa.MoveAxis;
+		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'bSlew is set while the slew runs');
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// let the move run for a few scans, then stop
+	IF nCycles >= 5 THEN
+		rig.fbTel.Stop();
+		nStep := 40;
+		nCycles := 0;
+	END_IF
+40:	// wait until the stop has settled
+	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		AssertEquals_UINT(Expected := SEL(bHaMoving, UINT#0, UINT#1), Actual := rig.fbHa.nStopEdges, Message := 'HA: one stop if it was the moving axis, none otherwise');
+		AssertEquals_UINT(Expected := SEL(bHaMoving, UINT#1, UINT#0), Actual := rig.fbDec.nStopEdges, Message := 'Dec: one stop if it was the moving axis, none otherwise');
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_Drops_The_Move_Before_Sending_The_Axis_Stop" Id="{c10fca0b-b98b-4f07-8436-58982a282ab0}">
+      <Declaration><![CDATA[// _StopTelescope (I:1927-1953): the first scan of a stop only drops MoveAxis (the first branch; that does not stop a running
+// move); the axis stop (StopAxis) is sent in the next scan.
+METHOD PRIVATE Stop_Drops_The_Move_Before_Sending_The_Axis_Stop
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bHaMoving	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_Drops_The_Move_Before_Sending_The_Axis_Stop');
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0), then slew
+	IF rig.Online THEN
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// wait until one axis is moving (the slew moves HA and Dec one after the other)
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		bHaMoving := rig.fbHa.MoveAxis;
+		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'bSlew is set while the slew runs');
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// let the move run for a few scans, then stop
+	IF nCycles >= 5 THEN
+		rig.fbTel.Stop();
+		nStep := 40;
+		nCycles := 0;
+	END_IF
+40:	// scan 1 of the stop has just run: the move is dropped, no axis stop yet; scan 2 sends it
+	IF nCycles = 1 THEN
+		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'scan 1 of the stop drops the move');
+		AssertFalse(Condition := rig.fbHa.StopAxis OR rig.fbDec.StopAxis, Message := 'scan 1 of the stop does not send an axis stop yet');
+	ELSIF nCycles = 2 THEN
+		AssertTrue(Condition := SEL(bHaMoving, rig.fbDec.StopAxis, rig.fbHa.StopAxis), Message := 'scan 2 sends the stop to the axis that was moving');
+		AssertFalse(Condition := SEL(bHaMoving, rig.fbHa.StopAxis, rig.fbDec.StopAxis), Message := 'scan 2 sends no stop to the axis at rest');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_Clears_The_Slew_And_Settles" Id="{71f1a941-1613-44ee-bcb8-9d58e4de9677}">
+      <Declaration><![CDATA[// Arbitration (I:501-526): a user stop during a slew drops bSlew, runs the stop until the axes stand still, and releases bStop.
+METHOD PRIVATE Stop_Clears_The_Slew_And_Settles
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bHaMoving	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_Clears_The_Slew_And_Settles');
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0), then slew
+	IF rig.Online THEN
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// wait until one axis is moving (the slew moves HA and Dec one after the other)
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		bHaMoving := rig.fbHa.MoveAxis;
+		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'bSlew is set while the slew runs');
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// let the move run for a few scans, then stop
+	IF nCycles >= 5 THEN
+		rig.fbTel.Stop();
+		nStep := 40;
+		nCycles := 0;
+	END_IF
+40:
+	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		AssertFalse(Condition := rig.fbTel.bSlew, Message := 'the stop dropped bSlew');
+		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'no axis move is left');
+		AssertTrue(Condition := rig.fbTel.bReady, Message := 'the telescope is still ready after the stop');
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
