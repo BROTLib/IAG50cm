@@ -18,7 +18,7 @@
     <LibraryReferences>{ec693b73-ba10-4552-8093-a205a0d9c8b6}</LibraryReferences>
     <Released>false</Released>
     <CompilerDefines />
-    <ProjectVersion>0.4.0</ProjectVersion>
+    <ProjectVersion>0.4.1</ProjectVersion>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
@@ -221,7 +221,7 @@
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.9.0 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.10.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="System_VisuElemBase">

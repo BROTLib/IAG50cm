@@ -2283,7 +2283,12 @@ bSlew		:= TRUE;]]></ST>
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bUserStop := TRUE;
-bStop := TRUE;]]></ST>
+bStop := TRUE;
+// MONETcommon#122: an explicit stop also stops a running focus move and holds the position reached; the automatic
+// stops of the mount (horizon, pole zone) leave the focus alone
+IF fbFocus <> 0 THEN
+	fbFocus.Stop();
+END_IF]]></ST>
       </Implementation>
     </Method>
     <Method Name="Track" Id="{6d7c3b1b-06e1-4002-b952-698198812e9b}" FolderPath="command methods\">
