@@ -10,6 +10,7 @@ VAR
 	fbSweepStopTests		: FB_SweepStop_Tests;
 	fbPointingForwardTests	: FB_PointingModelForward_Tests;
 	fbIagRigTests			: FB_IagRig_Tests;
+	fbStopDuringSlewTests	: IagStopDuringSlew_Tests;
 END_VAR
 ]]></Declaration>
     <Implementation>

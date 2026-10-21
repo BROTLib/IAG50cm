@@ -58,6 +58,7 @@ END_FOR
 AssertTrue(Condition := fbHa.Ready, Message := 'enabled mock axis is ready');
 AssertTrue(Condition := fbHa.Calibrated, Message := 'an enabled mock axis homes itself, like the real body');
 
+fbHa.nMockMoveScans := 4;	// the default move takes 60 scans (long enough to interrupt it in the scenario suites)
 fbHa.Position := 30.0;
 fbHa.MoveAxis := TRUE;
 FOR i := 1 TO 20 DO

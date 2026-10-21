@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
-  <POU Name="FB_DeclinationMock" Id="{1cd21724-ef66-4330-9536-d805df2339cc}" SpecialFunc="None">
+  <POU Name="FB_DeclinationMock" Id="{57fbf48f-2fef-40e6-840e-22207df6742e}" SpecialFunc="None">
     <Declaration><![CDATA[// Mock of FB_DeclinationControl for the telescope state machine tests (BROTLib plan 2026-10-21-telescope-state-machine-unification D1).
 FUNCTION_BLOCK FB_DeclinationMock EXTENDS FB_DeclinationControl
+VAR_INPUT
+	nMockMoveScans	: UINT := 60;	// scans a move takes (the telescope sees Busy meanwhile)
+	nMockStopScans	: UINT := 3;	// scans an MC_Stop takes until Done
+END_VAR
+VAR_OUTPUT
+	nStopEdges		: UINT;			// stop requests the telescope made (rising edges of StopAxis)
+END_VAR
 VAR
 	fbCore	: FB_AxisMockCore;
 	pBool	: POINTER TO BOOL;
@@ -14,7 +21,8 @@ END_VAR
 // fbAxis.MoveTo(), StopAxis -> fbAxis.Stop(), HomeAxis) stay, so the telescope sees the real command interface. The real body
 // homes an enabled, uncalibrated axis by itself; the model does the same (bHome := bEnable). The model writes what the
 // telescope reads: the base outputs and, through pointers (FB_Axis outputs are not writable from outside), the nested fbAxis outputs.
-fbCore(bEnable := bEnable, bHome := bEnable, bMove := bMoveAxis, fTarget := fPosition);
+fbCore(bEnable := bEnable, bHome := bEnable, bMove := bMoveAxis, bStop := bStopAxis, fTarget := fPosition,
+	nMoveScans := nMockMoveScans, nStopScans := nMockStopScans);
 
 pBool := ADR(fbAxis.Ready);			pBool^ := fbCore.bReady;
 pBool := ADR(fbAxis.Calibrated);	pBool^ := fbCore.bCalibrated;
@@ -24,16 +32,22 @@ pBool := ADR(fbAxis.Homing);		pBool^ := fbCore.bHoming;
 pBool := ADR(fbAxis.InMotion);		pBool^ := fbCore.bInMotion;
 pBool := ADR(fbAxis.StandStill);	pBool^ := fbCore.bStandStill;
 pBool := ADR(fbAxis.MoveDone);		pBool^ := fbCore.bMoveDone;
+pBool := ADR(fbAxis.Stopping);		pBool^ := fbCore.bStopping;
+pBool := ADR(fbAxis.StopDone);		pBool^ := fbCore.bStopDone;
 pBool := ADR(fbAxis.Busy);			pBool^ := fbCore.bInMotion OR fbCore.bHoming;
 pLreal := ADR(fbAxis.ActualPosition);	pLreal^ := fbCore.fPosition;
 
 bReady := fbCore.bReady AND fbCore.bStandStill;
+nStopEdges := fbCore.nStopEdges;
 bCalibrated := fbCore.bCalibrated;
 fActualPosition := fbCore.fPosition;
 
-// the real control body clears the level on MoveDone
+// the real control body clears the level on MoveDone, and bStopAxis on StopDone
 IF fbCore.bMoveDone THEN
 	bMoveAxis := FALSE;
+END_IF
+IF fbCore.bStopDone THEN
+	bStopAxis := FALSE;
 END_IF
 ]]></ST>
     </Implementation>
