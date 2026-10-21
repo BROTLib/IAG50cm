@@ -155,6 +155,7 @@ jobs:
             Start-Sleep -Seconds 30
           }
           if ($LASTEXITCODE -gt 1) { exit $LASTEXITCODE }
+          exit 0   # exit 1 = built with compile warnings (the copied FB_TelescopeControl has empty interface members): a success
 
       # Exit 0 = all passed, 1 = a test failed, 2 = no result within the timeout.
       - name: Run tests
