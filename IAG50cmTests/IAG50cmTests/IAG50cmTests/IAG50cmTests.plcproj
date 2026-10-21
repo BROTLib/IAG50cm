@@ -125,6 +125,10 @@
     <Folder Include="POUs" />
   </ItemGroup>
   <ItemGroup>
+    <PlaceholderReference Include="AstroBROT">
+      <DefaultResolution>AstroBROT, 0.4.3 (BROT)</DefaultResolution>
+      <Namespace>AstroBROT</Namespace>
+    </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
       <DefaultResolution>BROTLib, 0.9.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
