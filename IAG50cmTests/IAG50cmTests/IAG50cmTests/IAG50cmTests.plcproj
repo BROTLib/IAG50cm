@@ -105,6 +105,12 @@
     <Compile Include="POUs\IagStopDuringSlew_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\GVL_Diag.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\F_Note.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
