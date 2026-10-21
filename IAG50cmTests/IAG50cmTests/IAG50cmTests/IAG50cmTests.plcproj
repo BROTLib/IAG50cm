@@ -111,6 +111,15 @@
     <Compile Include="POUs\F_Note.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\IagResetUnderMotion_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagErrorPark_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagParkDuringPowerOn_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
