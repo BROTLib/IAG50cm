@@ -154,7 +154,7 @@ END_CASE
     </Method>
     <Method Name="Park_With_The_Axes_Off_Does_Not_Move_The_Mount" Id="{931c8f25-b6ed-4706-9d5f-d5d39e5cdc18}">
       <Declaration><![CDATA[// I:555-600 (#54): a park on a telescope whose axes are off (never powered on) cannot drive the mount: the covers are closed and the
-// dome parked, nothing moves, bIsParked is not set.
+// dome parked, nothing moves. bIsParked is TRUE from the start (FB_TelescopeControl.bIsParked := TRUE) and the park leaves it.
 METHOD PRIVATE Park_With_The_Axes_Off_Does_Not_Move_The_Mount
 VAR_INST
 	rig			: FB_IagRig;
@@ -194,8 +194,8 @@ CASE nStep OF
 		F_Note(bFailed := NOT (rig.fbDome.nParkCalls >= 1), sText := CONCAT(sTest, 'the dome is parked'));
 		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park command is dropped');
 		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park command is dropped'));
-		AssertFalse(Condition := rig.fbTel.bIsParked, Message := 'the mount is not parked');
-		F_Note(bFailed := (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the mount is not parked'));
+		AssertTrue(Condition := rig.fbTel.bIsParked, Message := 'bIsParked is still TRUE, as from the start: the park changes nothing');
+		F_Note(bFailed := NOT (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked is still TRUE, as from the start: the park changes nothing'));
 		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'the mount was not moved');
 		F_Note(bFailed := (rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis), sText := CONCAT(sTest, 'the mount was not moved'));
 		nStep := 99;

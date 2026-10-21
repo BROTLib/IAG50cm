@@ -63,7 +63,7 @@ bError := bInjected;
 nErrorID := nInjectedId;
 ]]></ST>
     </Implementation>
-    <Method Name="InjectError" Id="{1b237f51-fe81-41ee-ad6f-7afcd0f42772}">
+    <Method Name="InjectError" Id="{bb406fff-c42f-42f6-a732-89188577a9a4}">
       <Declaration><![CDATA[// the axis reports an error with this id until the telescope resets it (bError/nErrorID are what the telescope reads)
 METHOD InjectError
 VAR_INPUT
