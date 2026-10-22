@@ -72,38 +72,11 @@ jobs:
       # The PLC needs a license. The 7-day trial is renewed by hand. Once it has run out, or when a license the
       # tests need is not in it, the tests cannot run: warn with a clear message and skip them (output ok=false)
       # instead of failing the build, which would block releases (the compile steps do not need it).
-      - name: Check TwinCAT license
-        if: steps.same.outputs.same != 'true'
-        id: license
+      - name: Get tctool
         shell: powershell
-        run: |
-          # (not `>>`: Windows PowerShell 5.1 would write UTF-16, which the runner cannot parse)
-          function Skip($msg) { Write-Host "::warning::$msg The tests are skipped."; [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ok=false`n"); exit 0 }
-          $file = 'C:\TwinCAT\3.1\Runtimes\UmRT_Default\3.1\Target\License\TrialLicense.tclrs'
-          if (-not (Test-Path $file)) { Skip "No trial license at $file." }
-          $expire = [datetime]([xml](Get-Content $file)).TcLicenseInfo.LicenseInfo.ExpireTime
-          $left = $expire - (Get-Date)
-          Write-Host "Trial license expires $expire ($([math]::Round($left.TotalHours)) h left)"
-          if ($left.TotalSeconds -le 0) { Skip "The TwinCAT trial license expired $expire. Renew it: XAE > SYSTEM > License > Manage Licenses > 7 Days Trial License." }
-          $have = @(([xml](Get-Content $file)).SelectNodes('//*[local-name()="License"]') | ForEach-Object { $_.OrderNo })
-          $missing = @('TC1200') | Where-Object { $have -notcontains $_ }
-          if ($missing) { Skip "The TwinCAT trial license does not contain $($missing -join ', '). Renew it with these ticked: XAE > SYSTEM > License > Manage Licenses, then 7 Days Trial License." }
-          if ($left.TotalDays -lt 2) { Write-Host "::warning::TwinCAT trial license expires $expire" }
-          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ok=true`n")
-
-      # The runtime is started at boot by the scheduled task 'TwinCAT UmRT_Default'.
-      # Not running: warn and skip the tests (output ok=false), same reason as the license check.
-      - name: Check user-mode runtime
-        if: steps.same.outputs.same != 'true'
-        id: runtime
-        shell: powershell
-        run: |
-          if (-not (Get-Process TcSystemServiceUm -ErrorAction SilentlyContinue)) {
-            Write-Host "::warning::The TwinCAT user-mode runtime is not running. It is started at boot by the scheduled task 'TwinCAT UmRT_Default'; start it with: Start-ScheduledTask 'TwinCAT UmRT_Default'. The tests are skipped."
-            [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ok=false`n")
-            exit 0
-          }
-          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ok=true`n")
+        env:
+          GH_TOKEN: ${{ secrets.TCTOOL_TOKEN }}
+        run: .\tools\Get-TcTool.ps1
 
       # The org libraries this repo pins in its .plcproj files are reinstalled from their GitHub release before the
       # build. A `*` reference picks the highest version in the shared library repository, and a branch build of
@@ -119,7 +92,7 @@ jobs:
         if: steps.same.outputs.same != 'true'
         shell: powershell
         run: |
-          & "$env:GITHUB_WORKSPACE\tools\Invoke-XaeBuild.ps1" build IAG50cm.sln
+          tctool IAG50cm.sln build
           if ($LASTEXITCODE -gt 1) { exit $LASTEXITCODE }
           exit 0
 
@@ -130,28 +103,29 @@ jobs:
         shell: powershell
         run: .\IAG50cmTests\tools\Sync-Sources.ps1
 
-      - name: Build IAG50cmTests
+      # One tctool call: build the tests (exit 1 = compile warnings: the copied FB_TelescopeControl has empty
+      # interface members, a success), then deploy them to the user-mode runtime and wait for TcUnit, in one XAE
+      # session. `run` checks the license and the runtime first and returns 13 if the tests cannot run: the build
+      # is checked either way, the job stays green with a warning (--skip-if-unavailable), and `ran` stays false so
+      # no `tests-passed` status is posted. Exit 2 = compile errors, 10 = a test failed or none ran, 11 = timeout,
+      # 14 = TwinCAT stayed in Config after the restart (license).
+      - name: Build and run IAG50cmTests
+        id: tests
         if: steps.same.outputs.same != 'true'
         shell: powershell
         working-directory: IAG50cmTests
         run: |
-          & "$env:GITHUB_WORKSPACE\tools\Invoke-XaeBuild.ps1" build IAG50cmTests.sln
-          if ($LASTEXITCODE -gt 1) { exit $LASTEXITCODE }
-          exit 0   # exit 1 = built with compile warnings (the copied FB_TelescopeControl has empty interface members): a success
-
-      # Exit 0 = all passed, 1 = a test failed, 2 = no result within the timeout.
-      - name: Run tests
-        id: tests
-        if: steps.same.outputs.same != 'true' && steps.license.outputs.ok == 'true' && steps.runtime.outputs.ok == 'true'
-        shell: powershell
-        run: |
-          & .\IAG50cmTests\tools\Run-Tests.ps1
-          exit $LASTEXITCODE
+          tctool IAG50cmTests.sln build run --require-license TC1200 --skip-if-unavailable
+          $code = $LASTEXITCODE
+          # (not `>>`: Windows PowerShell 5.1 would write UTF-16, which the runner cannot parse)
+          if ($code -le 1) { [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ran=true`n"); exit 0 }
+          if ($code -eq 13) { [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ran=false`n"); exit 0 }
+          exit $code
 
       # Proof for tools/Find-TestedTree.ps1 that the tests really ran on this commit (a run that skipped them
       # because the license or runtime was missing is green too and must not vouch for a later commit).
       - name: Mark the commit as tested (status `tests-passed`)
-        if: steps.tests.outcome == 'success'
+        if: steps.tests.outputs.ran == 'true'
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
