@@ -18,6 +18,7 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	bSafetyAckRequest	: BOOL;		// set by a telescope reset, taken (and cleared) by MAIN which gives the safety acknowledge (#11)
 	bStartupAxisReset	: BOOL;		// set by MAIN once when the safety start-up is done: one axis reset pass like after the reset acknowledge (#103)
 	bAutoTrack			: BOOL := TRUE;	// automatic tracking after goto
+	nTimeDivisor		: UDINT := 1;	// test seam (plan decision 4): divides the long timeouts (600 s, 2 min, 12 h); production leaves it at 1
 	fRightAscension		: LREAL :=  0.0;	//  right ascension, degrees, double	
 	fDeclination		: LREAL :=  0.0;	//  declination, degrees, double
 	fDeclinationApparent: LREAL :=	0.0;	// apparent declination , degrees, double
@@ -107,21 +108,21 @@ VAR
 	sHomeDropWhy		: STRING(160);	// why the pending home was dropped, for the WARN text (#108)
 	fbStopTx			: FB_StopTransaction;	// #108/#120: one stop per axis and stop transaction
 	fbHomeDrop			: FB_HomeDropReason;	// #108/#120: why a pending home was dropped
-	tonHomePending		: TON;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
+	tonHomePending		: FB_TimeoutTimer;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
 	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	tpPowerOnWarning		: TP;		// triggers power warning
-	tonPowerTimeout		: TON;		// power on timeout
-	tonCommandTimeout		: TON;		// command timeout
+	tonPowerTimeout		: FB_TimeoutTimer;		// power on timeout
+	tonCommandTimeout		: FB_TimeoutTimer;		// command timeout
 	// MONETcommon#17: 600 s timeouts of the goto/home/slew state machines. They were TONs in the methods' plain VAR, which is
 	// re-created on every call, so they never fired. Fed every scan in the body, reset when the command flag drops.
-	tonGotoTimeout			: TON;
-	tonHomeTimeout			: TON;
-	tonSlewTimeout			: TON;
-	tonParkTimeout			: TON;		// park had no state-machine timeout: covers that never close hung it forever
-	tonParkFocus			: TON;		// park stage 80 waits for the focus move to end (#56), at most 60 s
+	tonGotoTimeout			: FB_TimeoutTimer;
+	tonHomeTimeout			: FB_TimeoutTimer;
+	tonSlewTimeout			: FB_TimeoutTimer;
+	tonParkTimeout			: FB_TimeoutTimer;		// park had no state-machine timeout: covers that never close hung it forever
+	tonParkFocus			: FB_TimeoutTimer;		// park stage 80 waits for the focus move to end (#56), at most 60 s
 	tonTrackingDelay		: TON;		// tracking delay
 	
 	TCSpowerEvent,
@@ -463,7 +464,7 @@ END_IF
 
 tpPowerOnWarning(IN := bPower OR (NOT fbHourAngle.bEnable), PT := T#250MS);
 
-tonPowerTimeout(IN := TCS_command = E_TCSCommand.no_command AND NOT bIsParked, PT := T#12H);
+tonPowerTimeout(IN := TCS_command = E_TCSCommand.no_command AND NOT bIsParked, PT := T#12H, nDivisor := nTimeDivisor);
 tonCommandTimeout();
 
 // MONETcommon#17: state-machine timeouts, checked in _GotoTelescope/_HomeTelescope/_SlewTelescope
@@ -471,14 +472,14 @@ tonCommandTimeout();
 // Counting from the request, a command that never started (not ready, preempted) fired the timeout in the next
 // stop/park/reset after 600 s and latched an error, and with the horizon/pole auto-home setting bGoHome again every
 // scan the timer never dropped, so no reset cleared it.
-tonGotoTimeout(IN := bGoto AND TCS_command = E_TCSCommand.goto AND NOT bError, PT := T#600S);
-tonHomeTimeout(IN := bGoHome AND TCS_command = E_TCSCommand.gohome AND NOT bError, PT := T#600S);
-tonSlewTimeout(IN := bSlew AND TCS_command = E_TCSCommand.slew AND NOT bError, PT := T#600S);
-tonParkTimeout(IN := bPark AND TCS_command = E_TCSCommand.park AND NOT bError, PT := T#600S);
+tonGotoTimeout(IN := bGoto AND TCS_command = E_TCSCommand.goto AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
+tonHomeTimeout(IN := bGoHome AND TCS_command = E_TCSCommand.gohome AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
+tonSlewTimeout(IN := bSlew AND TCS_command = E_TCSCommand.slew AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
+tonParkTimeout(IN := bPark AND TCS_command = E_TCSCommand.park AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
 // #75: a Home() that never starts (axes off, telescope not ready) left bGoHome set for good, swallowing Track() and
 // Slew(). Drop it after 2 min, with a log line, without an error. Not at once: the home that the power-on requests in
 // stage 100 can wait a few scans for bReady, and a stop from slew speed takes about 4 s. Not during a power-on.
-tonHomePending(IN := bGoHome AND TCS_command <> E_TCSCommand.gohome AND NOT bPower AND NOT bError, PT := T#2M);
+tonHomePending(IN := bGoHome AND TCS_command <> E_TCSCommand.gohome AND NOT bPower AND NOT bError, PT := T#2M, nDivisor := nTimeDivisor);
 IF tonHomePending.Q THEN
     fbStartup.MarkAbortedIfInitializing();
 	bGoHome := FALSE;
@@ -698,7 +699,7 @@ ELSIF bGoto THEN
 		bInterupted := TRUE;
 		_GotoTelescope();
 		bInterupted := FALSE;
-		tonGotoTimeout(IN := FALSE, PT := T#600S);	// the timeout counts from the new request
+		tonGotoTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);	// the timeout counts from the new request
 		bStopping := TRUE;
 	ELSE
 		IF bReady AND NOT bBusy THEN
@@ -715,7 +716,7 @@ ELSIF bSlew THEN
 		bInterupted := TRUE;
 		_SlewTelescope();
 		bInterupted := FALSE;
-		tonSlewTimeout(IN := FALSE, PT := T#600S);	// the timeout counts from the new request
+		tonSlewTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);	// the timeout counts from the new request
 		bStopping := TRUE;
 	ELSIF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.slew;
@@ -749,31 +750,31 @@ END_IF
 
 IF TCS_command = E_TCSCommand.poweron THEN
 	_PowerOn();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.poweron, PT := T#12H);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.poweron, PT := T#12H, nDivisor := nTimeDivisor);
 	TCSCTOEvent.OnMessage := 'POWER';
 ELSIF TCS_command = E_TCSCommand.stop THEN
 	_StopTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.stop, PT := T#30S);	// #40: a stop from slew speed takes about 4 s, a preempting stop can follow a long move
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.stop, PT := T#30S, nDivisor := nTimeDivisor);	// #40: a stop from slew speed takes about 4 s, a preempting stop can follow a long move
 	TCSCTOEvent.OnMessage := 'STOP';
 ELSIF TCS_command = E_TCSCommand.park THEN
 	_ParkTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.park, PT := T#2M);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.park, PT := T#2M, nDivisor := nTimeDivisor);
 	TCSCTOEvent.OnMessage := 'PARK';
 ELSIF TCS_command = E_TCSCommand.gohome THEN
 	_HomeTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.gohome, PT := T#2M);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.gohome, PT := T#2M, nDivisor := nTimeDivisor);
 	TCSCTOEvent.OnMessage := 'GOHOME';
 ELSIF TCS_command = E_TCSCommand.goto THEN
 	_GotoTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.goto, PT := T#2M);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.goto, PT := T#2M, nDivisor := nTimeDivisor);
 	TCSCTOEvent.OnMessage := 'GOTO';
 ELSIF TCS_command = E_TCSCommand.slew THEN
 	_SlewTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.slew, PT := T#2M);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.slew, PT := T#2M, nDivisor := nTimeDivisor);
 	TCSCTOEvent.OnMessage := 'SLEW';
 ELSIF TCS_command = E_TCSCommand.track THEN
 	_TrackTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.track, PT := T#12H);
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.track, PT := T#12H, nDivisor := nTimeDivisor);
 	TCSCTOEvent.OnMessage := 'TRACK';
 ELSE
 	// disable command timeout
@@ -1380,7 +1381,7 @@ CASE nStage OF
 		// are off after about a second and the focus enable was removed while it was still moving (error 16992
 		// "Controller enable"). Wait until it has arrived or stopped (at most 60 s), then disable it.
 		bFocusMoving := fbFocus <> 0 AND_THEN (fbFocus.Calibrated AND (fbFocus.Busy OR ABS(fbFocus.Position - fbFocus.ActualPosition) > 0.05));
-		tonParkFocus(IN := bFocusMoving, PT := T#60S);
+		tonParkFocus(IN := bFocusMoving, PT := T#60S, nDivisor := nTimeDivisor);
 		IF NOT bFocusMoving OR tonParkFocus.Q THEN
 			IF fbFocus <> 0 THEN
 				fbFocus.Enable := FALSE;
