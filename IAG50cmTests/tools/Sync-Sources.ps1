@@ -28,5 +28,7 @@ foreach ($f in 'FB_TelescopeControl.TcPOU', 'FB_HourAngleControl.TcPOU', 'FB_Dec
   Copy-Item (Join-Path $repo "IAG50cm\POUs\$f") $dest -Force
   Write-Host "Copied $f"
 }
-Copy-Item (Join-Path $repo 'IAG50cm\DUTs\ST_TelescopeConfig.TcDUT') $dest -Force
-Write-Host 'Copied ST_TelescopeConfig.TcDUT'
+foreach ($d in 'ST_TelescopeConfig.TcDUT', 'ST_AxisStatus.TcDUT') {
+  Copy-Item (Join-Path $repo "IAG50cm\DUTs\$d") $dest -Force
+  Write-Host "Copied $d"
+}
