@@ -34,8 +34,7 @@ and licensed.
 
 ```
 powershell -File tools\Sync-Sources.ps1
-TcBuild build IAG50cmTests.sln
-powershell -File tools\Run-Tests.ps1
+tctool IAG50cmTests.sln build run --require-license TC1200
 ```
 
 CI: `.github/workflows/tcbuild.yml` does this on every push (self-hosted runner, same queue as BROTLib's tests).

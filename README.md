@@ -290,7 +290,7 @@ safety applications (EL1918/ELM7212/ELM7221 `.tfzip`), so the controller boots
 directly into the application. Licenses: TC3 IoT Communication (TF6701) and
 TC3 Serial Communication (TF6340).
 
-**CI.** `.github/workflows/tcbuild.yml` builds `IAG50cm.sln` with TcBuild on every push (self-hosted runner, never on pull requests). A green run means the project compiles; TcBuild exit code 1 (built with warnings) counts as success. It only compiles; no tests run in CI.
+**CI.** `.github/workflows/tcbuild.yml` builds `IAG50cm.sln` with [`tctool`](https://github.com/BROTLib/TcTool) on every push (self-hosted runner, never on pull requests) and runs the TcUnit tests of `IAG50cmTests` on the user-mode runtime (see `IAG50cmTests/README.md`). A green run means the project compiles and the tests passed, or that they were skipped with a warning because the TwinCAT license or runtime is missing; `tctool` exit code 1 (built with warnings) counts as success.
 
 ## Startup readiness (READY_STATE)
 
