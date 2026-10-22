@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagErrorPark_Tests" Id="{2dd607e0-a75d-4829-a14d-dd1661772089}" SpecialFunc="None">
+    <Declaration><![CDATA[// Characterization of FB_TelescopeControl (IAG50cm) for an axis error and for a park during an error or with the axes off, on mock
+// axes (plan step 2, IAG50cmTests README). These tests pin what the code does today, with the line of the behaviour in a comment;
+// they are not a specification. Every test owns a rig and runs over many PLC cycles (VAR_INST of the method, one Scan() per
+// cycle). Failed checks are also noted in GVL_Diag.sFailures (printed by Run-Tests.ps1).
+FUNCTION_BLOCK IagErrorPark_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current();
+Park_During_An_Error_Closes_The_Covers_And_Parks_The_Dome();
+Park_With_The_Axes_Off_Does_Not_Move_The_Mount();
+]]></ST>
+    </Implementation>
+    <Method Name="Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current" Id="{0423491c-a8e9-40cd-9002-9680002d64f8}">
+      <Declaration><![CDATA[// I:281-290: an axis error drops every move command and disables both axes, but IAG starts no emergency park on its own (MONET does,
+// MONETcommon#86). The telescope reports READY_STATE -1.0 and the covers stay as they are.
+METHOD PRIVATE Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current');
+sTest := 'Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// online: the hour angle reports an error
+	IF rig.Online THEN
+		rig.InjectHaError(16#4550);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:
+	IF nCycles >= 60 THEN
+		AssertTrue(Condition := rig.fbTel.bError, Message := 'the error is reported');
+		F_Note(bFailed := NOT (rig.fbTel.bError), sText := CONCAT(sTest, 'the error is reported'));
+		AssertFalse(Condition := rig.fbHa.bEnable OR rig.fbDec.bEnable, Message := 'both axes are disabled');
+		F_Note(bFailed := (rig.fbHa.bEnable OR rig.fbDec.bEnable), sText := CONCAT(sTest, 'both axes are disabled'));
+		AssertFalse(Condition := rig.fbTel.bPark OR rig.fbTel.bIsParked, Message := 'no emergency park');
+		F_Note(bFailed := (rig.fbTel.bPark OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'no emergency park'));
+		AssertTrue(Condition := rig.fbCovers.nCloseCalls = 0, Message := 'the covers were not closed');
+		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls = 0), sText := CONCAT(sTest, 'the covers were not closed'));
+		AssertTrue(Condition := rig.fbTel.ReadyState = -1.0, Message := 'READY_STATE is -1.0 (error)');
+		F_Note(bFailed := NOT (rig.fbTel.ReadyState = -1.0), sText := CONCAT(sTest, 'READY_STATE is -1.0 (error)'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Park_During_An_Error_Closes_The_Covers_And_Parks_The_Dome" Id="{585f8837-781f-45ee-9229-230aef5e51f6}">
+      <Declaration><![CDATA[// I:555-630: a park requested during an error does what is safe without the mount: the covers are closed, the dome is parked, the
+// focus is disabled and the command is dropped. The mount is not moved and bIsParked is not set.
+METHOD PRIVATE Park_During_An_Error_Closes_The_Covers_And_Parks_The_Dome
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Park_During_An_Error_Closes_The_Covers_And_Parks_The_Dome');
+sTest := 'Park_During_An_Error_Closes_The_Covers_And_Parks_The_Dome: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// online: the hour angle reports an error
+	IF rig.Online THEN
+		rig.InjectHaError(16#4550);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the error is there: park
+	IF rig.fbTel.bError THEN
+		rig.fbTel.Park();
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 60 THEN
+		AssertTrue(Condition := FALSE, Message := 'the error was not reported');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the error was not reported'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+	IF nCycles >= 30 THEN
+		AssertTrue(Condition := rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1, Message := 'the covers are closed');
+		F_Note(bFailed := NOT (rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the covers are closed'));
+		AssertTrue(Condition := rig.fbDome.nParkCalls >= 1, Message := 'the dome is parked');
+		F_Note(bFailed := NOT (rig.fbDome.nParkCalls >= 1), sText := CONCAT(sTest, 'the dome is parked'));
+		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park command is dropped');
+		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park command is dropped'));
+		AssertFalse(Condition := rig.fbTel.bIsParked, Message := 'the mount is not parked');
+		F_Note(bFailed := (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the mount is not parked'));
+		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'the mount was not moved');
+		F_Note(bFailed := (rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis), sText := CONCAT(sTest, 'the mount was not moved'));
+		AssertTrue(Condition := rig.fbTel.ReadyState = -1.0, Message := 'READY_STATE stays -1.0 (error)');
+		F_Note(bFailed := NOT (rig.fbTel.ReadyState = -1.0), sText := CONCAT(sTest, 'READY_STATE stays -1.0 (error)'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Park_With_The_Axes_Off_Does_Not_Move_The_Mount" Id="{931c8f25-b6ed-4706-9d5f-d5d39e5cdc18}">
+      <Declaration><![CDATA[// I:555-600 (#54): a park on a telescope whose axes are off (never powered on) cannot drive the mount: the covers are closed and the
+// dome parked, nothing moves. bIsParked is TRUE from the start (FB_TelescopeControl.bIsParked := TRUE) and the park leaves it.
+METHOD PRIVATE Park_With_The_Axes_Off_Does_Not_Move_The_Mount
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Park_With_The_Axes_Off_Does_Not_Move_The_Mount');
+sTest := 'Park_With_The_Axes_Off_Does_Not_Move_The_Mount: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock
+	IF rig.ClockValid THEN
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the axes are off: park
+	rig.fbTel.Park();
+	nStep := 20;
+	nCycles := 0;
+20:
+	IF nCycles >= 30 THEN
+		AssertTrue(Condition := rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1, Message := 'the covers are closed');
+		F_Note(bFailed := NOT (rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the covers are closed'));
+		AssertTrue(Condition := rig.fbDome.nParkCalls >= 1, Message := 'the dome is parked');
+		F_Note(bFailed := NOT (rig.fbDome.nParkCalls >= 1), sText := CONCAT(sTest, 'the dome is parked'));
+		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park command is dropped');
+		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park command is dropped'));
+		AssertTrue(Condition := rig.fbTel.bIsParked, Message := 'bIsParked is still TRUE, as from the start: the park changes nothing');
+		F_Note(bFailed := NOT (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked is still TRUE, as from the start: the park changes nothing'));
+		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'the mount was not moved');
+		F_Note(bFailed := (rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis), sText := CONCAT(sTest, 'the mount was not moved'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

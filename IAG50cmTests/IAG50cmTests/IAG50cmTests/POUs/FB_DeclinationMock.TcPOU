@@ -9,11 +9,14 @@ VAR_INPUT
 END_VAR
 VAR_OUTPUT
 	nStopEdges		: UINT;			// stop requests the telescope made (rising edges of StopAxis)
+	nResetEdges		: UINT;			// resets the telescope sent to the axis (Reset())
 END_VAR
 VAR
 	fbCore	: FB_AxisMockCore;
 	pBool	: POINTER TO BOOL;
 	pLreal	: POINTER TO LREAL;
+	bInjected	: BOOL;
+	nInjectedId	: UDINT;
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -49,7 +52,29 @@ END_IF
 IF fbCore.bStopDone THEN
 	bStopAxis := FALSE;
 END_IF
+// a reset clears the injected error at once (ResetDone) and is counted
+IF bReset THEN
+	nResetEdges := nResetEdges + 1;
+	bReset := FALSE;
+	bInjected := FALSE;
+	nInjectedId := 0;
+END_IF
+bError := bInjected;
+nErrorID := nInjectedId;
 ]]></ST>
     </Implementation>
+    <Method Name="InjectError" Id="{bb406fff-c42f-42f6-a732-89188577a9a4}">
+      <Declaration><![CDATA[// the axis reports an error with this id until the telescope resets it (bError/nErrorID are what the telescope reads)
+METHOD InjectError
+VAR_INPUT
+	nId	: UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bInjected := TRUE;
+nInjectedId := nId;
+]]></ST>
+      </Implementation>
+    </Method>
   </POU>
 </TcPlcObject>

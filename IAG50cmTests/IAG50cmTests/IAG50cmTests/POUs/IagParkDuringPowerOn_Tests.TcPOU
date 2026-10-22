@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagParkDuringPowerOn_Tests" Id="{a4314ecb-706f-4940-94b1-4f69975d0378}" SpecialFunc="None">
+    <Declaration><![CDATA[// Characterization of FB_TelescopeControl (IAG50cm) for a park or a stop that arrives during the power-on, on mock axes (plan step 2,
+// IAG50cmTests README). These tests pin what the code does today, with the line of the behaviour in a comment; they are not a
+// specification. Every test owns a rig and runs over many PLC cycles (VAR_INST of the method, one Scan() per cycle). Failed checks
+// are also noted in GVL_Diag.sFailures (printed by Run-Tests.ps1).
+FUNCTION_BLOCK IagParkDuringPowerOn_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Park_During_PowerOn_Is_Dropped_Current();
+Stop_During_PowerOn_Aborts_The_Startup();
+]]></ST>
+    </Implementation>
+    <Method Name="Park_During_PowerOn_Is_Dropped_Current" Id="{fee3a10b-b0ce-4b59-b6ed-58da01277209}">
+      <Declaration><![CDATA[// I:529-541 (IAG50cm#109): a park that arrives while the power-on runs is cancelled by the power-on ('cancelled by power-on'): bPark
+// is dropped, the covers are not closed and the power-on finishes. (MONET lets the park win, MONETcommon#87.) The decision for
+// IAG is open (plan decision 3).
+METHOD PRIVATE Park_During_PowerOn_Is_Dropped_Current
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Park_During_PowerOn_Is_Dropped_Current');
+sTest := 'Park_During_PowerOn_Is_Dropped_Current: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the power-on has commanded the covers: park now
+	IF rig.fbCovers.nOpenCalls >= 1 THEN
+		rig.fbTel.Park();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the power-on never commanded the covers');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the power-on never commanded the covers'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:
+	IF nCycles = 3 THEN
+		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the power-on dropped the park');
+		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the power-on dropped the park'));
+		nStep := 30;
+		nCycles := 0;
+	END_IF
+30:	// the power-on finishes
+	IF rig.Online THEN
+		AssertTrue(Condition := rig.fbCovers.nCloseCalls = 0, Message := 'the covers were not closed');
+		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls = 0), sText := CONCAT(sTest, 'the covers were not closed'));
+		AssertFalse(Condition := rig.fbTel.bIsParked, Message := 'the telescope is not parked');
+		F_Note(bFailed := (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the telescope is not parked'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the power-on did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the power-on did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_During_PowerOn_Aborts_The_Startup" Id="{0dd3dce0-cbdf-4285-b7f6-82b17aaa459f}">
+      <Declaration><![CDATA[// I:501-526 (#27): an explicit stop outranks the power-on: the startup is aborted (READY_STATE -2.0), nothing is parked and the
+// covers the power-on opened stay open.
+METHOD PRIVATE Stop_During_PowerOn_Aborts_The_Startup
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_During_PowerOn_Aborts_The_Startup');
+sTest := 'Stop_During_PowerOn_Aborts_The_Startup: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the power-on has commanded the covers: stop now
+	IF rig.fbCovers.nOpenCalls >= 1 THEN
+		rig.fbTel.Stop();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the power-on never commanded the covers');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the power-on never commanded the covers'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// wait until the stop has settled
+	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		AssertFalse(Condition := rig.fbTel.bPower, Message := 'the power-on request is dropped');
+		F_Note(bFailed := (rig.fbTel.bPower), sText := CONCAT(sTest, 'the power-on request is dropped'));
+		AssertFalse(Condition := rig.fbTel.bPark OR rig.fbTel.bIsParked, Message := 'the stop does not park');
+		F_Note(bFailed := (rig.fbTel.bPark OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the stop does not park'));
+		AssertTrue(Condition := rig.fbTel.ReadyState = -2.0, Message := 'READY_STATE is -2.0 (startup aborted)');
+		F_Note(bFailed := NOT (rig.fbTel.ReadyState = -2.0), sText := CONCAT(sTest, 'READY_STATE is -2.0 (startup aborted)'));
+		AssertTrue(Condition := rig.fbCovers.nCloseCalls = 0 AND rig.fbCovers.bOpened, Message := 'the covers stay open');
+		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls = 0 AND rig.fbCovers.bOpened), sText := CONCAT(sTest, 'the covers stay open'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not settle'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

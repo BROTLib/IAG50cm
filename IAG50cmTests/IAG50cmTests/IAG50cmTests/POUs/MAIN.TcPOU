@@ -11,6 +11,9 @@ VAR
 	fbPointingForwardTests	: FB_PointingModelForward_Tests;
 	fbIagRigTests			: FB_IagRig_Tests;
 	fbStopDuringSlewTests	: IagStopDuringSlew_Tests;
+	fbResetUnderMotionTests	: IagResetUnderMotion_Tests;
+	fbErrorParkTests		: IagErrorPark_Tests;
+	fbParkDuringPowerOnTests	: IagParkDuringPowerOn_Tests;
 END_VAR
 ]]></Declaration>
     <Implementation>

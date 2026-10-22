@@ -77,5 +77,27 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
+    <Method Name="InjectHaError" Id="{905dc23c-55b4-4eb7-a513-f6b52cccde02}">
+      <Declaration><![CDATA[METHOD InjectHaError
+VAR_INPUT
+	nId	: UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbHa.InjectError(nId);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="InjectDecError" Id="{1a4cba55-34b7-4db9-ad88-e6e39d342843}">
+      <Declaration><![CDATA[METHOD InjectDecError
+VAR_INPUT
+	nId	: UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbDec.InjectError(nId);
+]]></ST>
+      </Implementation>
+    </Method>
   </POU>
 </TcPlcObject>
