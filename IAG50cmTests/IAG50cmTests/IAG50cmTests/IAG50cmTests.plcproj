@@ -72,6 +72,9 @@
     <Compile Include="POUs\NCError_TO_STRING.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\ST_AxisStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\ST_TelescopeConfig.TcDUT">
       <SubType>Code</SubType>
     </Compile>

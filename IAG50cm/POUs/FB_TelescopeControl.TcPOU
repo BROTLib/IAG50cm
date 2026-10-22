@@ -90,6 +90,8 @@ VAR
 	rtrigReset		: R_TRIG;
 	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
 	tonAxisResetAfterAck	: TON;
+	// plan step 3.2: the axis feedback of this scan (1 hour angle, 2 declination), filled by _ReadAxes
+	aAxis				: ARRAY[1..2] OF ST_AxisStatus;
 	bResetRequest		: BOOL;		// Reset() was called (one scan); kept apart from bReset, which the trigger below drives (#36)
 	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
 	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
@@ -180,7 +182,8 @@ VAR CONSTANT
 	fSiderialVelocity: LREAL := 360.0 / 86164.099;
 END_VAR]]></Declaration>
     <Implementation>
-      <ST><![CDATA[// Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
+      <ST><![CDATA[_ReadAxes();
+// Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
 // A repeated request to an already online telescope is dropped, it must not restart calibration.
 bPower := fbStartup.BeginScan(Power := bPower, Ready := bReady);
 // get the system time; fJd only follows the clock while the clock is valid (synced, see FB_AstroClock)
@@ -783,15 +786,15 @@ ELSE
 END_IF
 //----------------------------------------------------------------------------------------------
 (* STATUS BOOLS*)
-bSliding := NOT bTracking AND (fbHourAngle.fbAxis.InMotion OR fbHourAngle.fbAxis.InRamp OR
-			fbDeclination.fbAxis.InMotion OR fbDeclination.fbAxis.InRamp );
+bSliding := NOT bTracking AND (aAxis[1].bInMotion OR aAxis[1].bInRamp OR
+			aAxis[2].bInMotion OR aAxis[2].bInRamp );
 
 // signal must be stable for 1s
-tonTrackingDelay(in := fbHourAngle.fbAxis.isTracking AND 
-			fbDeclination.fbAxis.isTracking ,PT :=T#1000MS, Q => bTracking);
+tonTrackingDelay(in := aAxis[1].bTracking AND
+			aAxis[2].bTracking ,PT :=T#1000MS, Q => bTracking);
 
-bStopped :=  (NOT fbHourAngle.bEnable OR fbHourAngle.fbAxis.StandStill) AND 
-			(NOT fbDeclination.bEnable OR fbDeclination.fbAxis.StandStill);
+bStopped :=  (NOT fbHourAngle.bEnable OR aAxis[1].bStandStill) AND
+			(NOT fbDeclination.bEnable OR aAxis[2].bStandStill);
 
 // #98: bStopped is TRUE for one scan at the start of every stop, before MC_Stop has taken hold (StandStill is still
 // TRUE), and a home commanded while MC_Stop locks the axis (StateDWord bit 29) fails with 17135. A stop transaction
@@ -802,7 +805,7 @@ IF bReset OR bError OR bEstopTriggered THEN
 END_IF
 fbStopTx.Monitor(	bStopped := bStopped,
 					bHaEnabled := fbHourAngle.bEnable, bDecEnabled := fbDeclination.bEnable,
-					bHaStopDone := fbHourAngle.fbAxis.StopDone, bDecStopDone := fbDeclination.fbAxis.StopDone,
+					bHaStopDone := aAxis[1].bStopDone, bDecStopDone := aAxis[2].bStopDone,
 					bHaLocked := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
 					bDecLocked := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
 					bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy);
@@ -832,7 +835,7 @@ bReady := bHomed AND
 	(fbFocus <> 0 AND_THEN fbFocus.Enable) AND
     NOT bError;
 
-bBusy := fbHourAngle.fbAxis.Busy OR fbDeclination.fbAxis.Busy OR (fbFocus <> 0 AND_THEN fbFocus.Busy);
+bBusy := aAxis[1].bBusy OR aAxis[2].bBusy OR (fbFocus <> 0 AND_THEN fbFocus.Busy);
 //----------------------------------------------------------------------------------------------
 (* STATUS STATES*)
 // Public completion is latched only by the final startup stage, never by mechanical bReady alone.
@@ -988,6 +991,33 @@ TCSCTOEvent(	Trigger := tonCommandTimeout.Q,
     <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
     <Folder Name="internal methods" Id="{43f8a5dc-2166-4fdb-b436-34a8f62ea04a}" />
     <Folder Name="properties" Id="{65c2c08a-67b2-43de-bf16-65ce2beac397}" />
+    <Method Name="_ReadAxes" Id="{fbf95db5-70d7-4355-ad80-f4cd75187122}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// plan step 3.2: the feedback of the two axes (the outputs of their FB_Axis) once per scan, at the start of the body. The outputs
+// do not change while the telescope body runs, so they are the same wherever the body reads them.
+METHOD PRIVATE _ReadAxes
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[aAxis[1].bStandStill := fbHourAngle.fbAxis.StandStill;
+aAxis[1].bStopDone := fbHourAngle.fbAxis.StopDone;
+aAxis[1].bInMotion := fbHourAngle.fbAxis.InMotion;
+aAxis[1].bInRamp := fbHourAngle.fbAxis.InRamp;
+aAxis[1].bHoming := fbHourAngle.fbAxis.Homing;
+aAxis[1].bStopping := fbHourAngle.fbAxis.Stopping;
+aAxis[1].bBusy := fbHourAngle.fbAxis.Busy;
+aAxis[1].bTracking := fbHourAngle.fbAxis.isTracking;
+aAxis[2].bStandStill := fbDeclination.fbAxis.StandStill;
+aAxis[2].bStopDone := fbDeclination.fbAxis.StopDone;
+aAxis[2].bInMotion := fbDeclination.fbAxis.InMotion;
+aAxis[2].bInRamp := fbDeclination.fbAxis.InRamp;
+aAxis[2].bHoming := fbDeclination.fbAxis.Homing;
+aAxis[2].bStopping := fbDeclination.fbAxis.Stopping;
+aAxis[2].bBusy := fbDeclination.fbAxis.Busy;
+aAxis[2].bTracking := fbDeclination.fbAxis.isTracking;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="_GotoTelescope" Id="{43ebaf76-c0fc-41db-8c98-2f7671dc6b31}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _GotoTelescope : USINT
 VAR_INPUT
@@ -1937,7 +1967,7 @@ ELSE
 	// An axis that finishes a scan later than the other (HA outside its target window after 120 s of tracking) then
 	// never lined up with the other one, bStopped stayed FALSE and a gohome waiting for it was dropped. FB_AxisControl
 	// clears StopAxis on StopDone.
-	fbStopTx(	bHaStandStill := fbHourAngle.fbAxis.StandStill, bDecStandStill := fbDeclination.fbAxis.StandStill);
+	fbStopTx(	bHaStandStill := aAxis[1].bStandStill, bDecStandStill := aAxis[2].bStandStill);
 	IF fbStopTx.bStopHa THEN
 		fbHourAngle.StopAxis := TRUE;
 	END_IF

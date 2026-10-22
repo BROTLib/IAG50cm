@@ -24,6 +24,9 @@
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="DUTs\ST_AxisStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DUTs\ST_TelescopeConfig.TcDUT">
       <SubType>Code</SubType>
     </Compile>
