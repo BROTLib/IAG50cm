@@ -114,6 +114,9 @@
     <Compile Include="POUs\IagResetUnderMotion_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\IagTimeouts_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\IagErrorPark_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -151,7 +154,7 @@
       <Namespace>AstroBROT</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.10.0 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.10.3 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Math">

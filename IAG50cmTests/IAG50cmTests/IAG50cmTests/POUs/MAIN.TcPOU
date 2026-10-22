@@ -13,6 +13,7 @@ VAR
 	fbStopDuringSlewTests	: IagStopDuringSlew_Tests;
 	fbResetUnderMotionTests	: IagResetUnderMotion_Tests;
 	fbErrorParkTests		: IagErrorPark_Tests;
+	fbIagTimeoutsTests : IagTimeouts_Tests;
 	fbParkDuringPowerOnTests	: IagParkDuringPowerOn_Tests;
 END_VAR
 ]]></Declaration>

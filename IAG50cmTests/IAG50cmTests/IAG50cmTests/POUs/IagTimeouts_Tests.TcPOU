@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagTimeouts_Tests" Id="{493b62af-38dc-4188-837e-509d6070e4a1}" SpecialFunc="None">
+    <Declaration><![CDATA[// Characterization of the long timeouts of FB_TelescopeControl (IAG50cm) on mock axes, through the time seam (FB_TelescopeControl.nTimeDivisor,
+// per rig; BROTLib FB_TimeoutTimer). Plan step 3 (decision 4). Failed checks are also noted in GVL_Diag.sFailures.
+FUNCTION_BLOCK IagTimeouts_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Slew_Times_Out_After_600_Seconds();
+Idle_Telescope_Parks_After_12_Hours();
+]]></ST>
+    </Implementation>
+    <Method Name="Slew_Times_Out_After_600_Seconds" Id="{ca2cd503-099f-4dae-8eb0-a6e74682b5ee}">
+      <Declaration><![CDATA[// I:1800 (MONETcommon#17): a slew still running after 600 s is software error 16#40 and the slew is dropped. The time seam divides every
+// timeout by 1000, so the 600 s are 0.6 s; the mock move takes far longer.
+METHOD PRIVATE Slew_Times_Out_After_600_Seconds
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_Times_Out_After_600_Seconds');
+sTest := 'Slew_Times_Out_After_600_Seconds: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	IF rig.Online THEN
+		rig.SetMoveScans(nScans := 60000);
+		rig.SetTimeDivisor(nValue := 1000);
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:
+	IF rig.fbTel.bError THEN
+		AssertTrue(Condition := rig.fbTel.bSoftwareError AND rig.fbTel.nSoftwareErrorID = 16#40, Message := 'the slew timeout is software error 16#40');
+		F_Note(bFailed := NOT (rig.fbTel.bSoftwareError AND rig.fbTel.nSoftwareErrorID = 16#40), sText := CONCAT(sTest, 'the slew timeout is software error 16#40'));
+		AssertTrue(Condition := NOT rig.fbTel.bSlew, Message := 'the slew is dropped');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bSlew), sText := CONCAT(sTest, 'the slew is dropped'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew never timed out');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew never timed out'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Idle_Telescope_Parks_After_12_Hours" Id="{37cd5226-36c2-4b84-98bc-636724a87e4c}">
+      <Declaration><![CDATA[// I:466, 491-496: an online telescope without a command for 12 h parks itself (tonPowerTimeout). The time seam divides by 1000000, so the
+// 12 h are 43 ms.
+METHOD PRIVATE Idle_Telescope_Parks_After_12_Hours
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Idle_Telescope_Parks_After_12_Hours');
+sTest := 'Idle_Telescope_Parks_After_12_Hours: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	IF rig.Online THEN
+		rig.SetTimeDivisor(nValue := 1000000);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:
+	IF rig.fbTel.bPark OR rig.fbTel.bIsParked THEN
+		rig.SetTimeDivisor(nValue := 1);
+		AssertTrue(Condition := rig.fbTel.bPark OR rig.fbTel.bIsParked, Message := 'the idle telescope parked itself');
+		F_Note(bFailed := NOT (rig.fbTel.bPark OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the idle telescope parked itself'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the idle telescope never parked');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the idle telescope never parked'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

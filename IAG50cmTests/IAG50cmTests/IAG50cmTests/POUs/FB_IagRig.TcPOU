@@ -17,6 +17,7 @@ VAR
 	fbTel			: FB_TelescopeControl(comm := fbComm);
 	pBool			: POINTER TO BOOL;
 	nScans			: UDINT;
+	nTimeDivisor	: UDINT := 1;	// the time seam of the telescope under test (SetTimeDivisor)
 END_VAR
 VAR CONSTANT
 	telescopeConfig	: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0,
@@ -50,7 +51,8 @@ fbTel(
 	fbFocus := fbFocus,
 	fbDome := fbDome,
 	fbCovers := fbCovers,
-	telescopeConfig := telescopeConfig);
+	telescopeConfig := telescopeConfig,
+	nTimeDivisor := nTimeDivisor);
 nScans := nScans + 1;
 ]]></ST>
       </Implementation>
@@ -77,6 +79,32 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
+    <Method Name="SetTimeDivisor" Id="{26d99b39-b426-4fd5-ac43-ba739ce53716}">
+      <Declaration><![CDATA[// divides every long timeout of the telescope (600 s, 2 min, 12 h) by nValue, for this rig only (1 = real times)
+METHOD SetTimeDivisor
+VAR_INPUT
+	nValue	: UDINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nTimeDivisor := nValue;
+fbTel.nTimeDivisor := nValue;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetMoveScans" Id="{cdeb9136-db3d-432e-8efa-7f4fddc23765}">
+      <Declaration><![CDATA[// scans a move takes on both mock axes (default 60)
+METHOD SetMoveScans
+VAR_INPUT
+	nScans	: UINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbHa.nMockMoveScans := nScans;
+fbDec.nMockMoveScans := nScans;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="InjectHaError" Id="{905dc23c-55b4-4eb7-a513-f6b52cccde02}">
       <Declaration><![CDATA[METHOD InjectHaError
 VAR_INPUT
