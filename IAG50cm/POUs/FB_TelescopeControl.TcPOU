@@ -202,48 +202,7 @@ END_IF
 fbCabinet(bEstop := bEstopTriggered, bSafetyAckPending := bSafetyAckPending);	// #93: error LED during E-stop / pending acknowledge
 bLocalMode := fbCabinet.LocalMode;
 
-// set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
-// #36: the request from Reset() must not be overwritten by the key state, so it has its own flag
-// #59: also while the safety acknowledge after an E-stop is pending, so a reset sent during the E-stop (which
-// clears the axis errors but skips the acknowledge) or after an E-stop without an axis error is not lost
-rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND (bError OR bSafetyAckPending), Q=>bReset);
-bResetRequest := FALSE;
-
-IF bReset THEN
-    fbStartup.MarkAborted();
-	bTestError := FALSE;
-	bSoftwareError := FALSE;
-	nSoftwareErrorID := 0;
-	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
-	fDeclination := telescopeConfig.declinationPark;
-	fbHaDec2RaDec(	jd := fJd +fTimeOffset,
-					ha := telescopeConfig.houranglePark,
-					dec := telescopeConfig.declinationPark,
-					lon := telescopeConfig.longitude,
-					ra_out => fRightAscension);
-	// reset elevation values to abitrarry value over horizon, will get overwritten down the line
-	fElevationCalc := 20.0;
-	fElevation := 20.0;
-	// reset dome position
-	fbDome.Position := 180.0;
-	// #35: a dome error after an E-stop (serial link lost) stays latched until the dome is reset, and nothing else
-	// reaches it. Only the dome's error state reacts to a reset; in every other state it is ignored.
-	IF fbDome <> 0 THEN
-		fbDome.Reset();
-	END_IF
-	// reset the stages of all statemachine methods
-	// #100: a goto/slew/track request that is still pending must not outlive the reset (the error clears them only
-	// while it lasts)
-	bGoto := FALSE;
-	bSlew := FALSE;
-	bTrack := FALSE;
-	bInterupted := TRUE;
-	_HomeTelescope();
-	_GotoTelescope();
-	_SlewTelescope();
-	_ParkTelescope();
-	bInterupted := FALSE;
-END_IF
+_HandleReset();
 
 // get error ID
 IF fbHourAngle.Error THEN
@@ -889,7 +848,19 @@ END_IF
 
 //----------------------------------------------------------------------------------------------
 
-(* Event function blocks start here. *)
+_LogEvents();]]></ST>
+    </Implementation>
+    <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
+    <Folder Name="internal methods" Id="{43f8a5dc-2166-4fdb-b436-34a8f62ea04a}" />
+    <Folder Name="properties" Id="{65c2c08a-67b2-43de-bf16-65ce2beac397}" />
+    <Method Name="_LogEvents" Id="{2e11d121-0e66-42d3-bda8-e55c8ad61884}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// plan step 3.4: the event function blocks at the end of the body (ADS log and MQTT log), moved unchanged; called at the end of the body.
+METHOD PRIVATE _LogEvents
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(* Event function blocks start here. *)
 TCSpowerEvent(	Trigger := bPowerFailure, 
 				Level := ADSLOG_MSGTYPE_ERROR,
 				FormatString := 'power %s',
@@ -986,11 +957,64 @@ TCSsoftErrorEvent(	Trigger := bSoftwareError,
 TCSCTOEvent(	Trigger := tonCommandTimeout.Q,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := 'A timeout occured during %s command!',
-				Comm := fbComm);]]></ST>
-    </Implementation>
-    <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
-    <Folder Name="internal methods" Id="{43f8a5dc-2166-4fdb-b436-34a8f62ea04a}" />
-    <Folder Name="properties" Id="{65c2c08a-67b2-43de-bf16-65ce2beac397}" />
+				Comm := fbComm);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_HandleReset" Id="{d3bbfeba-2cbb-4111-9ae3-4525c9154e5c}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// plan step 3.4: the reset trigger and the reset handling of the body (bReset, drop of pending goto/slew/track, dome reset, stage reset), moved
+// unchanged; called where the block stood. The axis reset of #11 stays in the body, it runs after the error ID.
+METHOD PRIVATE _HandleReset
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// set reset state either by hardware (key pressed) or by software (set by e.g. tcs)
+// #36: the request from Reset() must not be overwritten by the key state, so it has its own flag
+// #59: also while the safety acknowledge after an E-stop is pending, so a reset sent during the E-stop (which
+// clears the axis errors but skips the acknowledge) or after an E-stop without an axis error is not lost
+rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND (bError OR bSafetyAckPending), Q=>bReset);
+bResetRequest := FALSE;
+
+IF bReset THEN
+    fbStartup.MarkAborted();
+	bTestError := FALSE;
+	bSoftwareError := FALSE;
+	nSoftwareErrorID := 0;
+	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
+	fDeclination := telescopeConfig.declinationPark;
+	fbHaDec2RaDec(	jd := fJd +fTimeOffset,
+					ha := telescopeConfig.houranglePark,
+					dec := telescopeConfig.declinationPark,
+					lon := telescopeConfig.longitude,
+					ra_out => fRightAscension);
+	// reset elevation values to abitrarry value over horizon, will get overwritten down the line
+	fElevationCalc := 20.0;
+	fElevation := 20.0;
+	// reset dome position
+	fbDome.Position := 180.0;
+	// #35: a dome error after an E-stop (serial link lost) stays latched until the dome is reset, and nothing else
+	// reaches it. Only the dome's error state reacts to a reset; in every other state it is ignored.
+	IF fbDome <> 0 THEN
+		fbDome.Reset();
+	END_IF
+	// reset the stages of all statemachine methods
+	// #100: a goto/slew/track request that is still pending must not outlive the reset (the error clears them only
+	// while it lasts)
+	bGoto := FALSE;
+	bSlew := FALSE;
+	bTrack := FALSE;
+	bInterupted := TRUE;
+	_HomeTelescope();
+	_GotoTelescope();
+	_SlewTelescope();
+	_ParkTelescope();
+	bInterupted := FALSE;
+END_IF
+
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="_ReadAxes" Id="{fbf95db5-70d7-4355-ad80-f4cd75187122}" FolderPath="internal methods\">
       <Declaration><![CDATA[// plan step 3.2: the feedback of the two axes (the outputs of their FB_Axis) once per scan, at the start of the body. The outputs
 // do not change while the telescope body runs, so they are the same wherever the body reads them.
