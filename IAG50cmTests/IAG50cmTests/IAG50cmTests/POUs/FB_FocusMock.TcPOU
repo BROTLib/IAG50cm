@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_FocusMock" Id="{5fdf5a9a-cc47-484b-b66c-dbdc86e8cac2}" SpecialFunc="None">
-    <Declaration><![CDATA[// Mock of the focus axis (I_Focus) for the telescope state machine tests: enabled = ready, homing calibrates at once, the
+    <Declaration><![CDATA[// Mock of the focus axis (I_Focus) for the telescope state machine tests: enabled = ready and calibrated at once (the telescope never sets HomeAxis), the
 // position follows the target at once. Status only, no motion model.
 FUNCTION_BLOCK FB_FocusMock IMPLEMENTS BROTLib.I_Focus
 VAR
@@ -17,7 +17,7 @@ VAR
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[IF bHome AND bEn THEN
+      <ST><![CDATA[IF bEn THEN
 	bCal := TRUE;
 END_IF
 fPos := fTarget;

@@ -21,6 +21,8 @@ name: TcBuild
 # instance, and killing that mid-run leaves a stray TcXaeShell behind. Runs queue instead (GitHub keeps only
 # the newest pending one).
 
+# Skipped when the pushed tree is one that already passed (typically the merge of a tested branch): see the
+# `Skip if this tree was already built and tested` step. A workflow_dispatch run always builds.
 on:
   push:
     branches: ['**']
@@ -40,9 +42,20 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: read     # tools/Find-TestedTree.ps1 lists earlier runs; a private repo (this one) needs it
       statuses: write   # the commit status below
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # A merge brings a new commit but often the tree that already passed on the branch. Then the build (and
+      # tests) below are skipped; the job still ends green, so the required `build` check is satisfied.
+      # See tools/Find-TestedTree.ps1 (best effort: on any doubt it answers "full build").
+      - name: Skip if this tree was already built and tested
+        id: same
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .\tools\Find-TestedTree.ps1
 
       # TcBuild starts TcXaeShell through COM (parent svchost, in the session of the runner service). A hung or
       # cancelled build leaves it behind and it can break the next build. Stop what runs in this job's own
@@ -59,111 +72,68 @@ jobs:
       # The PLC needs a license. The 7-day trial is renewed by hand. Once it has run out, or when a license the
       # tests need is not in it, the tests cannot run: warn with a clear message and skip them (output ok=false)
       # instead of failing the build, which would block releases (the compile steps do not need it).
-      - name: Check TwinCAT license
-        id: license
+      - name: Get tctool
         shell: powershell
-        run: |
-          # (not `>>`: Windows PowerShell 5.1 would write UTF-16, which the runner cannot parse)
-          function Skip($msg) { Write-Host "::warning::$msg The tests are skipped."; [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ok=false`n"); exit 0 }
-          $file = 'C:\TwinCAT\3.1\Runtimes\UmRT_Default\3.1\Target\License\TrialLicense.tclrs'
-          if (-not (Test-Path $file)) { Skip "No trial license at $file." }
-          $expire = [datetime]([xml](Get-Content $file)).TcLicenseInfo.LicenseInfo.ExpireTime
-          $left = $expire - (Get-Date)
-          Write-Host "Trial license expires $expire ($([math]::Round($left.TotalHours)) h left)"
-          if ($left.TotalSeconds -le 0) { Skip "The TwinCAT trial license expired $expire. Renew it: XAE > SYSTEM > License > Manage Licenses > 7 Days Trial License." }
-          $have = @(([xml](Get-Content $file)).SelectNodes('//*[local-name()="License"]') | ForEach-Object { $_.OrderNo })
-          $missing = @('TC1200') | Where-Object { $have -notcontains $_ }
-          if ($missing) { Skip "The TwinCAT trial license does not contain $($missing -join ', '). Renew it with these ticked: XAE > SYSTEM > License > Manage Licenses, then 7 Days Trial License." }
-          if ($left.TotalDays -lt 2) { Write-Host "::warning::TwinCAT trial license expires $expire" }
-          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ok=true`n")
-
-      # The runtime is started at boot by the scheduled task 'TwinCAT UmRT_Default'.
-      # Not running: warn and skip the tests (output ok=false), same reason as the license check.
-      - name: Check user-mode runtime
-        id: runtime
-        shell: powershell
-        run: |
-          if (-not (Get-Process TcSystemServiceUm -ErrorAction SilentlyContinue)) {
-            Write-Host "::warning::The TwinCAT user-mode runtime is not running. It is started at boot by the scheduled task 'TwinCAT UmRT_Default'; start it with: Start-ScheduledTask 'TwinCAT UmRT_Default'. The tests are skipped."
-            [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ok=false`n")
-            exit 0
-          }
-          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ok=true`n")
-
-      # A cold XAE start can outlast TcBuild's own COM retry window, which then fails with exit 3 (busy) on every
-      # retry below. Starting and quitting one XAE first leaves the following starts fast. Best effort: never
-      # fails the job, and only touches the XAE instance started here.
-      - name: Warm up XAE
-        shell: powershell
-        run: |
-          $before = @(Get-Process TcXaeShell -ErrorAction SilentlyContinue | ForEach-Object Id)
-          $dte = $null
-          $own = @()
-          try {
-            $dte = New-Object -ComObject 'TcXaeShell.DTE.15.0'
-            $own = @(Get-Process TcXaeShell -ErrorAction SilentlyContinue | Where-Object { $before -notcontains $_.Id } | ForEach-Object Id)
-            for ($n = 0; $n -lt 120; $n++) {
-              try { if ($null -ne $dte.Solution) { break } } catch { }
-              Start-Sleep -Seconds 1
-            }
-            Start-Sleep -Seconds 10
-            Write-Host "XAE ready after about $n s"
-          }
-          catch { Write-Host "::warning::XAE warm-up failed: $($_.Exception.Message)" }
-          finally {
-            if ($dte -and $own.Count -gt 0) { try { $dte.Quit() } catch { } }
-            Start-Sleep -Seconds 3
-            Get-Process TcXaeShell -ErrorAction SilentlyContinue | Where-Object { $own -contains $_.Id } | ForEach-Object { Stop-Process -Id $_.Id -Force }
-          }
-          exit 0
+        env:
+          GH_TOKEN: ${{ secrets.TCTOOL_TOKEN }}
+        run: .\tools\Get-TcTool.ps1
 
       # The org libraries this repo pins in its .plcproj files are reinstalled from their GitHub release before the
       # build. A `*` reference picks the highest version in the shared library repository, and a branch build of
       # that library overwrites its version slot, so the result depended on what ran last.
       - name: Install pinned libraries
+        if: steps.same.outputs.same != 'true'
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: .\tools\Install-PinnedLibraries.ps1
 
       - name: Build IAG50cm.sln
+        if: steps.same.outputs.same != 'true'
         shell: powershell
         run: |
-          # TcBuild exit codes: 0 = built, 1 = built with compile warnings (still a success),
-          # 2 = compile errors, 3 = COM busy (retry), 4/5 = other failure
-          for ($i = 1; $i -le 4; $i++) {
-            & "C:\Program Files\Industrial Brains B.V\TcBuild\TcBuild.exe" build IAG50cm.sln
-            if ($LASTEXITCODE -ne 3) { break }
-            Start-Sleep -Seconds 30
-          }
+          tctool IAG50cm.sln build
           if ($LASTEXITCODE -gt 1) { exit $LASTEXITCODE }
           exit 0
 
       # XAE cannot link files from outside the project folder, so the test project holds (git-ignored) copies of
       # the tested function blocks; copy them from IAG50cm/POUs, the code that is activated on the telescope.
       - name: Copy tested function blocks
+        if: steps.same.outputs.same != 'true'
         shell: powershell
         run: .\IAG50cmTests\tools\Sync-Sources.ps1
 
-      - name: Build IAG50cmTests
+      # One tctool call: build the tests (exit 1 = compile warnings: the copied FB_TelescopeControl has empty
+      # interface members, a success), then deploy them to the user-mode runtime and wait for TcUnit, in one XAE
+      # session. `run` checks the license and the runtime first and returns 13 if the tests cannot run: the build
+      # is checked either way, the job stays green with a warning (--skip-if-unavailable), and `ran` stays false so
+      # no `tests-passed` status is posted. Exit 2 = compile errors, 10 = a test failed or none ran, 11 = timeout,
+      # 14 = TwinCAT stayed in Config after the restart (license).
+      - name: Build and run IAG50cmTests
+        id: tests
+        if: steps.same.outputs.same != 'true'
         shell: powershell
         working-directory: IAG50cmTests
         run: |
-          for ($i = 1; $i -le 4; $i++) {
-            & "C:\Program Files\Industrial Brains B.V\TcBuild\TcBuild.exe" build IAG50cmTests.sln
-            if ($LASTEXITCODE -ne 3) { break }
-            Start-Sleep -Seconds 30
-          }
-          if ($LASTEXITCODE -gt 1) { exit $LASTEXITCODE }
-          exit 0   # exit 1 = built with compile warnings (the copied FB_TelescopeControl has empty interface members): a success
+          tctool IAG50cmTests.sln build run --require-license TC1200 --skip-if-unavailable
+          $code = $LASTEXITCODE
+          # (not `>>`: Windows PowerShell 5.1 would write UTF-16, which the runner cannot parse)
+          if ($code -le 1) { [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ran=true`n"); exit 0 }
+          if ($code -eq 13) { [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ran=false`n"); exit 0 }
+          exit $code
 
-      # Exit 0 = all passed, 1 = a test failed, 2 = no result within the timeout.
-      - name: Run tests
-        if: steps.license.outputs.ok == 'true' && steps.runtime.outputs.ok == 'true'
+      # Proof for tools/Find-TestedTree.ps1 that the tests really ran on this commit (a run that skipped them
+      # because the license or runtime was missing is green too and must not vouch for a later commit).
+      - name: Mark the commit as tested (status `tests-passed`)
+        if: steps.tests.outputs.ran == 'true'
         shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          & .\IAG50cmTests\tools\Run-Tests.ps1
-          exit $LASTEXITCODE
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" `
+            -f state=success -f context=tests-passed -f description="tests passed" -f target_url="$env:RUN_URL"
+          if ($LASTEXITCODE -ne 0) { Write-Host "::warning::posting the tests-passed status failed with exit code $LASTEXITCODE" }
 
       # A workflow_dispatch run (release.yml dispatches one for the version bump) is not linked to the
       # release PR, so its `build` check run does not satisfy the required `build` check on main and the PR
