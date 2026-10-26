@@ -63,7 +63,7 @@ CASE nStep OF
 		nStopsHa := rig.fbHa.nStopEdges;
 		nStopsDec := rig.fbDec.nStopEdges;
 		// the mount now stands at 45 deg: raise the horizon limit above it and park (#84)
-		rig.fHorizon := 60.0;
+		rig.SetHorizon(fValue := 60.0);
 		rig.fbTel.Park();
 		nStep := 20;
 		nCycles := 0;
@@ -143,7 +143,7 @@ CASE nStep OF
 		nStopsHa := rig.fbHa.nStopEdges;
 		nStopsDec := rig.fbDec.nStopEdges;
 		// the mount now stands at 45 deg: raise the horizon limit above it and park (#84)
-		rig.fHorizon := 60.0;
+		rig.SetHorizon(fValue := 60.0);
 		rig.fbTel.Park();
 		nStep := 20;
 		nCycles := 0;

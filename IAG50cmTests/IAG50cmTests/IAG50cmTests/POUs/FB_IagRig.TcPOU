@@ -94,6 +94,18 @@ fbTel.nTimeDivisor := nValue;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetHorizon" Id="{40095ef5-bf79-47cb-b27f-9ceb704f18d1}">
+      <Declaration><![CDATA[// the horizon limit of the telescope under test (an input of the telescope, so it cannot be written from outside; #84)
+METHOD SetHorizon
+VAR_INPUT
+	fValue	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fHorizon := fValue;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SetMoveScans" Id="{cdeb9136-db3d-432e-8efa-7f4fddc23765}">
       <Declaration><![CDATA[// scans a move takes on both mock axes (default 60)
 METHOD SetMoveScans
