@@ -84,6 +84,8 @@ VAR
 	fbPointingForward	: FB_PointingModelForward;
 	fbPointingInversion : FB_PointingModelInversion;
 	
+	bAxesCalibrated		: BOOL;		// #161: horizon/pole stops only act on a referenced counter
+	rtrigCalibLost		: F_TRIG;	// #161: calibration lost while enabled
 	rtrigHorizonError	: R_TRIG;		// if the set Coordinate is below the Horizon threshold fHorizon
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
@@ -361,9 +363,18 @@ fbEq2Hor(
 	alt => fElevationCurrentSky,
 	az => fAzimuthCurrentSky);
 //----------------------------------------------------------------------------------------------
+// #161: while an axis is uncalibrated (e.g. after a PLC activation) its counter is meaningless, so the horizon and
+// pole-zone stops must not act on it, otherwise the power-on sweep and the jog are stopped. Protection then is the NC
+// software limits, the sweep's DistanceLimit and the operator.
+bAxesCalibrated := fbHourAngle.Calibrated AND fbDeclination.Calibrated;
+// losing the reference while enabled and not homing: stop instead of silently releasing the horizon protection
+rtrigCalibLost(CLK := bAxesCalibrated);
+IF rtrigCalibLost.Q AND bReady AND NOT bError AND NOT aAxis[1].bHoming AND NOT aAxis[2].bHoming THEN
+	bStop := TRUE;
+END_IF
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
 // (also gated on fPointingSafeAltitude so tracking never lingers in the pointing model's chaotic zone)
-IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
+IF bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
 	IF NOT bSettled AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
@@ -371,7 +382,7 @@ IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
 	END_IF
 END_IF
 // If the Telescope goes into the forbidden polezone (e.g. while tracking, stop and gohome)
-IF (fDeclinationCurrent > (90.0 - fPoleZone)) OR (bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)))THEN
+IF (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)))THEN
 	IF NOT bSettled AND NOT bGoHome THEN
 		bStop := TRUE;
 	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
@@ -909,7 +920,7 @@ TCStargetHorizonEvent(	Trigger := rtrigHorizonError.Q,
 				OnMessage := 'Target below safe horizon, stopping telescope.',
 				OffMEssage := '', 
 				Comm := fbComm);
-TCSaltitudeEvent(	Trigger := fElevationCurrent<MAX(fHorizon+2.0, fPointingSafeAltitude+2.0),
+TCSaltitudeEvent(	Trigger := bAxesCalibrated AND fElevationCurrent<MAX(fHorizon+2.0, fPointingSafeAltitude+2.0),
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'Telescope below safe horizon, aboard and slew telescope to home position.',
