@@ -3,6 +3,7 @@
   <POU Name="FB_DeclinationControl" Id="{6080c426-7a5e-4f1a-af47-78007455d126}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_DeclinationControl EXTENDS FB_AxisControl
 VAR_INPUT
+	bReleaseHold : BOOL;		// #159: a new power-on was accepted, release the hold (one scan, set by FB_TelescopeControl.Init)
 	fMinPosition : LREAL := -50.0;
 	fMaxPosition : LREAL := 180.0;
 END_VAR
@@ -18,7 +19,6 @@ VAR
 	fbLatchHome : FB_LatchHome;
 	fbHomeHold : FB_HomeHold;		// #113: no homing request after a stop of the axis
 	tonReady : TON;					// #155: the NC axis takes some time after Ready before a command reaches it
-	bReleaseHold : BOOL;			// #159: a new power-on was accepted, release the hold (one scan, set by FB_TelescopeControl.Init)
 	bResetForAbort : BOOL;		// #113: the reset was asked for by FB_LatchHome to end a homing, it must not release the hold
 END_VAR
 ]]></Declaration>
