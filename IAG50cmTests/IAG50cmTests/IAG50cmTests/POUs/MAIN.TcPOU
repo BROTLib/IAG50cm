@@ -16,6 +16,7 @@ VAR
 	fbErrorParkTests		: IagErrorPark_Tests;
 	fbIagTimeoutsTests : IagTimeouts_Tests;
 	fbParkDuringPowerOnTests	: IagParkDuringPowerOn_Tests;
+	fbParkInLimitTests		: IagParkInLimit_Tests;
 END_VAR
 ]]></Declaration>
     <Implementation>
