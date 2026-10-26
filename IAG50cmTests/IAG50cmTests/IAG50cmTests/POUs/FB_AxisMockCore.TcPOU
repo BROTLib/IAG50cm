@@ -16,6 +16,7 @@ VAR_INPUT
 	nHomeScans		: UINT := 3;
 	nMoveScans		: UINT := 4;
 	nStopScans		: UINT := 3;
+	nStartScans		: UINT;		// scans between the move command and the axis reporting InMotion (the NC takes a few cycles; 0 = at once). #92
 END_VAR
 VAR_OUTPUT
 	bReady			: BOOL;
@@ -34,6 +35,8 @@ VAR
 	nHomeCount		: UINT;
 	nMoveCount		: UINT;
 	nStopCount		: UINT;
+	nStartCount		: UINT;
+	bStartPending	: BOOL;
 	rtMove			: R_TRIG;
 	rtStop			: R_TRIG;
 END_VAR
@@ -50,6 +53,7 @@ IF rtStop.Q THEN
 	bStopping := TRUE;
 	nStopCount := 0;
 	bInMotion := FALSE;
+	bStartPending := FALSE;
 END_IF
 IF bStopping THEN
 	nStopCount := nStopCount + 1;
@@ -84,8 +88,21 @@ END_IF
 
 rtMove(CLK := bMove);
 IF rtMove.Q AND bReady AND bCalibrated AND NOT bStopping THEN
-	bInMotion := TRUE;
-	nMoveCount := 0;
+	IF nStartScans = 0 THEN
+		bInMotion := TRUE;
+		nMoveCount := 0;
+	ELSE
+		// the move command is out, the axis still reports StandStill until the NC has started it (#92)
+		bStartPending := TRUE;
+		nStartCount := 0;
+	END_IF
+ELSIF bStartPending THEN
+	nStartCount := nStartCount + 1;
+	IF nStartCount >= nStartScans THEN
+		bStartPending := FALSE;
+		bInMotion := TRUE;
+		nMoveCount := 0;
+	END_IF
 END_IF
 IF bInMotion THEN
 	nMoveCount := nMoveCount + 1;
