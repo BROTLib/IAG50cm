@@ -30,7 +30,7 @@ Pending := Execute;
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Take"Id="{a9d41e07-62b3-4c5f-8e1a-0b7f3c9d2a64}">
+    <Method Name="Take" Id="{a9d41e07-62b3-4c5f-8e1a-0b7f3c9d2a64}">
       <Declaration><![CDATA[METHOD Take : BOOL
 ]]></Declaration>
       <Implementation>
