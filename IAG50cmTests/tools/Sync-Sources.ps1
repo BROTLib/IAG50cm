@@ -19,6 +19,9 @@ Copy-Item (Join-Path $repo 'IAG50cm\POUs\Pointing\FB_PointingModelForward.TcPOU'
 Write-Host 'Copied FB_PointingModelForward.TcPOU'
 Copy-Item (Join-Path $repo 'IAG50cm\GVLs\GVL_Pointing.TcGVL') $dest -Force
 Write-Host 'Copied GVL_Pointing.TcGVL'
+# FB_LatchHome reads the abort mode from GVL_Homing
+Copy-Item (Join-Path $repo 'IAG50cm\GVLs\GVL_Homing.TcGVL') $dest -Force
+Write-Host 'Copied GVL_Homing.TcGVL'
 # The telescope state machine and what it compiles against (mock rig, spike S0 of the unification plan): the closure of
 # FB_TelescopeControl in IAG50cm/POUs, found with a comment-blind reference search. The dome, focus and cover blocks are
 # not copied, they are mocks (FB_DomeMock, FB_FocusMock, FB_CoversMock).

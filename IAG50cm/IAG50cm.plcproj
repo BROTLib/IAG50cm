@@ -33,6 +33,9 @@
     <Compile Include="GlobalTextList.TcGTLO">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="GVLs\GVL_Homing.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="GVLs\GVL_Pointing.TcGVL">
       <SubType>Code</SubType>
       <LinkAlways>true</LinkAlways>
