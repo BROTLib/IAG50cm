@@ -1,0 +1,138 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_DomeStoppingState" Id="{a5a9c14f-6a37-4add-8063-32a353618855}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DomeStoppingState EXTENDS FB_DomeState
+// #96: the Baader dome has no stop command. The azimuth target is replaced at once by a new one (manual, page 5), so
+// a stop reads the azimuth the dome has now and sends it back as the new target. The azimuth is sent exactly as
+// the dome reported it (tenths of a degree, 0000 south): no conversion, no off-centre correction. A shutter
+// movement cannot be stopped this way and goes on.
+VAR
+	Stage		: UINT:= 0;
+	tonTimeout	: TON:= (PT:=T#30S);
+	tonSleep	: TON := (PT:=T#1S);
+
+	sSeperator		: STRING := 'd#azi';
+	sLeft			: STRING;
+	sAzi			: STRING;
+	bSplitSuccess 	: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="FoundError" Id="{3eaa0e89-0c43-4938-abfd-96f91ab9506b}">
+      <Declaration><![CDATA[
+METHOD FoundError : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+pDome^._Error := TRUE;
+pDome^.SetState(pDome^.fbDomeErrorState);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunState" Id="{b38bec3f-6d7b-45be-a8fa-22bf82739597}">
+      <Declaration><![CDATA[METHOD RunState : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// the stop does not wait for the old move or its 3 min timeout: it is a short transaction of its own
+tonTimeout(IN:=TRUE);
+IF tonTimeout.Q THEN
+	FoundError();
+	RETURN;
+END_IF
+
+CASE Stage OF
+	0:
+		// the state that was left may have a request or a reply on the line
+		IF NOT pDome^.fbReceive.Busy AND NOT pDome^.fbSend.Busy THEN
+			Stage := 1;
+		END_IF
+	1:
+		pDome^.fbSend(	SendString:= 'd#getazim',
+					TXbuffer:= TxBufferDome,
+					Busy=>,
+					Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 2;
+		END_IF
+	2:
+		IF pDome^._HasReceivedString THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSE
+				// a late reply of the cancelled move (d#gotmess) does not split and is waited out
+				bSplitSuccess := FindAndSplit(
+									pSeparator := ADR(sSeperator),
+									pSrcString := ADR(pDome^.sReceivedString),
+									pLeftString:= ADR(sLeft),
+									nLeftSize	:= 1,
+									pRightString := ADR(sAzi),
+									nRightSize := 5,
+									bSearchFromRight:= FALSE);
+				IF bSplitSuccess AND LEN(sAzi) = 4 AND ( STRING_TO_LREAL(sAzi) <> 0 OR sAzi = '0000' ) THEN
+					Stage := 3;
+				END_IF
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			tonSleep(IN:=TRUE);
+			IF tonSleep.Q THEN
+				tonSleep(IN:=FALSE);
+				Stage := 1;
+			END_IF
+		END_IF
+	3:
+		pDome^.fbSend(	SendString:= CONCAT('d#azi', sAzi),
+					TXbuffer:= TxBufferDome,
+					Busy=>,
+					Error=> );
+		IF NOT pDome^.fbSend.Busy  THEN
+			Stage := 4;
+		END_IF
+	4:
+		IF pDome^._HasReceivedString THEN
+			IF pDome^._ReceivedString = 'd#comerro' OR pDome^._ReceivedString = 'd#domerro' THEN
+				FoundError();
+			ELSIF pDome^._ReceivedString = 'd#gotmess' THEN
+				SuccessfulFinished();
+			END_IF
+		ELSIF NOT pDome^.fbReceive.Busy THEN
+			tonSleep(IN:=TRUE);
+			IF tonSleep.Q THEN
+				tonSleep(IN:=FALSE);
+				Stage := 3;
+			END_IF
+		END_IF
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="StateID" Id="{9ed86cb9-feb2-4164-9209-89795a8e365c}">
+      <Declaration><![CDATA[
+PROPERTY StateID : STRING
+]]></Declaration>
+      <Get Name="Get" Id="{09ad8b62-0143-4c31-be37-7377a2314d97}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateID := 'Stopping State';]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="SuccessfulFinished" Id="{08ab911c-22c8-49a5-8104-8e2c18901415}">
+      <Declaration><![CDATA[METHOD SuccessfulFinished : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage := 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+pDome^._DomeRotationState := E_DomeRotationState.idle;
+pDome^._StopDone := TRUE;
+pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

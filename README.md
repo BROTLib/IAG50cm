@@ -158,7 +158,9 @@ The heart of the application: a full telescope control system implementing
 - `FB_DomeControl` — **Baader dome** over RS232 (EL6002 Ch 2): shutter commands
   (`d#opeshut`, `d#closhut`, ...), azimuth slews (`d#aziXXXX`), off-center
   compensation (±5°), Baader west-of-south azimuth convention conversion;
-  state machine `Idle / Opening / Closing / Moving / Parking / Homing / Error`.
+  state machine `Idle / Opening / Closing / Moving / Parking / Stopping / Homing / Error`.
+  `dome_stop` (#96) holds the azimuth: the baader has no stop command, so `Stopping`
+  reads the azimuth and sends it back as the new target; a shutter movement is not stopped.
 - `FB_CoverControl` — two mirror covers, each driven by two relay outputs
   (EL2652); staggered open/close (`Delta` 5 s, `TimeToCycle` 15 s), state
   machine `Idle / Opening / Closing / Stopping`; state enum `E_MirrorCoverState`.
