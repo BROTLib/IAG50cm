@@ -85,6 +85,8 @@ VAR
 	fbPointingInversion : FB_PointingModelInversion;
 	
 	bAxesCalibrated		: BOOL;		// #161: horizon/pole stops only act on a referenced counter
+	bPowerOnHold		: BOOL;		// #166: a power-on is running and may be enabling a still axis inside a limit
+	bHaMoving, bDecMoving	: BOOL;	// #166
 	rtrigCalibLost		: F_TRIG;	// #161: calibration lost while enabled
 	rtrigHorizonError	: R_TRIG;		// if the set Coordinate is below the Horizon threshold fHorizon
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
@@ -372,10 +374,17 @@ rtrigCalibLost(CLK := bAxesCalibrated);
 IF rtrigCalibLost.Q AND bReady AND NOT bError AND NOT aAxis[1].bHoming AND NOT aAxis[2].bHoming THEN
 	bStop := TRUE;
 END_IF
+// #166: a running power-on does not move a calibrated axis, but enabling it is not settled for a few scans and the mount
+// is not ready before stage 100, so a mount inside a limit was stopped and the power-on aborted (any bStop aborts it).
+// Skip the automatic stop only while the axes that matter stand still; stage 100 hands over to bGoHome. Any motion, a
+// user stop or an error still stops.
+bPowerOnHold := bPower AND NOT bUserStop AND NOT bError;
+bHaMoving := aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming;
+bDecMoving := aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming;
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
 // (also gated on fPointingSafeAltitude so tracking never lingers in the pointing model's chaotic zone)
 IF bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
-	IF NOT bSettled AND NOT bGoHome THEN
+	IF NOT bSettled AND NOT bGoHome AND NOT (bPowerOnHold AND NOT bHaMoving AND NOT bDecMoving) THEN
 		bStop := TRUE;
 	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
@@ -383,7 +392,7 @@ IF bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitu
 END_IF
 // If the Telescope goes into the forbidden polezone (e.g. while tracking, stop and gohome)
 IF (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)))THEN
-	IF NOT bSettled AND NOT bGoHome THEN
+	IF NOT bSettled AND NOT bGoHome AND NOT (bPowerOnHold AND NOT bDecMoving) THEN
 		bStop := TRUE;
 	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
@@ -471,7 +480,7 @@ END_IF
 //----------------------------------------------------------------------------------------------		
 // set TCS_command according to state variables ordered by precedence
 // #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
-// time) do not abort a running power-on, as before.
+// time) are meant not to abort a running power-on, but _PowerOn aborts on any bStop, so they are held back in the checks above (#166).
 IF bStop AND (bUserStop OR NOT bPower) THEN
     fbStartup.MarkAbortedIfStarting(Power := bPower);
 	bTrack := FALSE;
