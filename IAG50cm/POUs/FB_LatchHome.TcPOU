@@ -29,6 +29,9 @@ VAR_INPUT
 
 	(* maximum travel distance for on calibration step (should be 6) *)
 	DistanceLimit				: LREAL;									(* E *)
+	(* #165: maximum distance of the axis from where the sequence started, over all segments and restarts (0 = off). The
+	   limit per step does not bound the sequence: 3 steps out, a jog and 3 back, and an abort restarts it. *)
+	TravelLimit				: LREAL;
 	
 	(* Set bipolar torque limit to this value to avoid mechanical damadges [%] *)
 	TorqueLimit					: LREAL;								(* E *)
@@ -94,6 +97,8 @@ VAR
 	fbStepStuck					: TON;									(* #113: longest wait for a stale step block to leave Busy before a start *)
 	bStepBusy					: BOOL;									(* #113: a step block is still running its NC command *)
 	nSearch						: INT;
+	fStartPos					: LREAL;								(* #165: axis position before the sequence started, sampled while Execute is FALSE *)
+	bTravelExceeded			: BOOL;									(* #165 *)
 
 	fbStartReq					: FB_StartRequest;						(* #155: start request, kept until state 0 can take it *)
 	fbReady						: R_TRIG;
@@ -104,6 +109,7 @@ END_VAR
 VAR CONSTANT
 	ERR_ABORT_TIMEOUT			: UDINT := 16#4F000001;					(* #155: the abort did not finish in time *)
 	ERR_STEP_STUCK				: UDINT := 16#4F000002;					(* #113: a step block does not leave Busy, no start possible *)
+	ERR_TRAVEL_LIMIT			: UDINT := 16#4F000003;					(* #165: the search left the allowed range without finding the marks *)
 END_VAR
 
 ]]></Declaration>
@@ -117,7 +123,12 @@ RefSignal.TouchProbe := E_TouchProbe.TouchProbe1;
 // #113: nothing else stops this sequence (a step block ignores a falling Execute, and the state machine reads Execute
 // only in state 0). A stop of the axis, or Execute going away, aborts it: release the step blocks and go to the abort
 // state, which waits for the MC_Stop lock to clear.
-IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive) THEN
+// #165: the sample is not taken after a start, so a restart after an abort (Execute stays TRUE) keeps the first start
+IF nState = 0 AND NOT Execute THEN
+	fStartPos := Axis.NcToPlc.ActPos;
+END_IF
+bTravelExceeded := TravelLimit > 0 AND nState >= 1 AND nState <= 3 AND ABS(Axis.NcToPlc.ActPos - fStartPos) > TravelLimit;
+IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive OR bTravelExceeded) THEN
 	nAbortFrom := nState;
 	// #113 mode 2: the running reference step keeps its Execute until the abort is over
 	IF GVL_Homing.nAbortMode <> 2 THEN
@@ -138,6 +149,9 @@ IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive) THEN
 		Parameter				:= Parameter,
 		Axis					:= Axis);
 	iErrorId := 0;
+	IF bTravelExceeded THEN
+		iErrorId := ERR_TRAVEL_LIMIT;
+	END_IF
 	nState := 20;
 END_IF
 fbLockWait(IN := nState = 20 AND StopActive AND NOT StepAbortHoming.Busy, PT := T#5S);
