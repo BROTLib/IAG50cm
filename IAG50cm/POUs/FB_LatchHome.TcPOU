@@ -9,6 +9,7 @@ END_VAR
 VAR_INPUT
 	Execute					: BOOL;										(* B *)
 	StopActive				: BOOL;										(* #113: the axis is being stopped (stop requested or MC_Stop lock): abort the sequence *)
+	Reset					: BOOL;										(* #155: leave the abort state at once, whatever MC_AbortHoming does *)
 
 	(* static parameters *)
 	Direction					: MC_Home_Direction;						(* E *)
@@ -87,15 +88,21 @@ VAR
 	nState						: INT;
 	nSearch						: INT;
 
-	fbExecute					: R_TRIG;
+	fbStartReq					: FB_StartRequest;						(* #155: start request, kept until state 0 can take it *)
 	fbReady						: R_TRIG;
 	fbTimeOut					: TON;
 	fbLockWait					: TON;									(* #113: longest wait for the MC_Stop lock before MC_AbortHoming *)
+	fbAbortTimeout				: TON;									(* #155: longest time in the abort state, it has no other exit *)
+END_VAR
+VAR CONSTANT
+	ERR_ABORT_TIMEOUT			: UDINT := 16#4F000001;					(* #155: the abort did not finish in time *)
 END_VAR
 
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[fbExecute(CLK:= Execute);
+      <ST><![CDATA[// #155: the rising edge of Execute is only taken in state 0. One that arrives while the sequence is still aborting would
+// be lost and the axis would never start, so remember it until state 0 is reached (and drop it with Execute).
+fbStartReq(Execute := Execute);
 
 RefSignal.TouchProbe := E_TouchProbe.TouchProbe1;
 
@@ -122,6 +129,7 @@ IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive) THEN
 	nState := 20;
 END_IF
 fbLockWait(IN := nState = 20 AND StopActive AND NOT StepAbortHoming.Busy, PT := T#5S);
+fbAbortTimeout(IN := nState = 20, PT := T#10S);
 
 CASE nState OF
 	0 :	(* init *)
@@ -145,7 +153,7 @@ CASE nState OF
 			RecordedDistances_back	:= DistanceReset;
 		END_IF
  	
-	  	IF fbExecute.Q THEN
+	  	IF fbStartReq.Take() THEN
 			(* initialize output values *)
 	  		Busy 				:= TRUE;
 
@@ -385,6 +393,22 @@ CASE nState OF
 		END_IF
 
 	20:	(*Abort Homing*)
+		// #155: no other exit: a reset or the timeout leaves the state even if MC_AbortHoming never reports back
+		IF Reset OR fbAbortTimeout.Q THEN
+			StepAbortHoming(
+				Axis				:= Axis,
+				Parameter			:= Parameter,
+				Execute				:= FALSE,
+				Options				:= );
+			Busy := FALSE;
+			IF Reset THEN
+				CommandAborted := TRUE;
+			ELSE
+				Error := TRUE;
+				ErrorID := ERR_ABORT_TIMEOUT;
+			END_IF
+			nState := 0;
+		ELSE
 		// #113: MC_Stop locks the axis for motion commands until it is done (StateDWord bit 29); MC_AbortHoming sent into the
 		// lock is rejected (17135) and the error disables both axes. Wait for the lock to clear, 5 s at most.
 		IF NOT StopActive OR fbLockWait.Q OR StepAbortHoming.Busy THEN
@@ -423,6 +447,7 @@ CASE nState OF
 
 				nState := 0;
 			END_IF
+		END_IF
 		END_IF
 
 END_CASE]]></ST>

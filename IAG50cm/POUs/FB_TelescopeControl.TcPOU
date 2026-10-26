@@ -1529,6 +1529,7 @@ END_VAR
 VAR_INST
 	nStage		: USINT := 0;
 	nLastStage	: USINT := 0;
+	tonCalibTimeout	: TON;		// #155: stage 40 had no timeout
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[// #59: also refused while the safety acknowledge after an E-stop is pending. While the reset is running
@@ -1561,6 +1562,26 @@ END_IF
 
 IF nStage >= 40 THEN
     fbStartup.MarkCalibrating();
+END_IF
+
+// #155: an axis that never starts its calibration (no error, no log) held the power-on in stage 40 for good. The sweep
+// of one axis takes about 35 s; end the power-on as a failed startup if it lasts three minutes.
+tonCalibTimeout(IN := nStage = 40, PT := T#3M);
+IF tonCalibTimeout.Q THEN
+	bPowerFailure := TRUE;
+	TCSpowerEvent.OnMessage := 'failed';
+	IF fbHourAngle.Calibrated THEN
+		TCSpowerBlockedEvent.OnMessage := 'POWER: calibration timeout (Declination is not calibrated)';
+	ELSIF fbDeclination.Calibrated THEN
+		TCSpowerBlockedEvent.OnMessage := 'POWER: calibration timeout (Hour Angle is not calibrated)';
+	ELSE
+		TCSpowerBlockedEvent.OnMessage := 'POWER: calibration timeout (neither axis is calibrated)';
+	END_IF
+	bPowerBlocked := TRUE;
+	fbStartup.MarkAborted();
+	bPower := FALSE;
+	nStage := 0;
+	RETURN;
 END_IF
 
 CASE nStage OF

@@ -2,6 +2,7 @@
 FB_StopTransaction.TcPOU
 FB_HomeDropReason.TcPOU
 FB_HomeHold.TcPOU
+FB_StartRequest.TcPOU
 FB_SweepStop.TcPOU
 FB_PointingModelForward.TcPOU
 GVL_Pointing.TcGVL

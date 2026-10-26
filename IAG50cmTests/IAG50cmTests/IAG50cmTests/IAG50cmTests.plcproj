@@ -138,6 +138,12 @@
     <Compile Include="POUs\FB_HomeHold.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FB_StartRequest.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_StartRequest_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\FB_SweepStop.TcPOU">
       <SubType>Code</SubType>
     </Compile>
