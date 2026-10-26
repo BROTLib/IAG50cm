@@ -12,7 +12,7 @@ END_VAR
     <Implementation>
       <ST><![CDATA[Park_During_PowerOn_Aborts_The_Startup_And_Parks();
 Stop_During_PowerOn_Aborts_The_Startup();
-// TMP AxesOff_Park_After_Stopped_Startup_Reports_Parked();
+AxesOff_Park_After_Stopped_Startup_Reports_Parked();
 ]]></ST>
     </Implementation>
     <Method Name="Park_During_PowerOn_Aborts_The_Startup_And_Parks" Id="{fee3a10b-b0ce-4b59-b6ed-58da01277209}">
