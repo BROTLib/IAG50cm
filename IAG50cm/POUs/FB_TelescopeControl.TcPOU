@@ -113,6 +113,12 @@ VAR
 	bHomeCancelled		: BOOL;		// a pending home that never started was dropped (one scan): logs the reason (#75)
 	sHomeDropWhy		: STRING(160);	// why the pending home was dropped, for the WARN text (#108)
 	fbStopTx			: FB_StopTransaction;	// #108/#120: one stop per axis and stop transaction
+	rtHaMove			: R_TRIG;		// #92: MoveAxis of the axis went TRUE: the move command is out (MoveTo)
+	rtDecMove			: R_TRIG;
+	bHaMovePending		: BOOL;			// #92: a move was commanded and the NC does not report it yet: the axis is not at rest
+	bDecMovePending		: BOOL;
+	tonHaMovePending	: TON;			// #92: a command the NC never started (cancelled in time) is forgotten after 1 s
+	tonDecMovePending	: TON;
 	fbHomeDrop			: FB_HomeDropReason;	// #108/#120: why a pending home was dropped
 	tonHomePending		: FB_TimeoutTimer;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
@@ -788,8 +794,37 @@ bSliding := NOT bTracking AND (aAxis[1].bInMotion OR aAxis[1].bInRamp OR
 tonTrackingDelay(in := aAxis[1].bTracking AND
 			aAxis[2].bTracking ,PT :=T#1000MS, Q => bTracking);
 
+// #92: a move that was commanded (MoveAxis -> MoveTo) is reported by the NC a few cycles later; until then the axis
+// reports StandStill. A stop in that window saw bStopped, so bStop was cleared after one scan, the stop only dropped
+// MoveAxis (which does not cancel a move that has started) and no axis stop was sent: the move ran to its end (T18.4,
+// park, Dec). The axis is not at rest while its move is on the way; the stop then lasts until the axis moves and gets
+// its axis stop from the stop transaction.
+rtHaMove(CLK := fbHourAngle.MoveAxis);
+rtDecMove(CLK := fbDeclination.MoveAxis);
+IF rtHaMove.Q THEN
+	bHaMovePending := TRUE;
+END_IF
+IF rtDecMove.Q THEN
+	bDecMovePending := TRUE;
+END_IF
+IF aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming OR fbHourAngle.MoveDone OR bError OR NOT fbHourAngle.bEnable THEN
+	bHaMovePending := FALSE;
+END_IF
+IF aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming OR fbDeclination.MoveDone OR bError OR NOT fbDeclination.bEnable THEN
+	bDecMovePending := FALSE;
+END_IF
+tonHaMovePending(IN := bHaMovePending, PT := T#1S);
+tonDecMovePending(IN := bDecMovePending, PT := T#1S);
+IF tonHaMovePending.Q THEN
+	bHaMovePending := FALSE;
+END_IF
+IF tonDecMovePending.Q THEN
+	bDecMovePending := FALSE;
+END_IF
+
 bStopped :=  (NOT fbHourAngle.bEnable OR aAxis[1].bStandStill) AND
-			(NOT fbDeclination.bEnable OR aAxis[2].bStandStill);
+			(NOT fbDeclination.bEnable OR aAxis[2].bStandStill) AND
+			NOT bHaMovePending AND NOT bDecMovePending;
 
 // #98: bStopped is TRUE for one scan at the start of every stop, before MC_Stop has taken hold (StandStill is still
 // TRUE), and a home commanded while MC_Stop locks the axis (StateDWord bit 29) fails with 17135. A stop transaction
