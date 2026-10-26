@@ -99,7 +99,7 @@ CASE nStep OF
 		bHaMoved := TRUE;
 	END_IF
 	IF bHaMoved AND rig.fbDec.MoveAxis AND NOT rig.fbDec.fbAxis.InMotion AND rig.fbTel.bPark THEN
-		fDecAtStop := rig.fbDec.fPosition;
+		fDecAtStop := rig.fbDec.fActualPosition;
 		sTrace := 'pre-stop ';
 		AddTrace(rig := rig);
 		rig.fbTel.Stop();
@@ -125,7 +125,7 @@ CASE nStep OF
 	END_IF
 	IF nCycles >= 60 THEN
 		// TEMPORARY (#92 diagnostic): the trace goes into the CI log (chunks: the long message was lost), only when Dec moved
-		IF rig.fbDec.fPosition <> fDecAtStop THEN
+		IF rig.fbDec.fActualPosition <> fDecAtStop THEN
 			FOR nChunk := 0 TO 3 DO
 				AssertTrue(Condition := FALSE, Message := CONCAT(CONCAT('TRACE', INT_TO_STRING(nChunk)), CONCAT(' ', MID(sTrace, 50, nChunk * 50 + 1))));
 			END_FOR
@@ -134,8 +134,8 @@ CASE nStep OF
 		F_Note(bFailed := NOT (bSawStop), sText := CONCAT(sTest, 'the stop command ran (TCS_command passed stop)'));
 		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park is cancelled');
 		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park is cancelled'));
-		AssertTrue(Condition := rig.fbDec.fPosition = fDecAtStop, Message := 'Dec did not move to home after the stop');
-		F_Note(bFailed := NOT (rig.fbDec.fPosition = fDecAtStop), sText := CONCAT(sTest, 'Dec did not move to home after the stop'));
+		AssertTrue(Condition := rig.fbDec.fActualPosition = fDecAtStop, Message := 'Dec did not move to home after the stop');
+		F_Note(bFailed := NOT (rig.fbDec.fActualPosition = fDecAtStop), sText := CONCAT(sTest, 'Dec did not move to home after the stop'));
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
