@@ -153,6 +153,32 @@ The heart of the application: a full telescope control system implementing
 - `FB_Axis3` — generic NC-axis driver with an external-setpoint tracking
   section (`MC_ExtSetPointGenFeed`, `TrackVelocityRef`, tracking envelope).
 
+### Uncalibrated axes (after an activation or Reset Cold)
+
+After a PLC activation or Reset Cold the axis counters are not referenced (HA about
+-0.02, Dec about -23) and mean nothing until the power-on sweep has found the
+reference markers. While an axis is uncalibrated the horizon and pole-zone stops do
+not act on its counter (#162), and there are no hardware limit switches. The only
+protection is:
+
+- the sweep: 6 deg per step (`DistanceLimit`), 21 deg in total from where it started
+  (`TravelLimit`, error `4F000003`, #165), and the 3 min power-on timeout;
+- the operator. A jog is hold-to-run and has **no travel cap**, so that a stuck
+  uncalibrated axis can still be moved as far as needed.
+
+The sweep starts from wherever the mount was left, and the PLC cannot check that.
+Procedure for the first `power=1` after an activation or Reset Cold:
+
+1. Confirm the mount stands at the park position (Dec 52), or move it there
+   first, and that nothing can collide with it.
+2. Have the E-stop in reach and watch the axes during the covers and sweep phases
+   (about 1 min). `stop=1` ends the sweep cleanly.
+3. If the sweep ends in an error, jog the axes back past the first marker before the
+   next `power=1`: a sweep started from past the marker ends in 19210.
+
+NC soft limits as a backstop are only planned for the calibrated frame; they cannot
+replace the curved horizon stop.
+
 ### Dome, covers, pendant, cabinet
 
 - `FB_DomeControl` — **Baader dome** over RS232 (EL6002 Ch 2): shutter commands
