@@ -482,8 +482,9 @@ END_IF
 //----------------------------------------------------------------------------------------------		
 // set TCS_command according to state variables ordered by precedence
 // #109: a park outranks a running power-on (like an explicit stop, #27, and like MONET): the startup is aborted
-// (READY_STATE -2 for the aborted init) and the park runs below in this scan. A park never got lost silently before.
-IF bPower AND bPark AND NOT bStop THEN
+// (READY_STATE -2 for the aborted init) and the park runs below in this scan. Only for a power-on that was already running
+// (TCS_command of the last scan): an Init() during a park still cancels the park, see the bPower branch below.
+IF bPower AND bPark AND NOT bStop AND TCS_command = E_TCSCommand.poweron THEN
 	bPowerParked := TRUE;
 	bInterupted := TRUE;
 	_PowerOn();					// bInterupted: marks the startup aborted, clears bPower, resets its stage
