@@ -150,6 +150,9 @@
     <Compile Include="POUs\FB_PointingModelForward.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\GVL_Homing.TcGVL">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\GVL_Pointing.TcGVL">
       <SubType>Code</SubType>
     </Compile>

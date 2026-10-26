@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <GVL Name="GVL_Homing" Id="{5a1d7c3e-92f4-4b68-a0c5-e7d3b19f4c82}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+VAR_GLOBAL
+	// #113: how FB_LatchHome ends the calibration sweep after a stop. Test switch, written over ADS (GVL_Homing.nAbortMode),
+	// so the approaches can be tried one after the other without a new activation. Not persistent.
+	//   0: as before (MC_AbortHoming into the running step: never completes, 4F000001 after 10 s)
+	//   1: no MC_AbortHoming while a step block is Busy, the axis is reset instead (reset=1 clears HomingBusy)
+	//   2: the Busy reference step keeps its Execute while MC_AbortHoming runs
+	//   3: MC_AbortHoming with DisableDriveAccess FALSE
+	nAbortMode		: INT := 1;
+END_VAR
+]]></Declaration>
+  </GVL>
+</TcPlcObject>
