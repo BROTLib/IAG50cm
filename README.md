@@ -190,8 +190,10 @@ The heart of the application: a full telescope control system implementing
   robotic operation.
 - **Dome shutter** follows `E_RoofState` (BROTLib), dome rotation
   `E_DomeRotationState` (BROTLib).
-- **Covers**: `closing / opening / stopped / closed / open / error`
-  (`E_MirrorCoverState`).
+- **Covers**: `closing / opening / stopped / closed / open / error / unknown`
+  (`E_MirrorCoverState`). After every PLC start (activation, Reset Cold) the position is
+  `unknown` until the first open or close cycle completes; the first request always runs
+  a full cycle (#111).
 
 ---
 

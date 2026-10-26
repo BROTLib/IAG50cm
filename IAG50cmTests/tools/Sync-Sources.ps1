@@ -10,7 +10,7 @@
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $dest = Join-Path $PSScriptRoot '..\IAG50cmTests\IAG50cmTests\POUs'
-foreach ($n in 'FB_StopTransaction', 'FB_HomeDropReason', 'FB_HomeHold', 'FB_StartRequest', 'FB_SweepStop', 'FB_StepDrain') {
+foreach ($n in 'FB_StopTransaction', 'FB_HomeDropReason', 'FB_HomeHold', 'FB_StartRequest', 'FB_StepDrain', 'FB_SweepStop') {
   Copy-Item (Join-Path $repo "IAG50cm\POUs\$n.TcPOU") $dest -Force
   Write-Host "Copied $n.TcPOU"
 }
