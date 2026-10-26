@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_StepDrain" Id="{5a7e2c91-3b48-4d06-9f1a-c84e0d7b6a35}" SpecialFunc="None">
+    <Declaration><![CDATA[// Decides what FB_LatchHome does with a step block that is still Busy while it is idle (#113). A stop leaves the reference
+// step Busy and the reset of the axis ends its NC command without the block being called again; at the next start the block
+// reported the old command as aborted and the abort overlapped the new MC_Home (4B66). While idle a Busy block is called with
+// Execute FALSE until it drops Busy, and no start is taken before. Pure logic, tested offline in IAG50cmTests (the offline
+// mocks do not run FB_LatchHome).
+FUNCTION_BLOCK FB_StepDrain
+VAR_INPUT
+	bIdle			: BOOL;		// FB_LatchHome is in state 0
+	bStepBusy		: BOOL;		// a step block still runs its NC command
+	bStartPending	: BOOL;		// a start request waits to be taken
+	PT				: TIME := T#2S;	// longest wait for the step block to leave Busy while a start is pending
+END_VAR
+VAR_OUTPUT
+	bDrain			: BOOL;		// call the step blocks with Execute FALSE
+	bMayTake		: BOOL;		// a pending start may be taken
+	bStuck			: BOOL;		// the step block did not leave Busy in time: give up the start
+END_VAR
+VAR
+	fbStuck			: TON;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[bDrain := bIdle AND bStepBusy;
+bMayTake := bIdle AND NOT bStepBusy;
+fbStuck(IN := bDrain AND bStartPending, PT := PT);
+bStuck := fbStuck.Q;
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

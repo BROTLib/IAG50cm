@@ -125,6 +125,7 @@ VAR
 	bParkAfterHome		: BOOL;		// #84: a park waits for that home
 	bParkHomeDone		: BOOL;		// #84: the home finished for this park: the limit blocks do not home again, the park runs
 	bParkHomeFirst		: BOOL;		// #84: a park was requested in a limit, the home runs first (one scan): logs it
+	bSafeParked			: BOOL;		// an axes-off park closed the covers and parked the dome, the mount was not moved: READY_STATE 0, bIsParked stays FALSE (#110)
 	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: FB_TimeoutTimer;		// power on timeout
@@ -648,6 +649,9 @@ ELSIF bPark THEN
 			END_IF
 			bParkInError := TRUE;
 		END_IF
+		// #110: with no error and no E-stop this leaves a known, covered state. READY_STATE reports it as parked once the
+		// covers are closed and the dome is parked; bIsParked stays FALSE, the mount is where it was.
+		bSafeParked := NOT bError AND NOT bEstopTriggered;
 		TCS_command := E_TCSCommand.no_command;
 	// #84: a park in a limit: the home out of the limit runs first, the park follows (see bParkHomeDone)
 	ELSIF bGoHome AND bLimitHome THEN
@@ -879,9 +883,13 @@ bBusy := aAxis[1].bBusy OR aAxis[2].bBusy OR (fbFocus <> 0 AND_THEN fbFocus.Busy
 //----------------------------------------------------------------------------------------------
 (* STATUS STATES*)
 // Public completion is latched only by the final startup stage, never by mechanical bReady alone.
+// #110: the covered state ends with a power-on, an error or an E-stop.
+IF bPower OR bError OR bEstopTriggered THEN
+    bSafeParked := FALSE;
+END_IF
 fReadyState := fbStartup.Update(
     Error := bError OR bSoftwareError OR bPowerFailure OR bEstopTriggered,
-    Parked := bIsParked,
+    Parked := bIsParked OR (bSafeParked AND fbCovers.Closed AND fbDome.Parked),
     Parking := bPark AND NOT bPower,
     Operational := bReady AND bMainReady AND NOT bEstopTriggered,
     AbortExtra := bEstopTriggered);

@@ -8,6 +8,7 @@ VAR
 	fbHomeDropReasonTests	: FB_HomeDropReason_Tests;
 	fbHomeHoldTests			: FB_HomeHold_Tests;
 	fbStartRequestTests		: FB_StartRequest_Tests;
+	fbStepDrainTests		: FB_StepDrain_Tests;
 	fbSweepStopTests		: FB_SweepStop_Tests;
 	fbPointingForwardTests	: FB_PointingModelForward_Tests;
 	fbIagRigTests			: FB_IagRig_Tests;

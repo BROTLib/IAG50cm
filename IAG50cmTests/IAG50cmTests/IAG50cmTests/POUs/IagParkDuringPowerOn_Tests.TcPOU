@@ -12,12 +12,14 @@ END_VAR
     <Implementation>
       <ST><![CDATA[Park_During_PowerOn_Aborts_The_Startup_And_Parks();
 Stop_During_PowerOn_Aborts_The_Startup();
+AxesOff_Park_After_Stopped_Startup_Reports_Parked();
 ]]></ST>
     </Implementation>
     <Method Name="Park_During_PowerOn_Aborts_The_Startup_And_Parks" Id="{fee3a10b-b0ce-4b59-b6ed-58da01277209}">
       <Declaration><![CDATA[// I:529-541 (IAG50cm#109): a park that arrives while the power-on runs outranks it, like a stop: the startup is aborted, the
 // covers the power-on opened are closed again and the telescope ends parked, never ready (READY_STATE does not reach 1.0).
-// Decision 3 of the plan: as MONET (MONETcommon#87).
+// In the covers phase the axes are still off, so the park takes the axes-off path (#54, #110): covers closed, dome parked,
+// the mount is not moved, READY_STATE 0.0 and bIsParked stays FALSE. Decision 3 of the plan: as MONET (MONETcommon#87).
 METHOD PRIVATE Park_During_PowerOn_Aborts_The_Startup_And_Parks
 VAR_INST
 	rig			: FB_IagRig;
@@ -64,14 +66,14 @@ CASE nStep OF
 		nStep := 30;
 		nCycles := 0;
 	END_IF
-30:	// the park finishes, the startup never does
+30:	// the park finishes (READY_STATE 0.0, the axes were off: bIsParked stays FALSE, #110), the startup never does
 	AssertFalse(Condition := rig.Online, Message := 'the startup went on to the end');
 	F_Note(bFailed := (rig.Online), sText := CONCAT(sTest, 'the startup went on to the end'));
-	IF rig.fbTel.bIsParked THEN
+	IF rig.fbTel.ReadyState = 0.0 THEN
 		AssertTrue(Condition := rig.fbCovers.nCloseCalls >= 1, Message := 'the covers were closed');
 		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the covers were closed'));
-		AssertTrue(Condition := rig.fbTel.ReadyState = 0.0, Message := 'READY_STATE is 0.0 (parked)');
-		F_Note(bFailed := NOT (rig.fbTel.ReadyState = 0.0), sText := CONCAT(sTest, 'READY_STATE is 0.0 (parked)'));
+		AssertFalse(Condition := rig.fbTel.bIsParked, Message := 'bIsParked stays FALSE, the mount was not moved');
+		F_Note(bFailed := (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked stays FALSE, the mount was not moved'));
 		nStep := 99;
 		TEST_FINISHED();
 	ELSIF nCycles > 1500 THEN
@@ -142,6 +144,91 @@ CASE nStep OF
 	ELSIF nCycles > 400 THEN
 		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
 		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not settle'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AxesOff_Park_After_Stopped_Startup_Reports_Parked" Id="{5b0e2d41-7c3a-4f58-9e16-2a8d4c7b1f03}">
+      <Declaration><![CDATA[// IAG50cm#110: after a stopped startup (-2) a park with the axes off closes the covers and parks the dome, the mount is not moved.
+// READY_STATE leaves -2 for 0.0 although bIsParked stays FALSE (T18.2); a new power-on ends the covered state.
+METHOD PRIVATE AxesOff_Park_After_Stopped_Startup_Reports_Parked
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('AxesOff_Park_After_Stopped_Startup_Reports_Parked');
+sTest := 'AxesOff_Park_After_Stopped_Startup_Reports_Parked: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the power-on has commanded the covers: stop now
+	IF rig.fbCovers.nOpenCalls >= 1 THEN
+		rig.fbTel.Stop();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the power-on never commanded the covers');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the power-on never commanded the covers'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the stop has settled: -2, then park with the axes off
+	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		AssertTrue(Condition := rig.fbTel.ReadyState = -2.0, Message := 'READY_STATE is -2.0 after the stop');
+		F_Note(bFailed := NOT (rig.fbTel.ReadyState = -2.0), sText := CONCAT(sTest, 'READY_STATE is -2.0 after the stop'));
+		rig.fbTel.Park();
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not settle'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// the covers close, READY_STATE becomes 0.0, bIsParked stays FALSE
+	IF rig.fbTel.ReadyState = 0.0 THEN
+		AssertTrue(Condition := rig.fbCovers.nCloseCalls >= 1, Message := 'the covers were closed');
+		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the covers were closed'));
+		AssertFalse(Condition := rig.fbTel.bIsParked, Message := 'bIsParked stays FALSE, the mount was not moved');
+		F_Note(bFailed := (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked stays FALSE, the mount was not moved'));
+		rig.fbTel.Init();
+		nStep := 40;
+		nCycles := 0;
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'READY_STATE did not reach 0.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'READY_STATE did not reach 0.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+40:	// a new power-on ends the covered state
+	IF rig.fbTel.ReadyState > 0.0 THEN
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the new power-on did not leave READY_STATE 0.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the new power-on did not leave READY_STATE 0.0'));
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
