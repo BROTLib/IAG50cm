@@ -181,6 +181,18 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
+    <Method Name="StopCommand" Id="{4adfc0bd-0c92-49b3-ad40-a4adba482d47}">
+      <Declaration><![CDATA[
+METHOD StopCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeStoppingState);]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SuccessfulFinished" Id="{eaa94ad4-58a6-4ca5-9c6f-84da24826579}">
       <Declaration><![CDATA[
 METHOD SuccessfulFinished : BOOL

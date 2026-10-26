@@ -52,6 +52,11 @@ PROPERTY StateID : STRING
         <Declaration><![CDATA[]]></Declaration>
       </Get>
     </Property>
+    <Method Name="StopCommand" Id="{82ab6c06-0067-49d3-920f-158d61f1c09a}">
+      <Declaration><![CDATA[
+METHOD StopCommand : BOOL
+]]></Declaration>
+    </Method>
     <Method Name="SuccessfulFinished" Id="{ac769bc0-6135-4613-8474-4662273aa323}">
       <Declaration><![CDATA[
 METHOD SuccessfulFinished : BOOL

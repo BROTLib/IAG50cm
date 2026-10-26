@@ -92,6 +92,7 @@ VAR
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
 	rtrigReset		: R_TRIG;
+	rtrigPoweredClear	: R_TRIG;		// #100: error or E-stop edge: the telescope is no longer powered
 	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
 	tonAxisResetAfterAck	: TON;
 	// plan step 3.2: the axis feedback of this scan (1 hour angle, 2 declination), filled by _ReadAxes
@@ -125,6 +126,12 @@ VAR
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
 	bPowerParked		: BOOL;		// a park aborted a running power-on (one scan, #109)
+	bInHorizonLimit		: BOOL;		// #84: the mount is below the horizon limit (the safety block homes it out)
+	bInPoleLimit		: BOOL;		// #84: the mount (or the tracking target) is in the pole zone
+	bLimitHome			: BOOL;		// #84: the pending or running home was requested by a limit block; latched while bGoHome
+	bParkAfterHome		: BOOL;		// #84: a park waits for that home
+	bParkHomeDone		: BOOL;		// #84: the home finished for this park: the limit blocks do not home again, the park runs
+	bParkHomeFirst		: BOOL;		// #84: a park was requested in a limit, the home runs first (one scan): logs it
 	bSafeParked			: BOOL;		// an axes-off park closed the covers and parked the dome, the mount was not moved: READY_STATE 0, bIsParked stays FALSE (#110)
 	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	tpPowerOnWarning		: TP;		// triggers power warning
@@ -155,6 +162,7 @@ VAR
 	TCShomeCancelEvent,
 	TCSpowerBlockedEvent,
 	TCSpowerParkEvent,
+	TCSparkHomeEvent,
 	TCScommandRefusedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
@@ -256,6 +264,13 @@ fSlewTime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
 // ERROR (either one of the Axis or below safe Horizon (fHorizon))
 bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error OR bTestError OR bSoftwareError;
 			
+// #100: an error or an E-stop ends the powered state. Only a power-on or a park wrote bIsPowered, so it stayed TRUE and the
+// next power=1 could be taken for a running telescope. bReady needs bIsPowered, so this only forces the full power-on.
+rtrigPoweredClear(CLK := bError OR bEstopTriggered);
+IF rtrigPoweredClear.Q THEN
+	bIsPowered := FALSE;
+END_IF
+
 IF bError THEN
 	bGoHome := 	FALSE;
 	bTrack := 	FALSE;
@@ -392,19 +407,31 @@ bHaMoving := aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming;
 bDecMoving := aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming;
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
 // (also gated on fPointingSafeAltitude so tracking never lingers in the pointing model's chaotic zone)
-IF bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
+// #84: a park requested in a limit homes out of it first and then parks. The stop conditions are unchanged.
+IF NOT bGoHome THEN
+	bLimitHome := FALSE;
+END_IF
+IF NOT bPark THEN
+	bParkAfterHome := FALSE;
+	bParkHomeDone := FALSE;
+END_IF
+bInHorizonLimit := bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude);
+bInPoleLimit := (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)));
+IF bInHorizonLimit THEN
 	IF NOT bSettled AND NOT bGoHome AND NOT (bPowerOnHold AND NOT bHaMoving AND NOT bDecMoving) THEN
 		bStop := TRUE;
-	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
+	ELSIF bReady AND NOT bError AND NOT bParkHomeDone THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
+		bLimitHome := TRUE;		// #84: also when bGoHome was set already (Home(), power-on stage 100)
 	END_IF
 END_IF
 // If the Telescope goes into the forbidden polezone (e.g. while tracking, stop and gohome)
-IF (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)))THEN
+IF bInPoleLimit THEN
 	IF NOT bSettled AND NOT bGoHome AND NOT (bPowerOnHold AND NOT bDecMoving) THEN
 		bStop := TRUE;
-	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
+	ELSIF bReady AND NOT bError AND NOT bParkHomeDone THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
+		bLimitHome := TRUE;		// #84
 	END_IF
 END_IF
 //----------------------------------------------------------------------------------------------
@@ -511,10 +538,17 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 		IF _PowerOn() >= 40 THEN	// bStop is set: resets its stage; returns the stage it was in
 			fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
 		END_IF
-	ELSIF bPark THEN
+	ELSIF bPark AND (bUserStop OR TCS_command = E_TCSCommand.park OR NOT (bInHorizonLimit OR bInPoleLimit)) THEN
 		bPark := FALSE;
 		sParkEnd := 'cancelled by stop';
 		_ParkTelescope();
+		IF bGoHome THEN
+			// #84: the park was waiting for the limit home; the home goes with it (and its stage is reset, it would resume mid-way)
+			bGoHome := FALSE;
+			sHomeEnd := 'cancelled by stop';
+			_HomeTelescope();
+		END_IF
+	// #84: a park that is only pending survives the automatic stop of a limit: the stop settles, the limit home runs, then the park
 	ELSIF bGoto THEN
 		bGoto := FALSE;
 		_GotoTelescope();
@@ -633,6 +667,29 @@ ELSIF bPark THEN
 		// covers are closed and the dome is parked; bIsParked stays FALSE, the mount is where it was.
 		bSafeParked := NOT bError AND NOT bEstopTriggered;
 		TCS_command := E_TCSCommand.no_command;
+	// #84: a park in a limit: the home out of the limit runs first, the park follows (see bParkHomeDone)
+	ELSIF bGoHome AND bLimitHome THEN
+		IF bGoto OR bSlew THEN
+			bGoto := FALSE;
+			bSlew := FALSE;
+			bInterupted := TRUE;
+			_GotoTelescope();
+			_SlewTelescope();
+			bInterupted := FALSE;
+			IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew THEN
+				bStopping := TRUE;
+			END_IF
+		ELSE
+			IF NOT bParkAfterHome THEN
+				bParkAfterHome := TRUE;
+				bParkHomeFirst := TRUE;
+				fbStartup.MarkAbortedIfInitializing();	// #109: a park during the startup makes the init fail
+			END_IF
+			IF TCS_command <> E_TCSCommand.gohome AND bReady AND NOT bBusy AND bSettled THEN
+				bInterupted := FALSE;
+				TCS_command := E_TCSCommand.gohome;
+			END_IF
+		END_IF
 	// If lower presedence commands are ongoing, let them know they are interupted
 	ELSIF bGoto OR bSlew OR bGoHome THEN
 		bGoHome := FALSE;
@@ -1018,6 +1075,12 @@ TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
 				FormatString := '%s',
 				Comm := fbComm);
 bPowerBlocked := FALSE;
+TCSparkHomeEvent(	Trigger := bParkHomeFirst,
+				Level := ADSLOG_MSGTYPE_HINT,
+				FormatString := '%s',
+				OnMessage := 'Park in the horizon/pole-zone limit: homing out of it first, then parking',
+				Comm := fbComm);
+bParkHomeFirst := FALSE;
 TCSpowerParkEvent(	Trigger := bPowerParked,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
@@ -1354,12 +1417,13 @@ CASE nStage OF
         IF fbFocus <> 0 THEN
             fbFocus.Position := telescopeConfig.focusHome;
         END_IF
-        IF fbStartup.Initializing THEN
+        IF fbStartup.Initializing AND NOT bParkAfterHome THEN	// #84: a park follows, the startup was aborted
             // Only initialization waits for its remaining focus work; manual Home semantics stay unchanged.
             nStage := 110;
         ELSE
             fRightAscension := fRightAscensionCurrentICRS;
             fDeclination := fDeclinationCurrentICRS;
+            bParkHomeDone := bParkAfterHome;	// #84
             bGoHome := FALSE;
             nStage := 0;
         END_IF
