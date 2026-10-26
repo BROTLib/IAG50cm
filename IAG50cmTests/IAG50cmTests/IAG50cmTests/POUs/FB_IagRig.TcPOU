@@ -18,6 +18,7 @@ VAR
 	pBool			: POINTER TO BOOL;
 	nScans			: UDINT;
 	nTimeDivisor	: UDINT := 1;	// the time seam of the telescope under test (SetTimeDivisor)
+	fHorizon		: LREAL := 1.0;	// the horizon limit passed to the telescope (an input, so tests set it here; #84)
 END_VAR
 VAR CONSTANT
 	telescopeConfig	: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0,
@@ -52,7 +53,8 @@ fbTel(
 	fbDome := fbDome,
 	fbCovers := fbCovers,
 	telescopeConfig := telescopeConfig,
-	nTimeDivisor := nTimeDivisor);
+	nTimeDivisor := nTimeDivisor,
+	fHorizon := fHorizon);
 nScans := nScans + 1;
 ]]></ST>
       </Implementation>
