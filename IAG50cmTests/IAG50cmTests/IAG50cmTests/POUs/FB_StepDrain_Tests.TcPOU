@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_StepDrain_Tests" Id="{7ae3a0d2-9b38-4f1c-8657-d4a81f92372e}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_StepDrain, the drain of a stale step block before FB_LatchHome takes a start (#113).
+FUNCTION_BLOCK FB_StepDrain_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Idle_Not_Busy_May_Take();
+Busy_Drains_And_Blocks_Start();
+No_Drain_Outside_Idle();
+Start_Taken_Once_Busy_Drops();
+Stuck_Only_With_Pending_Start();
+Busy_Dropping_Before_Timeout_Is_Not_Stuck();
+]]></ST>
+    </Implementation>
+    <Method Name="Idle_Not_Busy_May_Take" Id="{1c8e4a07-5d32-4b96-a0f1-7e2b93c4d618}">
+      <Declaration><![CDATA[METHOD PRIVATE Idle_Not_Busy_May_Take
+VAR
+	fbDrain	: FB_StepDrain;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Idle_Not_Busy_May_Take');
+fbDrain(bIdle := TRUE, bStepBusy := FALSE, bStartPending := TRUE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbDrain.bMayTake, Message := 'may take');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbDrain.bDrain, Message := 'no drain');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Busy_Drains_And_Blocks_Start" Id="{2d9f5b18-6e43-4ca7-b102-8f3ca4d5e729}">
+      <Declaration><![CDATA[METHOD PRIVATE Busy_Drains_And_Blocks_Start
+VAR
+	fbDrain	: FB_StepDrain;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Busy_Drains_And_Blocks_Start');
+fbDrain(bIdle := TRUE, bStepBusy := TRUE, bStartPending := TRUE, PT := T#1H);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbDrain.bDrain, Message := 'drain');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbDrain.bMayTake, Message := 'no start while busy');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbDrain.bStuck, Message := 'not stuck yet');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="No_Drain_Outside_Idle" Id="{3eaf6c29-7f54-4db8-8213-904db5e6f83a}">
+      <Declaration><![CDATA[METHOD PRIVATE No_Drain_Outside_Idle
+VAR
+	fbDrain	: FB_StepDrain;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('No_Drain_Outside_Idle');
+fbDrain(bIdle := FALSE, bStepBusy := TRUE, bStartPending := TRUE, PT := T#0S);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbDrain.bDrain, Message := 'a running step is not released');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbDrain.bMayTake, Message := 'no start outside idle');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbDrain.bStuck, Message := 'not stuck outside idle');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Start_Taken_Once_Busy_Drops" Id="{4fb07d3a-8065-4ec9-9324-a15ec6f7094b}">
+      <Declaration><![CDATA[METHOD PRIVATE Start_Taken_Once_Busy_Drops
+VAR
+	fbDrain	: FB_StepDrain;
+	fbReq	: FB_StartRequest;
+	i		: INT;
+	nTaken	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Start_Taken_Once_Busy_Drops');
+// the sequence of the 14:07 run: a start waits while the stale block drains, then it is taken exactly once
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+FOR i := 1 TO 5 DO
+	fbDrain(bIdle := TRUE, bStepBusy := TRUE, bStartPending := fbReq.Pending, PT := T#1H);
+	IF fbDrain.bMayTake AND fbReq.Take() THEN
+		nTaken := nTaken + 1;
+	END_IF
+END_FOR
+AssertEquals_INT(Expected := 0, Actual := nTaken, Message := 'nothing taken while busy');
+FOR i := 1 TO 5 DO
+	fbReq(Execute := TRUE);
+	fbDrain(bIdle := TRUE, bStepBusy := FALSE, bStartPending := fbReq.Pending, PT := T#1H);
+	IF fbDrain.bMayTake AND fbReq.Take() THEN
+		nTaken := nTaken + 1;
+	END_IF
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nTaken, Message := 'taken once after the drain');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stuck_Only_With_Pending_Start" Id="{50c18e4b-9176-4fda-a435-b26fd708150c}">
+      <Declaration><![CDATA[METHOD PRIVATE Stuck_Only_With_Pending_Start
+VAR
+	fbDrain	: FB_StepDrain;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stuck_Only_With_Pending_Start');
+fbDrain(bIdle := TRUE, bStepBusy := TRUE, bStartPending := FALSE, PT := T#0S);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbDrain.bStuck, Message := 'a busy block without a start is no error');
+fbDrain(bIdle := TRUE, bStepBusy := TRUE, bStartPending := TRUE, PT := T#0S);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbDrain.bStuck, Message := 'stuck with a pending start');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Busy_Dropping_Before_Timeout_Is_Not_Stuck" Id="{61d29f5c-a287-4e0b-b546-c370e819261d}">
+      <Declaration><![CDATA[METHOD PRIVATE Busy_Dropping_Before_Timeout_Is_Not_Stuck
+VAR
+	fbDrain	: FB_StepDrain;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Busy_Dropping_Before_Timeout_Is_Not_Stuck');
+fbDrain(bIdle := TRUE, bStepBusy := TRUE, bStartPending := TRUE, PT := T#1H);
+fbDrain(bIdle := TRUE, bStepBusy := FALSE, bStartPending := TRUE, PT := T#1H);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbDrain.bStuck, Message := 'not stuck');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbDrain.bMayTake, Message := 'may take');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
