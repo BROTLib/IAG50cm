@@ -78,16 +78,22 @@ fbReq(Execute := FALSE);
 fbReq(Execute := TRUE);
 FOR i := 1 TO 5 DO
 	fbDrain(bIdle := TRUE, bStepBusy := TRUE, bStartPending := fbReq.Pending, PT := T#1H);
-	IF fbDrain.bMayTake AND fbReq.Take() THEN
-		nTaken := nTaken + 1;
+	// nested like FB_LatchHome: AND does not short-circuit, Take() would clear the pending request while the block is busy
+	IF fbDrain.bMayTake THEN
+		IF fbReq.Take() THEN
+			nTaken := nTaken + 1;
+		END_IF
 	END_IF
 END_FOR
 AssertEquals_INT(Expected := 0, Actual := nTaken, Message := 'nothing taken while busy');
 FOR i := 1 TO 5 DO
 	fbReq(Execute := TRUE);
 	fbDrain(bIdle := TRUE, bStepBusy := FALSE, bStartPending := fbReq.Pending, PT := T#1H);
-	IF fbDrain.bMayTake AND fbReq.Take() THEN
-		nTaken := nTaken + 1;
+	// nested like FB_LatchHome: AND does not short-circuit, Take() would clear the pending request while the block is busy
+	IF fbDrain.bMayTake THEN
+		IF fbReq.Take() THEN
+			nTaken := nTaken + 1;
+		END_IF
 	END_IF
 END_FOR
 AssertEquals_INT(Expected := 1, Actual := nTaken, Message := 'taken once after the drain');
