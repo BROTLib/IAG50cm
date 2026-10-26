@@ -95,6 +95,7 @@ fbLatchHome(
 	RefDistance			:= 5.21,
 	TimeLimit 			:= T#1M,
 	DistanceLimit 		:= 6,
+	TravelLimit			:= 21,	// #165: 3 steps of 6 deg and the 2 deg jog, plus a margin
 	Error 				=> bLatchHomeError,
 	ErrorID 			=> nLatchHomeErrorID);
 	
