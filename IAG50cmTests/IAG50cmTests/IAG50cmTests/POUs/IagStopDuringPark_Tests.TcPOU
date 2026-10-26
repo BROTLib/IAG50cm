@@ -6,7 +6,7 @@
 // method, one Scan() per cycle). Failed checks are also noted in GVL_Diag.sFailures (printed by Run-Tests.ps1).
 FUNCTION_BLOCK IagStopDuringPark_Tests EXTENDS TcUnit.FB_TestSuite
 VAR
-	sTrace		: STRING(255);	// TEMPORARY diagnostic (#92): per scan "TCS_command:S U T P D H" = bStop bUserStop bStopped bPark Dec.MoveAxis HA.MoveAxis
+	sTrace		: STRING(255);	// TEMPORARY diagnostic (#92): per scan "TCS_command:S U T P D H I M" = bStop bUserStop bStopped bPark Dec.MoveAxis HA.MoveAxis Dec.InMotion DecMoved
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -29,6 +29,8 @@ sTrace := CONCAT(sTrace, SEL(rig.fbTel.bStopped, '0', '1'));
 sTrace := CONCAT(sTrace, SEL(rig.fbTel.bPark, '0', '1'));
 sTrace := CONCAT(sTrace, SEL(rig.fbDec.MoveAxis, '0', '1'));
 sTrace := CONCAT(sTrace, SEL(rig.fbHa.MoveAxis, '0', '1'));
+sTrace := CONCAT(sTrace, SEL(rig.fbDec.fbAxis.InMotion, '0', '1'));
+sTrace := CONCAT(sTrace, SEL(rig.fbDec.fActualPosition <> fDecAtStop, '0', '1'));
 sTrace := CONCAT(sTrace, ' ');
 ]]></ST>
       </Implementation>
@@ -120,16 +122,14 @@ CASE nStep OF
 	IF rig.fbTel.TCS_command = E_TCSCommand.stop THEN
 		bSawStop := TRUE;
 	END_IF
-	IF nCycles <= 12 THEN
+	IF nCycles <= 14 THEN
 		AddTrace(rig := rig);
 	END_IF
 	IF nCycles >= 60 THEN
-		// TEMPORARY (#92 diagnostic): the trace goes into the CI log (chunks: the long message was lost), only when Dec moved
-		IF rig.fbDec.fActualPosition <> fDecAtStop THEN
-			FOR nChunk := 0 TO 3 DO
-				AssertTrue(Condition := FALSE, Message := CONCAT(CONCAT('TRACE', INT_TO_STRING(nChunk)), CONCAT(' ', MID(sTrace, 50, nChunk * 50 + 1))));
-			END_FOR
-		END_IF
+		// TEMPORARY (#92 diagnostic): the trace always goes into the CI log, as failing assertions (chunks: a long message was lost)
+		FOR nChunk := 0 TO 4 DO
+			AssertTrue(Condition := FALSE, Message := CONCAT(CONCAT('TRACE', INT_TO_STRING(nChunk)), CONCAT(' ', MID(sTrace, 50, nChunk * 50 + 1))));
+		END_FOR
 		AssertTrue(Condition := bSawStop, Message := 'the stop command ran (TCS_command passed stop)');
 		F_Note(bFailed := NOT (bSawStop), sText := CONCAT(sTest, 'the stop command ran (TCS_command passed stop)'));
 		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park is cancelled');
