@@ -105,6 +105,19 @@ fbDec.nMockMoveScans := nScans;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetStartScans" Id="{933a0b2d-7791-43fd-bb42-99ec4e6a5ddf}">
+      <Declaration><![CDATA[// scans from a move command until the mock axes report InMotion (default 0: at once); the NC on the real axes takes a few cycles
+METHOD SetStartScans
+VAR_INPUT
+	nScans	: UINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbHa.nMockStartScans := nScans;
+fbDec.nMockStartScans := nScans;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="InjectHaError" Id="{905dc23c-55b4-4eb7-a513-f6b52cccde02}">
       <Declaration><![CDATA[METHOD InjectHaError
 VAR_INPUT

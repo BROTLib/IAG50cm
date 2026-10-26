@@ -34,10 +34,11 @@ sTrace := CONCAT(sTrace, ' ');
       </Implementation>
     </Method>
     <Method Name="Stop_Right_After_The_HA_Stage_Of_A_Park_Still_Stops_Dec" Id="{19d29f7c-7cb6-48a5-8673-fd458202fb79}">
-      <Declaration><![CDATA[// #92 (T18.4): the park moves HA home first. In the scan after the HA move has ended both axes stand still (bStopped), the Dec move
-// is about to start. A stop in that scan is cancelled with the park (PARK cancelled by stop), but bStop is cleared in the same scan
-// (bStopped), the stop command never runs (TCS_command goes park -> no_command, not via stop) and the Dec move to home still happens.
-// Expected: the stop runs (TCS_command passes stop) and Dec stays where it was.
+      <Declaration><![CDATA[// #92 (T18.4): the park moves HA home first, then commands the Dec move (MoveAxis -> fbAxis.MoveTo()). The NC reports InMotion a few
+// cycles later (mock: SetStartScans), so for those scans both axes still report StandStill (bStopped). A stop in that window runs for one
+// scan only: bStop is cleared at once (bStopped), the first scan of _StopTelescope only drops MoveAxis (CancelMove does not
+// stop a move that was already started) and the axis stop (StopAxis) is never sent. The Dec move to home runs to the end.
+// Expected: Dec stays where it was. (A stop between the HA stage and the Dec command works: the first version of this test.)
 METHOD PRIVATE Stop_Right_After_The_HA_Stage_Of_A_Park_Still_Stops_Dec
 VAR_INST
 	rig			: FB_IagRig;
@@ -62,6 +63,7 @@ CASE nStep OF
 0:	// wait for the clock, then power on
 	IF rig.ClockValid THEN
 		rig.fbTel.Init();
+		rig.SetStartScans(nScans := 3);
 		nStep := 10;
 		nCycles := 0;
 	ELSIF nCycles > 2000 THEN
@@ -92,11 +94,11 @@ CASE nStep OF
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
-30:	// wait until HA has been moved by the park and its move is over, Dec has not been started yet: stop in the next scan
+30:	// wait until HA has been moved by the park and the Dec move is commanded but the axis does not report InMotion yet: stop now
 	IF rig.fbHa.MoveAxis THEN
 		bHaMoved := TRUE;
 	END_IF
-	IF bHaMoved AND NOT rig.fbHa.MoveAxis AND NOT rig.fbDec.MoveAxis AND rig.fbTel.bPark THEN
+	IF bHaMoved AND rig.fbDec.MoveAxis AND NOT rig.fbDec.fbAxis.InMotion AND rig.fbTel.bPark THEN
 		fDecAtStop := rig.fbDec.fPosition;
 		sTrace := 'pre-stop ';
 		AddTrace(rig := rig);
@@ -122,10 +124,12 @@ CASE nStep OF
 		AddTrace(rig := rig);
 	END_IF
 	IF nCycles >= 60 THEN
-		// TEMPORARY (#92): fails on purpose to put the trace into the CI log; remove with the diagnostic
-		FOR nChunk := 0 TO 3 DO
-			AssertTrue(Condition := FALSE, Message := CONCAT(CONCAT('TRACE', INT_TO_STRING(nChunk)), CONCAT(' ', MID(sTrace, 50, nChunk * 50 + 1))));
-		END_FOR
+		// TEMPORARY (#92 diagnostic): the trace goes into the CI log (chunks: the long message was lost), only when Dec moved
+		IF rig.fbDec.fPosition <> fDecAtStop THEN
+			FOR nChunk := 0 TO 3 DO
+				AssertTrue(Condition := FALSE, Message := CONCAT(CONCAT('TRACE', INT_TO_STRING(nChunk)), CONCAT(' ', MID(sTrace, 50, nChunk * 50 + 1))));
+			END_FOR
+		END_IF
 		AssertTrue(Condition := bSawStop, Message := 'the stop command ran (TCS_command passed stop)');
 		F_Note(bFailed := NOT (bSawStop), sText := CONCAT(sTest, 'the stop command ran (TCS_command passed stop)'));
 		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park is cancelled');
