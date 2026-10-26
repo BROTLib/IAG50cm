@@ -18,7 +18,8 @@ AxesOff_Park_After_Stopped_Startup_Reports_Parked();
     <Method Name="Park_During_PowerOn_Aborts_The_Startup_And_Parks" Id="{fee3a10b-b0ce-4b59-b6ed-58da01277209}">
       <Declaration><![CDATA[// I:529-541 (IAG50cm#109): a park that arrives while the power-on runs outranks it, like a stop: the startup is aborted, the
 // covers the power-on opened are closed again and the telescope ends parked, never ready (READY_STATE does not reach 1.0).
-// Decision 3 of the plan: as MONET (MONETcommon#87).
+// In the covers phase the axes are still off, so the park takes the axes-off path (#54, #110): covers closed, dome parked,
+// the mount is not moved, READY_STATE 0.0 and bIsParked stays FALSE. Decision 3 of the plan: as MONET (MONETcommon#87).
 METHOD PRIVATE Park_During_PowerOn_Aborts_The_Startup_And_Parks
 VAR_INST
 	rig			: FB_IagRig;
@@ -65,14 +66,14 @@ CASE nStep OF
 		nStep := 30;
 		nCycles := 0;
 	END_IF
-30:	// the park finishes, the startup never does
+30:	// the park finishes (READY_STATE 0.0, the axes were off: bIsParked stays FALSE, #110), the startup never does
 	AssertFalse(Condition := rig.Online, Message := 'the startup went on to the end');
 	F_Note(bFailed := (rig.Online), sText := CONCAT(sTest, 'the startup went on to the end'));
-	IF rig.fbTel.bIsParked THEN
+	IF rig.fbTel.ReadyState = 0.0 THEN
 		AssertTrue(Condition := rig.fbCovers.nCloseCalls >= 1, Message := 'the covers were closed');
 		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the covers were closed'));
-		AssertTrue(Condition := rig.fbTel.ReadyState = 0.0, Message := 'READY_STATE is 0.0 (parked)');
-		F_Note(bFailed := NOT (rig.fbTel.ReadyState = 0.0), sText := CONCAT(sTest, 'READY_STATE is 0.0 (parked)'));
+		AssertFalse(Condition := rig.fbTel.bIsParked, Message := 'bIsParked stays FALSE, the mount was not moved');
+		F_Note(bFailed := (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked stays FALSE, the mount was not moved'));
 		nStep := 99;
 		TEST_FINISHED();
 	ELSIF nCycles > 1500 THEN
