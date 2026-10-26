@@ -92,6 +92,7 @@ VAR
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
 	rtrigReset		: R_TRIG;
+	rtrigPoweredClear	: R_TRIG;		// #100: error or E-stop edge: the telescope is no longer powered
 	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
 	tonAxisResetAfterAck	: TON;
 	// plan step 3.2: the axis feedback of this scan (1 hour angle, 2 declination), filled by _ReadAxes
@@ -257,6 +258,13 @@ fSlewTime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
 // ERROR (either one of the Axis or below safe Horizon (fHorizon))
 bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error OR bTestError OR bSoftwareError;
 			
+// #100: an error or an E-stop ends the powered state. Only a power-on or a park wrote bIsPowered, so it stayed TRUE and the
+// next power=1 could be taken for a running telescope. bReady needs bIsPowered, so this only forces the full power-on.
+rtrigPoweredClear(CLK := bError OR bEstopTriggered);
+IF rtrigPoweredClear.Q THEN
+	bIsPowered := FALSE;
+END_IF
+
 IF bError THEN
 	bGoHome := 	FALSE;
 	bTrack := 	FALSE;
