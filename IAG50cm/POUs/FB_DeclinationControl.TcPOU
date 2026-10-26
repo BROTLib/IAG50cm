@@ -3,6 +3,7 @@
   <POU Name="FB_DeclinationControl" Id="{6080c426-7a5e-4f1a-af47-78007455d126}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_DeclinationControl EXTENDS FB_AxisControl
 VAR_INPUT
+	bReleaseHold : BOOL;		// #159: a new power-on was accepted, release the hold (one scan, set by FB_TelescopeControl.Init)
 	fMinPosition : LREAL := -50.0;
 	fMaxPosition : LREAL := 180.0;
 END_VAR
@@ -37,7 +38,8 @@ END_IF
 IF NOT bEnable THEN
 	bResetForAbort := FALSE;
 END_IF
-fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort);
+fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort, bRelease := bReleaseHold);
+bReleaseHold := FALSE;
 
 // #155: not before the NC axis is enabled, and not right after Ready either: the first reference step started 5 to 40 ms
 // after Ready still aborts about 80 ms later, and the abort and the re-arm can overlap (4B66). Ready for 0.5 s.

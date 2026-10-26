@@ -90,6 +90,8 @@ VAR
 	nAbortFrom					: INT;									(* #113: state in which the sequence was aborted *)
 	bRearm						: BOOL;									(* #155: re-arm the start once the abort has settled *)
 	fbRearmDelay				: TON;
+	bTakeStart					: BOOL;
+	fbStepStuck					: TON;									(* #113: longest wait for a stale step block to leave Busy before a start *)
 	bStepBusy					: BOOL;									(* #113: a step block is still running its NC command *)
 	nSearch						: INT;
 
@@ -101,6 +103,7 @@ VAR
 END_VAR
 VAR CONSTANT
 	ERR_ABORT_TIMEOUT			: UDINT := 16#4F000001;					(* #155: the abort did not finish in time *)
+	ERR_STEP_STUCK				: UDINT := 16#4F000002;					(* #113: a step block does not leave Busy, no start possible *)
 END_VAR
 
 ]]></Declaration>
@@ -149,9 +152,36 @@ ELSIF NOT Execute THEN
 END_IF
 ResetRequest := FALSE;
 bStepBusy := StepReferencePulseDetection.Busy OR MoveAxis.Busy OR SetPos.Busy OR StepFinishHoming.Busy;
+// #113: a stop leaves the reference step Busy (it ignores the falling Execute), and the reset of the axis ends its NC command
+// without the block ever being called again. At the next start it then reported the old command as finished, the sequence
+// went to the abort state and the abort overlapped the new MC_Home (4B66). In state 0 call a Busy block with FALSE until it
+// drops Busy, and take no start before.
+fbStepStuck(IN := nState = 0 AND bStepBusy AND fbStartReq.Pending, PT := T#2S);
+IF fbStepStuck.Q THEN
+	fbStartReq.Take();
+	Error := TRUE;
+	ErrorID := ERR_STEP_STUCK;
+END_IF
 
 CASE nState OF
 	0 :	(* init *)
+		IF bStepBusy THEN
+			StepReferencePulseDetection(
+				Execute					:= FALSE,
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+			MoveAxis(
+				Axis					:= Axis,
+				JogForward				:= FALSE,
+				JogBackwards			:= FALSE);
+			SetPos(
+				Execute					:= FALSE,
+				Axis					:= Axis);
+			StepFinishHoming(
+				Execute					:= FALSE,
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+		END_IF
 		// #113 mode 2: release the reference step that was kept running during the abort
 		IF GVL_Homing.nAbortMode = 2 THEN
 			StepReferencePulseDetection(
@@ -179,7 +209,12 @@ CASE nState OF
 			RecordedDistances_back	:= DistanceReset;
 		END_IF
  	
-	  	IF fbStartReq.Take() THEN
+		IF NOT bStepBusy THEN
+			bTakeStart := fbStartReq.Take();
+		ELSE
+			bTakeStart := FALSE;
+		END_IF
+	  	IF bTakeStart THEN
 			(* initialize output values *)
 	  		Busy 				:= TRUE;
 

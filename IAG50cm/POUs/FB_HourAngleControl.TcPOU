@@ -3,6 +3,7 @@
   <POU Name="FB_HourAngleControl" Id="{69217813-d219-4ca2-9cea-b7c641aa5dcd}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_HourAngleControl EXTENDS FB_AxisControl
 VAR_INPUT
+	bReleaseHold : BOOL;		// #159: a new power-on was accepted, release the hold (one scan, set by FB_TelescopeControl.Init)
 	fMinPosition : LREAL := -180.0;
 	fMaxPosition : LREAL := 180.0;
 END_VAR
@@ -38,7 +39,8 @@ END_IF
 IF NOT bEnable THEN
 	bResetForAbort := FALSE;
 END_IF
-fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort);
+fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort, bRelease := bReleaseHold);
+bReleaseHold := FALSE;
 
 // #155: not before the NC axis is enabled, and not right after Ready either: the first reference step started 5 to 40 ms
 // after Ready still aborts about 80 ms later, and the abort and the re-arm can overlap (4B66). Ready for 0.5 s.
