@@ -47,6 +47,7 @@ VAR_INST
 	bSawStop	: BOOL;
 	fDecAtStop	: LREAL;
 	sTest		: STRING(80);
+	nChunk		: INT;
 END_VAR
 ]]></Declaration>
       <Implementation>
@@ -122,7 +123,9 @@ CASE nStep OF
 	END_IF
 	IF nCycles >= 60 THEN
 		// TEMPORARY (#92): fails on purpose to put the trace into the CI log; remove with the diagnostic
-		AssertTrue(Condition := FALSE, Message := CONCAT('TRACE cmd:StUsTPDH ', sTrace));
+		FOR nChunk := 0 TO 3 DO
+			AssertTrue(Condition := FALSE, Message := CONCAT(CONCAT('TRACE', INT_TO_STRING(nChunk)), CONCAT(' ', MID(sTrace, 50, nChunk * 50 + 1))));
+		END_FOR
 		AssertTrue(Condition := bSawStop, Message := 'the stop command ran (TCS_command passed stop)');
 		F_Note(bFailed := NOT (bSawStop), sText := CONCAT(sTest, 'the stop command ran (TCS_command passed stop)'));
 		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park is cancelled');
