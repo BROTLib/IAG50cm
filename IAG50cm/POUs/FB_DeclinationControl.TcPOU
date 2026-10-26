@@ -18,6 +18,7 @@ VAR
 	fbLatchHome : FB_LatchHome;
 	fbHomeHold : FB_HomeHold;		// #113: no homing request after a stop of the axis
 	tonReady : TON;					// #155: the NC axis takes some time after Ready before a command reaches it
+	bReleaseHold : BOOL;			// #159: a new power-on was accepted, release the hold (one scan, set by FB_TelescopeControl.Init)
 	bResetForAbort : BOOL;		// #113: the reset was asked for by FB_LatchHome to end a homing, it must not release the hold
 END_VAR
 ]]></Declaration>
@@ -37,7 +38,8 @@ END_IF
 IF NOT bEnable THEN
 	bResetForAbort := FALSE;
 END_IF
-fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort);
+fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort, bRelease := bReleaseHold);
+bReleaseHold := FALSE;
 
 // #155: not before the NC axis is enabled, and not right after Ready either: the first reference step started 5 to 40 ms
 // after Ready still aborts about 80 ms later, and the abort and the re-arm can overlap (4B66). Ready for 0.5 s.

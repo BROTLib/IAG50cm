@@ -2235,6 +2235,9 @@ END_VAR
 IF fbStartup.AcceptInit() THEN
     bPower := TRUE;
     fReadyState := 0.7;
+    // #159: an automatic stop leaves the sweep hold set with the axes enabled; a new power-on releases it
+    fbHourAngle.bReleaseHold := TRUE;
+    fbDeclination.bReleaseHold := TRUE;
 END_IF
 Init := TRUE;]]></ST>
       </Implementation>
