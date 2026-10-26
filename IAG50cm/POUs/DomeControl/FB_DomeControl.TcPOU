@@ -258,6 +258,25 @@ END_VAR
         </Implementation>
       </Set>
     </Property>
+    <Property Name="_StopDone" Id="{972f1c99-75d8-4fff-ae5d-301663a13d0f}" FolderPath="internal properties\">
+      <Declaration><![CDATA[PROPERTY _StopDone : BOOL]]></Declaration>
+      <Get Name="Get" Id="{e95f46bc-fd74-4b65-8b40-76498780211b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_StopDone := bStopDone;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{f7672a6c-da04-4be5-bce4-44adb61d318d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bStopDone := _StopDone;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
     <Property Name="_HasReceivedString" Id="{efe4ec58-b013-4bd3-91d7-a40e68ac61d6}" FolderPath="internal properties\">
       <Declaration><![CDATA[PROPERTY _HasReceivedString : Bool]]></Declaration>
       <Get Name="Get" Id="{6af32aed-d4e7-435f-a147-9af66e31cbf3}">

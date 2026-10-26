@@ -130,7 +130,7 @@ END_VAR
 tonSleep(IN:=FALSE);
 tonTimeout(IN:=FALSE);
 pDome^._DomeRotationState := E_DomeRotationState.idle;
-pDome^.bStopDone := TRUE;
+pDome^._StopDone := TRUE;
 pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
       </Implementation>
     </Method>
