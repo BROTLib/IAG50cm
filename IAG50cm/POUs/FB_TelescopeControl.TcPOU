@@ -114,6 +114,7 @@ VAR
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
+	bPowerParked		: BOOL;		// a park aborted a running power-on (one scan, #109)
 	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: FB_TimeoutTimer;		// power on timeout
@@ -142,6 +143,7 @@ VAR
 	TCSparkErrorEvent,
 	TCShomeCancelEvent,
 	TCSpowerBlockedEvent,
+	TCSpowerParkEvent,
 	TCScommandRefusedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
@@ -459,6 +461,16 @@ IF tonPowerTimeout.Q AND NOT bIsParked THEN
 END_IF
 //----------------------------------------------------------------------------------------------		
 // set TCS_command according to state variables ordered by precedence
+// #109: a park outranks a running power-on (like an explicit stop, #27, and like MONET): the startup is aborted
+// (READY_STATE -2 for the aborted init) and the park runs below in this scan. Only for a power-on that was already running
+// (TCS_command of the last scan): an Init() during a park still cancels the park, see the bPower branch below.
+IF bPower AND bPark AND NOT bStop AND TCS_command = E_TCSCommand.poweron THEN
+	bPowerParked := TRUE;
+	bInterupted := TRUE;
+	_PowerOn();					// bInterupted: marks the startup aborted, clears bPower, resets its stage
+	bInterupted := FALSE;
+	bPower := FALSE;
+END_IF
 // #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
 // time) do not abort a running power-on, as before.
 IF bStop AND (bUserStop OR NOT bPower) THEN
@@ -943,6 +955,12 @@ TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
 				FormatString := '%s',
 				Comm := fbComm);
 bPowerBlocked := FALSE;
+TCSpowerParkEvent(	Trigger := bPowerParked,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				OnMessage := 'Power-on aborted by park',
+				Comm := fbComm);
+bPowerParked := FALSE;
 TCScommandRefusedEvent(	Trigger := bCommandRefused,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
