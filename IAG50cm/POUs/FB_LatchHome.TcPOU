@@ -94,7 +94,7 @@ VAR
 	bRearm						: BOOL;									(* #155: re-arm the start once the abort has settled *)
 	fbRearmDelay				: TON;
 	bTakeStart					: BOOL;
-	fbStepStuck					: TON;									(* #113: longest wait for a stale step block to leave Busy before a start *)
+	fbStepDrain					: FB_StepDrain;							(* #113: drain of a stale step block before a start *)
 	bStepBusy					: BOOL;									(* #113: a step block is still running its NC command *)
 	nSearch						: INT;
 	fStartPos					: LREAL;								(* #165: axis position before the sequence started, sampled while Execute is FALSE *)
@@ -170,8 +170,8 @@ bStepBusy := StepReferencePulseDetection.Busy OR MoveAxis.Busy OR SetPos.Busy OR
 // without the block ever being called again. At the next start it then reported the old command as finished, the sequence
 // went to the abort state and the abort overlapped the new MC_Home (4B66). In state 0 call a Busy block with FALSE until it
 // drops Busy, and take no start before.
-fbStepStuck(IN := nState = 0 AND bStepBusy AND fbStartReq.Pending, PT := T#2S);
-IF fbStepStuck.Q THEN
+fbStepDrain(bIdle := nState = 0, bStepBusy := bStepBusy, bStartPending := fbStartReq.Pending);
+IF fbStepDrain.bStuck THEN
 	fbStartReq.Take();
 	Error := TRUE;
 	ErrorID := ERR_STEP_STUCK;
@@ -179,7 +179,7 @@ END_IF
 
 CASE nState OF
 	0 :	(* init *)
-		IF bStepBusy THEN
+		IF fbStepDrain.bDrain THEN
 			StepReferencePulseDetection(
 				Execute					:= FALSE,
 				Parameter				:= Parameter,
@@ -223,7 +223,7 @@ CASE nState OF
 			RecordedDistances_back	:= DistanceReset;
 		END_IF
  	
-		IF NOT bStepBusy THEN
+		IF fbStepDrain.bMayTake THEN
 			bTakeStart := fbStartReq.Take();
 		ELSE
 			bTakeStart := FALSE;
