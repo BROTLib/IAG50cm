@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagStopDuringPark_Tests" Id="{a12c82c6-ea41-4faa-936c-0cf6bcd4a223}" SpecialFunc="None">
+    <Declaration><![CDATA[// IAG50cm#92: a stop during the HA stage of a park, on mock axes (IAG50cmTests README). Unlike the characterization suites this is
+// a regression test of a defect: it FAILS until #92 is fixed. Every test owns a rig and runs over many PLC cycles (VAR_INST of the
+// method, one Scan() per cycle). Failed checks are also noted in GVL_Diag.sFailures (printed by Run-Tests.ps1).
+FUNCTION_BLOCK IagStopDuringPark_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Stop_Right_After_The_HA_Stage_Of_A_Park_Still_Stops_Dec();
+]]></ST>
+    </Implementation>
+    <Method Name="Stop_Right_After_The_HA_Stage_Of_A_Park_Still_Stops_Dec" Id="{19d29f7c-7cb6-48a5-8673-fd458202fb79}">
+      <Declaration><![CDATA[// #92 (T18.4): the park moves HA home first. In the scan after the HA move has ended both axes stand still (bStopped), the Dec move
+// is about to start. A stop in that scan is cancelled with the park (PARK cancelled by stop), but bStop is cleared in the same scan
+// (bStopped), the stop command never runs (TCS_command goes park -> no_command, not via stop) and the Dec move to home still happens.
+// Expected: the stop runs (TCS_command passes stop) and Dec stays where it was.
+METHOD PRIVATE Stop_Right_After_The_HA_Stage_Of_A_Park_Still_Stops_Dec
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bHaMoved	: BOOL;
+	bSawStop	: BOOL;
+	fDecAtStop	: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_Right_After_The_HA_Stage_Of_A_Park_Still_Stops_Dec');
+sTest := 'Stop_Right_After_The_HA_Stage_Of_A_Park_Still_Stops_Dec: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// ready: slew away from home to a point with an hour angle, so that the park moves HA first
+	IF rig.Online THEN
+		rig.fbTel.Slew(fAzimuth := 120.0, fAltitude := 40.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the slew has finished and the mount stands still: park
+	IF nCycles > 10 AND NOT rig.fbTel.bSlew AND rig.fbTel.bStopped AND rig.fbTel.TCS_command <> E_TCSCommand.slew THEN
+		rig.fbTel.Park();
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 600 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// wait until HA has been moved by the park and its move is over, Dec has not been started yet: stop in the next scan
+	IF rig.fbHa.MoveAxis THEN
+		bHaMoved := TRUE;
+	END_IF
+	IF bHaMoved AND NOT rig.fbHa.MoveAxis AND NOT rig.fbDec.MoveAxis AND rig.fbTel.bPark THEN
+		fDecAtStop := rig.fbDec.fPosition;
+		rig.fbTel.Stop();
+		nStep := 40;
+		nCycles := 0;
+	ELSIF NOT rig.fbTel.bPark AND nCycles > 5 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park ended before the HA stage could be observed');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park ended before the HA stage could be observed'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 600 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park never finished its HA stage');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park never finished its HA stage'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+40:	// let the mock run well past a Dec move (4 scans), watching for the stop command
+	IF rig.fbTel.TCS_command = E_TCSCommand.stop THEN
+		bSawStop := TRUE;
+	END_IF
+	IF nCycles >= 60 THEN
+		AssertTrue(Condition := bSawStop, Message := 'the stop command ran (TCS_command passed stop)');
+		F_Note(bFailed := NOT (bSawStop), sText := CONCAT(sTest, 'the stop command ran (TCS_command passed stop)'));
+		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park is cancelled');
+		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park is cancelled'));
+		AssertTrue(Condition := rig.fbDec.fPosition = fDecAtStop, Message := 'Dec did not move to home after the stop');
+		F_Note(bFailed := NOT (rig.fbDec.fPosition = fDecAtStop), sText := CONCAT(sTest, 'Dec did not move to home after the stop'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
