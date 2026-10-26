@@ -215,6 +215,18 @@ END_CASE
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="StopCommand" Id="{7acaa647-1f4d-457c-aae9-b2517072faf9}">
+      <Declaration><![CDATA[
+METHOD StopCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stage:= 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+tonDelay(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeStoppingState);]]></ST>
+      </Implementation>
+    </Method>
     <Property Name="StateID" Id="{25716fec-f7ae-4751-8f4c-4e9b44cfd178}">
       <Declaration><![CDATA[
 PROPERTY StateID : STRING

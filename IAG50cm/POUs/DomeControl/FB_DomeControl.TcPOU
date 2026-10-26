@@ -13,6 +13,8 @@ VAR
 	bHome		: BOOL;
 	bTrack		: BOOL;
 	bPark		: BOOL;
+	bStop		: BOOL;
+	bStopDone	: BOOL;
 	
 	fDomeAziGoInput			: LREAL := 180.0;
 	fDomeAziGo				: LREAL := 180.0;
@@ -34,6 +36,7 @@ VAR
 	fbDomeOpeningState	: FB_DomeOpeningState(THIS);
 	fbDomeMovingState	: FB_DomeMovingState(THIS);
 	fbDomeParkingState	: FB_DomeParkingState(THIS);
+	fbDomeStoppingState	: FB_DomeStoppingState(THIS);
 	
 
 	rtrigOpen		: R_TRIG;
@@ -41,11 +44,13 @@ VAR
 	rtrigReset		: R_TRIG;
 	rtrigHome		: R_TRIG;
 	rtrigPark		: R_TRIG;
+	rtrigStop		: R_TRIG;
 	
 	fbComm			: I_Comm;
 	tonComm 		: TON := (PT:=T#5S);
 	
 	fbDomeParkedEvent:	FB_EventLog;
+	fbDomeStopEvent:	FB_EventLog;
 	fbDomeErrorEvent: FB_EventLog;
 	
 	sSendstring	: STRING;
@@ -107,6 +112,18 @@ rtrigClose(CLK := bClose);
 rtrigReset(CLK := bReset);
 rtrigHome(CLK := bHome);
 rtrigPark(CLK := bPark);
+rtrigStop(CLK := bStop);
+
+// #96: a stop wins over every other request of the same scan, which are dropped with it
+IF (rtrigStop.Q) THEN
+	bStop := FALSE;
+	bOpen := FALSE;
+	bClose := FALSE;
+	bHome := FALSE;
+	bPark := FALSE;
+	bTrack := FALSE;
+	ipState.StopCommand();
+END_IF
 
 IF (rtrigReset.Q) THEN
 	bReset := FALSE;
@@ -142,7 +159,9 @@ bClose := FALSE;
 bReset := FALSE;
 bHome := FALSE;
 bPark := FALSE;
+bStop := FALSE;
 
+bStopDone := FALSE;
 ipState.RunState();
 
 IF eDomeRotationState = E_DomeRotationState.parked AND eDomeShutterState = E_RoofState.closed THEN
@@ -162,6 +181,11 @@ fbDomeParkedEvent(
 	Trigger := bParked,
 	Level := ADSLOG_MSGTYPE_HINT,
 	OnMessage := 'Dome is in parking position and closed.',
+	comm:= fbComm);
+fbDomeStopEvent(
+	Trigger := bStopDone,
+	Level := ADSLOG_MSGTYPE_HINT,
+	OnMessage := 'Dome stopped: rotation holds the current azimuth, a shutter movement is not stopped.',
 	comm:= fbComm);
 fbDomeErrorEvent(
 	Trigger := bDomeError,
@@ -562,7 +586,8 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
+        <ST><![CDATA[// #96: the dome has no stop command, the state holds the azimuth it reads (FB_DomeStoppingState)
+bStop := TRUE;]]></ST>
       </Implementation>
     </Method>
     <Method Name="StopTrack" Id="{592d7f7e-1fdb-4ea9-b619-2542fb2b964e}">

@@ -102,6 +102,14 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
+    <Method Name="StopCommand" Id="{b30e50be-4549-474b-9f4c-a5519dd17bc2}">
+      <Declaration><![CDATA[
+METHOD StopCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SuccessfulFinished" Id="{062c433e-903b-4e33-8ead-c5a8ea2c9e66}">
       <Declaration><![CDATA[
 METHOD SuccessfulFinished : BOOL
