@@ -88,6 +88,8 @@ VAR
 	
 	nState						: INT;
 	nAbortFrom					: INT;									(* #113: state in which the sequence was aborted *)
+	bRearm						: BOOL;									(* #155: re-arm the start once the abort has settled *)
+	fbRearmDelay				: TON;
 	bStepBusy					: BOOL;									(* #113: a step block is still running its NC command *)
 	nSearch						: INT;
 
@@ -137,6 +139,14 @@ IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive) THEN
 END_IF
 fbLockWait(IN := nState = 20 AND StopActive AND NOT StepAbortHoming.Busy, PT := T#5S);
 fbAbortTimeout(IN := nState = 20, PT := T#10S);
+// #155: not in the scan in which the abort ended: the NC has to settle, a start at once overlapped it (4B66)
+fbRearmDelay(IN := bRearm AND nState = 0 AND Execute, PT := T#300MS);
+IF fbRearmDelay.Q THEN
+	bRearm := FALSE;
+	fbStartReq.Rearm();
+ELSIF NOT Execute THEN
+	bRearm := FALSE;
+END_IF
 ResetRequest := FALSE;
 bStepBusy := StepReferencePulseDetection.Busy OR MoveAxis.Busy OR SetPos.Busy OR StepFinishHoming.Busy;
 
@@ -457,7 +467,7 @@ CASE nState OF
 					// #155: aborted by itself (not by a stop, a reset or Execute going away): the start is still
 					// requested, so request it again. Execute stays TRUE, there is no new edge to do it.
 					IF Execute AND NOT StopActive AND NOT Reset THEN
-						fbStartReq.Rearm();
+						bRearm := TRUE;
 					END_IF
 				END_IF
 		
