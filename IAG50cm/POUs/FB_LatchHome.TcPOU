@@ -427,6 +427,11 @@ CASE nState OF
 					ErrorId				:= iErrorId;
 				ELSE
 					CommandAborted		:= TRUE;
+					// #155: aborted by itself (not by a stop, a reset or Execute going away): the start is still
+					// requested, so request it again. Execute stays TRUE, there is no new edge to do it.
+					IF Execute AND NOT StopActive AND NOT Reset THEN
+						fbStartReq.Rearm();
+					END_IF
 				END_IF
 		
 				StepAbortHoming(	

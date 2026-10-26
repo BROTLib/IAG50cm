@@ -29,7 +29,9 @@ fPosition := LIMIT(fMinPosition, fPosition, fMaxPosition);
 // scan while the axis is enabled and uncalibrated, so FB_LatchHome went on commanding the NC while MC_Stop held the lock)
 fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset);
 
-IF bEnable AND NOT fbAxis.Calibrated AND NOT fbHomeHold.bHold THEN
+// #155: not before the NC axis is enabled. After a stop and a reset the NC needs about 140 ms; a start taken in the
+// first scan runs the reference step on a disabled axis, it ends in the abort state and nothing starts it again.
+IF bEnable AND fbAxis.Ready AND NOT fbAxis.Calibrated AND NOT fbHomeHold.bHold THEN
 	bHomeAxis := TRUE;
 END_IF
 

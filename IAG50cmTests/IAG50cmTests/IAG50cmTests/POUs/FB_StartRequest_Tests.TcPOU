@@ -12,6 +12,8 @@ Edge_While_Busy_Is_Kept();
 No_Restart_While_Execute_Stays_True();
 Execute_Falling_Drops_The_Request();
 New_Edge_Starts_Again();
+Rearm_Asks_Again_While_Execute_Is_True();
+Rearm_Does_Nothing_Without_Execute();
 ]]></ST>
     </Implementation>
     <Method Name="Edge_Is_Taken_Once" Id="{1b5d8c42-9e07-4a63-8f1c-2d6a40b7e931}">
@@ -98,6 +100,41 @@ fbReq.Take();
 fbReq(Execute := FALSE);
 fbReq(Execute := TRUE);
 AssertEquals_BOOL(Expected := TRUE, Actual := fbReq.Take(), Message := 'second sweep');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Rearm_Asks_Again_While_Execute_Is_True" Id="{b5e82f0d-17a6-4c93-9d4e-6a31c8f70e25}">
+      <Declaration><![CDATA[METHOD PRIVATE Rearm_Asks_Again_While_Execute_Is_True
+VAR
+	fbReq	: FB_StartRequest;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Rearm_Asks_Again_While_Execute_Is_True');
+// the start was taken, ended in the abort state without a result and Execute stayed TRUE (#155)
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+fbReq.Take();
+fbReq(Execute := TRUE);
+fbReq.Rearm();
+AssertEquals_BOOL(Expected := TRUE, Actual := fbReq.Take(), Message := 'started again');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbReq.Take(), Message := 'once');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Rearm_Does_Nothing_Without_Execute" Id="{07c4d9a3-e61b-4f58-a2d0-93b5f1e8c74a}">
+      <Declaration><![CDATA[METHOD PRIVATE Rearm_Does_Nothing_Without_Execute
+VAR
+	fbReq	: FB_StartRequest;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Rearm_Does_Nothing_Without_Execute');
+fbReq(Execute := FALSE);
+fbReq.Rearm();
+AssertEquals_BOOL(Expected := FALSE, Actual := fbReq.Take(), Message := 'no request');
 TEST_FINISHED();
 ]]></ST>
       </Implementation>
