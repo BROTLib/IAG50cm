@@ -147,9 +147,12 @@ The heart of the application: a full telescope control system implementing
   markers** via `FB_LatchHome` (`MC_StepReferencePulseDetection`, three pulses,
   re-detection on the way back), sidereal tracking for HA
   (`omega = 360/86164.099`), soft-limit interlocks, slew-time readout
-  (`MC_ReadParameter`), SoE reset.
+  (`MC_ReadParameter`).
 - `FB_FocusControl` — focus travel 1…17 mm, tolerance 0.005, force-calibration
   homing.
+- The axes run on ELM72xx servo terminals (EtherCAT CoE, not SERCOS/SoE): an axis or
+  drive error is cleared with `bReset`. The inherited `FB_BaseAxis.bSoEReset` has
+  no effect here (BROTLib#67).
 - `FB_Axis3` — generic NC-axis driver with an external-setpoint tracking
   section (`MC_ExtSetPointGenFeed`, `TrackVelocityRef`, tracking envelope).
 
@@ -298,8 +301,7 @@ function blocks feeding it are currently commented out in `FB_SafetyHandling`).
 - **BROTLib** (0.3.0) — `FB_Comm_MQTT_Influx`, `FB_Eventlog`, interfaces
   (`I_Telescope`, `I_RaDecTelescope`, `I_Dome`, `I_Focus`, `I_MirrorCovers`,
   `I_Axis`, `I_BaseAxis`, `I_Comm`), `E_TCSCommand`, `E_RoofState`,
-  `E_DomeRotationState`, `ST_RaDecCoordinate`, `ST_AltAzCoordinate`,
-  `FB_SoEReset`.
+  `E_DomeRotationState`, `ST_RaDecCoordinate`, `ST_AltAzCoordinate`.
 - **AstroBROT** (0.3.0) — `FB_AstroClock`, `FB_EQ2HOR`, `FB_HOR2EQ`,
   `FB_HADEC2RADEC`, `FB_RADEC2HADEC`, `DateTime2JD`, `CT2LST`.
 - Beckhoff system libraries: `Tc2_MC2`, `Tc2_MC2_Drive`,
