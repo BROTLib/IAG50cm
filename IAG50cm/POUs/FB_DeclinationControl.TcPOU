@@ -153,18 +153,6 @@ IF fbReadParameter.Valid THEN
 	fSlewtime := fbReadParameter.Value;
 END_IF
 
-IF bSoEReset THEN
-	fbSoEReset(
-		Axis 	:= axisRef,
-		Execute := TRUE,
-		Timeout := DEFAULT_ADS_TIMEOUT);
- 	IF NOT fbSoEReset.Busy THEN
-		fbSoEReset(Axis := axisRef, Execute := FALSE);
-		bSoEReset := FALSE;
-		bReset := TRUE;
-	END_IF
-END_IF
-
 
 axisEvent(	
 	Trigger 		:= bError, 
