@@ -147,18 +147,49 @@ The heart of the application: a full telescope control system implementing
   markers** via `FB_LatchHome` (`MC_StepReferencePulseDetection`, three pulses,
   re-detection on the way back), sidereal tracking for HA
   (`omega = 360/86164.099`), soft-limit interlocks, slew-time readout
-  (`MC_ReadParameter`), SoE reset.
+  (`MC_ReadParameter`).
 - `FB_FocusControl` — focus travel 1…17 mm, tolerance 0.005, force-calibration
   homing.
+- The axes run on ELM72xx servo terminals (EtherCAT CoE, not SERCOS/SoE): an axis or
+  drive error is cleared with `bReset`. The inherited `FB_BaseAxis.bSoEReset` has
+  no effect here (BROTLib#67).
 - `FB_Axis3` — generic NC-axis driver with an external-setpoint tracking
   section (`MC_ExtSetPointGenFeed`, `TrackVelocityRef`, tracking envelope).
+
+### Uncalibrated axes (after an activation or Reset Cold)
+
+After a PLC activation or Reset Cold the axis counters are not referenced (HA about
+-0.02, Dec about -23) and mean nothing until the power-on sweep has found the
+reference markers. While an axis is uncalibrated the horizon and pole-zone stops do
+not act on its counter (#162), and there are no hardware limit switches. The only
+protection is:
+
+- the sweep: 6 deg per step (`DistanceLimit`), 21 deg in total from where it started
+  (`TravelLimit`, error `4F000003`, #165), and the 3 min power-on timeout;
+- the operator. A jog is hold-to-run and has **no travel cap**, so that a stuck
+  uncalibrated axis can still be moved as far as needed.
+
+The sweep starts from wherever the mount was left, and the PLC cannot check that.
+Procedure for the first `power=1` after an activation or Reset Cold:
+
+1. Confirm the mount stands at the park position (Dec 52), or move it there
+   first, and that nothing can collide with it.
+2. Have the E-stop in reach and watch the axes during the covers and sweep phases
+   (about 1 min). `stop=1` ends the sweep cleanly.
+3. If the sweep ends in an error, jog the axes back past the first marker before the
+   next `power=1`: a sweep started from past the marker ends in 19210.
+
+NC soft limits as a backstop are only planned for the calibrated frame; they cannot
+replace the curved horizon stop.
 
 ### Dome, covers, pendant, cabinet
 
 - `FB_DomeControl` — **Baader dome** over RS232 (EL6002 Ch 2): shutter commands
   (`d#opeshut`, `d#closhut`, ...), azimuth slews (`d#aziXXXX`), off-center
   compensation (±5°), Baader west-of-south azimuth convention conversion;
-  state machine `Idle / Opening / Closing / Moving / Parking / Homing / Error`.
+  state machine `Idle / Opening / Closing / Moving / Parking / Stopping / Homing / Error`.
+  `dome_stop` (#96) holds the azimuth: the baader has no stop command, so `Stopping`
+  reads the azimuth and sends it back as the new target; a shutter movement is not stopped.
 - `FB_CoverControl` — two mirror covers, each driven by two relay outputs
   (EL2652); staggered open/close (`Delta` 5 s, `TimeToCycle` 15 s), state
   machine `Idle / Opening / Closing / Stopping`; state enum `E_MirrorCoverState`.
@@ -190,8 +221,10 @@ The heart of the application: a full telescope control system implementing
   robotic operation.
 - **Dome shutter** follows `E_RoofState` (BROTLib), dome rotation
   `E_DomeRotationState` (BROTLib).
-- **Covers**: `closing / opening / stopped / closed / open / error`
-  (`E_MirrorCoverState`).
+- **Covers**: `closing / opening / stopped / closed / open / error / unknown`
+  (`E_MirrorCoverState`). After every PLC start (activation, Reset Cold) the position is
+  `unknown` until the first open or close cycle completes; the first request always runs
+  a full cycle (#111).
 
 ---
 
@@ -268,8 +301,7 @@ function blocks feeding it are currently commented out in `FB_SafetyHandling`).
 - **BROTLib** (0.3.0) — `FB_Comm_MQTT_Influx`, `FB_Eventlog`, interfaces
   (`I_Telescope`, `I_RaDecTelescope`, `I_Dome`, `I_Focus`, `I_MirrorCovers`,
   `I_Axis`, `I_BaseAxis`, `I_Comm`), `E_TCSCommand`, `E_RoofState`,
-  `E_DomeRotationState`, `ST_RaDecCoordinate`, `ST_AltAzCoordinate`,
-  `FB_SoEReset`.
+  `E_DomeRotationState`, `ST_RaDecCoordinate`, `ST_AltAzCoordinate`.
 - **AstroBROT** (0.3.0) — `FB_AstroClock`, `FB_EQ2HOR`, `FB_HOR2EQ`,
   `FB_HADEC2RADEC`, `FB_RADEC2HADEC`, `DateTime2JD`, `CT2LST`.
 - Beckhoff system libraries: `Tc2_MC2`, `Tc2_MC2_Drive`,

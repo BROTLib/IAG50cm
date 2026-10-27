@@ -2,9 +2,11 @@
 FB_StopTransaction.TcPOU
 FB_HomeDropReason.TcPOU
 FB_HomeHold.TcPOU
+FB_StartRequest.TcPOU
 FB_SweepStop.TcPOU
 FB_PointingModelForward.TcPOU
 GVL_Pointing.TcGVL
+GVL_Homing.TcGVL
 FB_TelescopeControl.TcPOU
 FB_HourAngleControl.TcPOU
 FB_DeclinationControl.TcPOU

@@ -126,6 +126,12 @@
     <Compile Include="POUs\IagParkDuringPowerOn_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\IagStopDuringPark_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagParkInLimit_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -138,10 +144,25 @@
     <Compile Include="POUs\FB_HomeHold.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FB_StartRequest.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_StartRequest_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_StepDrain.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_StepDrain_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\FB_SweepStop.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_PointingModelForward.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\GVL_Homing.TcGVL">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\GVL_Pointing.TcGVL">
@@ -153,11 +174,11 @@
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="AstroBROT">
-      <DefaultResolution>AstroBROT, 0.4.3 (BROT)</DefaultResolution>
+      <DefaultResolution>AstroBROT, 0.5.0 (BROT)</DefaultResolution>
       <Namespace>AstroBROT</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.10.4 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.14.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Math">

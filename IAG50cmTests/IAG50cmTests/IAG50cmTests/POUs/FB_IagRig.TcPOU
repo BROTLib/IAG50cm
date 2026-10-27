@@ -18,6 +18,7 @@ VAR
 	pBool			: POINTER TO BOOL;
 	nScans			: UDINT;
 	nTimeDivisor	: UDINT := 1;	// the time seam of the telescope under test (SetTimeDivisor)
+	fHorizon		: LREAL := 1.0;	// the horizon limit passed to the telescope (an input, so tests set it here; #84)
 END_VAR
 VAR CONSTANT
 	telescopeConfig	: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0,
@@ -52,7 +53,8 @@ fbTel(
 	fbDome := fbDome,
 	fbCovers := fbCovers,
 	telescopeConfig := telescopeConfig,
-	nTimeDivisor := nTimeDivisor);
+	nTimeDivisor := nTimeDivisor,
+	fHorizon := fHorizon);
 nScans := nScans + 1;
 ]]></ST>
       </Implementation>
@@ -92,6 +94,18 @@ fbTel.nTimeDivisor := nValue;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetHorizon" Id="{40095ef5-bf79-47cb-b27f-9ceb704f18d1}">
+      <Declaration><![CDATA[// the horizon limit of the telescope under test (an input of the telescope, so it cannot be written from outside; #84)
+METHOD SetHorizon
+VAR_INPUT
+	fValue	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fHorizon := fValue;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SetMoveScans" Id="{cdeb9136-db3d-432e-8efa-7f4fddc23765}">
       <Declaration><![CDATA[// scans a move takes on both mock axes (default 60)
 METHOD SetMoveScans
@@ -102,6 +116,19 @@ END_VAR
       <Implementation>
         <ST><![CDATA[fbHa.nMockMoveScans := nScans;
 fbDec.nMockMoveScans := nScans;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetStartScans" Id="{933a0b2d-7791-43fd-bb42-99ec4e6a5ddf}">
+      <Declaration><![CDATA[// scans from a move command until the mock axes report InMotion (default 0: at once); the NC on the real axes takes a few cycles
+METHOD SetStartScans
+VAR_INPUT
+	nScans	: UINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbHa.nMockStartScans := nScans;
+fbDec.nMockStartScans := nScans;
 ]]></ST>
       </Implementation>
     </Method>

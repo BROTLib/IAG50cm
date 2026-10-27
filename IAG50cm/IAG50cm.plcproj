@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <FileVersion>1.0.0.0</FileVersion>
@@ -18,7 +18,7 @@
     <LibraryReferences>{ec693b73-ba10-4552-8093-a205a0d9c8b6}</LibraryReferences>
     <Released>false</Released>
     <CompilerDefines />
-    <ProjectVersion>0.4.4</ProjectVersion>
+    <ProjectVersion>0.5.0</ProjectVersion>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
@@ -31,6 +31,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="GlobalTextList.TcGTLO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\GVL_Homing.TcGVL">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="GVLs\GVL_Pointing.TcGVL">
@@ -93,6 +96,9 @@
     <Compile Include="POUs\DomeControl\States\FB_DomeParkingState.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\DomeControl\States\FB_DomeStoppingState.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\DomeControl\States\FB_DomeState.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -124,6 +130,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_HomeHold.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_StartRequest.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_StepDrain.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_SweepStop.TcPOU">
@@ -224,7 +236,7 @@
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.10.4 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.14.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="System_VisuElemBase">

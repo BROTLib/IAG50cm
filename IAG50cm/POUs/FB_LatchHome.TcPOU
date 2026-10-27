@@ -9,6 +9,7 @@ END_VAR
 VAR_INPUT
 	Execute					: BOOL;										(* B *)
 	StopActive				: BOOL;										(* #113: the axis is being stopped (stop requested or MC_Stop lock): abort the sequence *)
+	Reset					: BOOL;										(* #155: leave the abort state at once, whatever MC_AbortHoming does *)
 
 	(* static parameters *)
 	Direction					: MC_Home_Direction;						(* E *)
@@ -28,6 +29,9 @@ VAR_INPUT
 
 	(* maximum travel distance for on calibration step (should be 6) *)
 	DistanceLimit				: LREAL;									(* E *)
+	(* #165: maximum distance of the axis from where the sequence started, over all segments and restarts (0 = off). The
+	   limit per step does not bound the sequence: 3 steps out, a jog and 3 back, and an abort restarts it. *)
+	TravelLimit				: LREAL;
 	
 	(* Set bipolar torque limit to this value to avoid mechanical damadges [%] *)
 	TorqueLimit					: LREAL;								(* E *)
@@ -42,6 +46,7 @@ VAR_OUTPUT
 	CommandAborted				: BOOL;										(* E *)
 	Error						: BOOL;										(* B *)
 	ErrorID						: UDINT;									(* E *)
+	ResetRequest				: BOOL;										(* #113: the axis is to be reset to end a homing that MC_AbortHoming cannot abort *)
 END_VAR
 VAR	
 	RefSignal					: MC_Ref_Signal_Ref;
@@ -85,28 +90,53 @@ VAR
 	iCommandAborted				: BOOL;
 	
 	nState						: INT;
+	nAbortFrom					: INT;									(* #113: state in which the sequence was aborted *)
+	bRearm						: BOOL;									(* #155: re-arm the start once the abort has settled *)
+	fbRearmDelay				: TON;
+	bTakeStart					: BOOL;
+	fbStepDrain					: FB_StepDrain;							(* #113: drain of a stale step block before a start *)
+	bStepBusy					: BOOL;									(* #113: a step block is still running its NC command *)
 	nSearch						: INT;
+	fStartPos					: LREAL;								(* #165: axis position before the sequence started, sampled while Execute is FALSE *)
+	bTravelExceeded			: BOOL;									(* #165 *)
 
-	fbExecute					: R_TRIG;
+	fbStartReq					: FB_StartRequest;						(* #155: start request, kept until state 0 can take it *)
 	fbReady						: R_TRIG;
 	fbTimeOut					: TON;
 	fbLockWait					: TON;									(* #113: longest wait for the MC_Stop lock before MC_AbortHoming *)
+	fbAbortTimeout				: TON;									(* #155: longest time in the abort state, it has no other exit *)
+END_VAR
+VAR CONSTANT
+	ERR_ABORT_TIMEOUT			: UDINT := 16#4F000001;					(* #155: the abort did not finish in time *)
+	ERR_STEP_STUCK				: UDINT := 16#4F000002;					(* #113: a step block does not leave Busy, no start possible *)
+	ERR_TRAVEL_LIMIT			: UDINT := 16#4F000003;					(* #165: the search left the allowed range without finding the marks *)
 END_VAR
 
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[fbExecute(CLK:= Execute);
+      <ST><![CDATA[// #155: the rising edge of Execute is only taken in state 0. One that arrives while the sequence is still aborting would
+// be lost and the axis would never start, so remember it until state 0 is reached (and drop it with Execute).
+fbStartReq(Execute := Execute);
 
 RefSignal.TouchProbe := E_TouchProbe.TouchProbe1;
 
 // #113: nothing else stops this sequence (a step block ignores a falling Execute, and the state machine reads Execute
 // only in state 0). A stop of the axis, or Execute going away, aborts it: release the step blocks and go to the abort
 // state, which waits for the MC_Stop lock to clear.
-IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive) THEN
-	StepReferencePulseDetection(
-		Execute					:= FALSE,
-		Parameter				:= Parameter,
-		Axis					:= Axis);
+// #165: the sample is not taken after a start, so a restart after an abort (Execute stays TRUE) keeps the first start
+IF nState = 0 AND NOT Execute THEN
+	fStartPos := Axis.NcToPlc.ActPos;
+END_IF
+bTravelExceeded := TravelLimit > 0 AND nState >= 1 AND nState <= 3 AND ABS(Axis.NcToPlc.ActPos - fStartPos) > TravelLimit;
+IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive OR bTravelExceeded) THEN
+	nAbortFrom := nState;
+	// #113 mode 2: the running reference step keeps its Execute until the abort is over
+	IF GVL_Homing.nAbortMode <> 2 THEN
+		StepReferencePulseDetection(
+			Execute					:= FALSE,
+			Parameter				:= Parameter,
+			Axis					:= Axis);
+	END_IF
 	MoveAxis(
 		Axis					:= Axis,
 		JogForward				:= FALSE,
@@ -119,12 +149,60 @@ IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive) THEN
 		Parameter				:= Parameter,
 		Axis					:= Axis);
 	iErrorId := 0;
+	IF bTravelExceeded THEN
+		iErrorId := ERR_TRAVEL_LIMIT;
+	END_IF
 	nState := 20;
 END_IF
 fbLockWait(IN := nState = 20 AND StopActive AND NOT StepAbortHoming.Busy, PT := T#5S);
+fbAbortTimeout(IN := nState = 20, PT := T#10S);
+// #155: not in the scan in which the abort ended: the NC has to settle, a start at once overlapped it (4B66)
+fbRearmDelay(IN := bRearm AND nState = 0 AND Execute, PT := T#300MS);
+IF fbRearmDelay.Q THEN
+	bRearm := FALSE;
+	fbStartReq.Rearm();
+ELSIF NOT Execute THEN
+	bRearm := FALSE;
+END_IF
+ResetRequest := FALSE;
+bStepBusy := StepReferencePulseDetection.Busy OR MoveAxis.Busy OR SetPos.Busy OR StepFinishHoming.Busy;
+// #113: a stop leaves the reference step Busy (it ignores the falling Execute), and the reset of the axis ends its NC command
+// without the block ever being called again. At the next start it then reported the old command as finished, the sequence
+// went to the abort state and the abort overlapped the new MC_Home (4B66). In state 0 call a Busy block with FALSE until it
+// drops Busy, and take no start before.
+fbStepDrain(bIdle := nState = 0, bStepBusy := bStepBusy, bStartPending := fbStartReq.Pending);
+IF fbStepDrain.bStuck THEN
+	fbStartReq.Take();
+	Error := TRUE;
+	ErrorID := ERR_STEP_STUCK;
+END_IF
 
 CASE nState OF
 	0 :	(* init *)
+		IF fbStepDrain.bDrain THEN
+			StepReferencePulseDetection(
+				Execute					:= FALSE,
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+			MoveAxis(
+				Axis					:= Axis,
+				JogForward				:= FALSE,
+				JogBackwards			:= FALSE);
+			SetPos(
+				Execute					:= FALSE,
+				Axis					:= Axis);
+			StepFinishHoming(
+				Execute					:= FALSE,
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+		END_IF
+		// #113 mode 2: release the reference step that was kept running during the abort
+		IF GVL_Homing.nAbortMode = 2 THEN
+			StepReferencePulseDetection(
+				Execute					:= FALSE,
+				Parameter				:= Parameter,
+				Axis					:= Axis);
+		END_IF
 		IF NOT Execute THEN
 			(* reset at falling edge of Execute *)
 			Busy 			:= FALSE;
@@ -145,7 +223,12 @@ CASE nState OF
 			RecordedDistances_back	:= DistanceReset;
 		END_IF
  	
-	  	IF fbExecute.Q THEN
+		IF fbStepDrain.bMayTake THEN
+			bTakeStart := fbStartReq.Take();
+		ELSE
+			bTakeStart := FALSE;
+		END_IF
+	  	IF bTakeStart THEN
 			(* initialize output values *)
 	  		Busy 				:= TRUE;
 
@@ -385,10 +468,37 @@ CASE nState OF
 		END_IF
 
 	20:	(*Abort Homing*)
+		// #155: no other exit: a reset or the timeout leaves the state even if MC_AbortHoming never reports back
+		IF Reset OR fbAbortTimeout.Q THEN
+			StepAbortHoming(
+				Axis				:= Axis,
+				Parameter			:= Parameter,
+				Execute				:= FALSE,
+				Options				:= );
+			Busy := FALSE;
+			IF Reset THEN
+				CommandAborted := TRUE;
+			ELSE
+				Error := TRUE;
+				ErrorID := ERR_ABORT_TIMEOUT;
+			END_IF
+			nState := 0;
+		ELSE
 		// #113: MC_Stop locks the axis for motion commands until it is done (StateDWord bit 29); MC_AbortHoming sent into the
 		// lock is rejected (17135) and the error disables both axes. Wait for the lock to clear, 5 s at most.
 		IF NOT StopActive OR fbLockWait.Q OR StepAbortHoming.Busy THEN
-			StepAbortHoming.Options.DisableDriveAccess := Options.DisableDriveAccess;
+			IF GVL_Homing.nAbortMode = 1 AND bStepBusy AND NOT StepAbortHoming.Busy THEN
+				// #113 mode 1: MC_AbortHoming into a running step never completes (HomingBusy stays TRUE, 4F000001 after
+				// 10 s), but a reset of the axis does end it. Ask for one; the Reset input then leaves this state.
+				ResetRequest := TRUE;
+			ELSE
+			StepAbortHoming.Options.DisableDriveAccess := Options.DisableDriveAccess AND (GVL_Homing.nAbortMode <> 3);
+			IF GVL_Homing.nAbortMode = 2 AND (nAbortFrom = 1 OR nAbortFrom = 3) THEN
+				StepReferencePulseDetection(
+					Execute					:= TRUE,
+					Parameter				:= Parameter,
+					Axis					:= Axis);
+			END_IF
 
 			StepAbortHoming(
 				Axis				:= Axis, 
@@ -403,6 +513,11 @@ CASE nState OF
 					ErrorId				:= iErrorId;
 				ELSE
 					CommandAborted		:= TRUE;
+					// #155: aborted by itself (not by a stop, a reset or Execute going away): the start is still
+					// requested, so request it again. Execute stays TRUE, there is no new edge to do it.
+					IF Execute AND NOT StopActive AND NOT Reset THEN
+						bRearm := TRUE;
+					END_IF
 				END_IF
 		
 				StepAbortHoming(	
@@ -423,6 +538,8 @@ CASE nState OF
 
 				nState := 0;
 			END_IF
+			END_IF
+		END_IF
 		END_IF
 
 END_CASE]]></ST>

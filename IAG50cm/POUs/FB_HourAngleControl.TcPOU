@@ -3,6 +3,7 @@
   <POU Name="FB_HourAngleControl" Id="{69217813-d219-4ca2-9cea-b7c641aa5dcd}" SpecialFunc="None">
     <Declaration><![CDATA[FUNCTION_BLOCK FB_HourAngleControl EXTENDS FB_AxisControl
 VAR_INPUT
+	bReleaseHold : BOOL;		// #159: a new power-on was accepted, release the hold (one scan, set by FB_TelescopeControl.Init)
 	fMinPosition : LREAL := -180.0;
 	fMaxPosition : LREAL := 180.0;
 END_VAR
@@ -17,6 +18,8 @@ VAR
 	nLatchHomeErrorIDHeld : UDINT;
 	fbLatchHome : FB_LatchHome;
 	fbHomeHold : FB_HomeHold;		// #113: no homing request after a stop of the axis
+	tonReady : TON;					// #155: the NC axis takes some time after Ready before a command reaches it
+	bResetForAbort : BOOL;		// #113: the reset was asked for by FB_LatchHome to end a homing, it must not release the hold
 	omega 	: LREAL := 360.0 / 86164.099 * (PI/180.0); //sidereal velocity
 END_VAR
 ]]></Declaration>
@@ -27,13 +30,28 @@ fPosition := LIMIT(fMinPosition, fPosition, fMaxPosition);
 
 // #113: a stop during the calibration sweep must not be followed by a new homing request (bHomeAxis was set again every
 // scan while the axis is enabled and uncalibrated, so FB_LatchHome went on commanding the NC while MC_Stop held the lock)
-fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset);
+// #113: FB_LatchHome asks for a reset when MC_AbortHoming cannot end a running step. That reset must not release the hold
+// (the sweep would start again); the hold ends with the disable that FB_SweepStop does after the stop.
+IF fbLatchHome.ResetRequest THEN
+	bReset := TRUE;
+	bResetForAbort := TRUE;
+END_IF
+IF NOT bEnable THEN
+	bResetForAbort := FALSE;
+END_IF
+fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort, bRelease := bReleaseHold);
+bReleaseHold := FALSE;
 
-IF bEnable AND NOT fbAxis.Calibrated AND NOT fbHomeHold.bHold THEN
+// #155: not before the NC axis is enabled, and not right after Ready either: the first reference step started 5 to 40 ms
+// after Ready still aborts about 80 ms later, and the abort and the re-arm can overlap (4B66). Ready for 0.5 s.
+tonReady(IN := bEnable AND fbAxis.Ready, PT := T#500MS);
+IF tonReady.Q AND NOT fbAxis.Calibrated AND NOT fbHomeHold.bHold THEN
 	bHomeAxis := TRUE;
 END_IF
 
-IF fbAxis.Calibrated OR fbHomeHold.bHold THEN
+// #155: the request used to survive a disable. After the next enable it was already TRUE, so FB_LatchHome saw no rising
+// edge and the sweep never started.
+IF fbAxis.Calibrated OR fbHomeHold.bHold OR NOT bEnable THEN
 	bHomeAxis := FALSE;
 END_IF
 
@@ -66,6 +84,7 @@ bCalibrated := fbAxis.Calibrated;
 fbLatchHome(
 	Axis				:= AxisRef,
 	Execute				:= bHomeAxis,
+	Reset				:= bReset,	// #155
 	StopActive			:= bStopAxis OR ((axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0),	// #113
 	Direction 			:= MC_Home_Direction.mcPositiveDirection,
 	Velocity 			:= 1.0,
@@ -76,6 +95,7 @@ fbLatchHome(
 	RefDistance			:= 5.21,
 	TimeLimit 			:= T#1M,
 	DistanceLimit 		:= 6,
+	TravelLimit			:= 21,	// #165: 3 steps of 6 deg and the 2 deg jog, plus a margin
 	Error 				=> bLatchHomeError,
 	ErrorID 			=> nLatchHomeErrorID);
 	
@@ -114,7 +134,9 @@ IF fbAxis.ResetDone THEN
 	bReset := FALSE;
 END_IF
 
-IF fbAxis.StopDone THEN
+// #159: bStopAxis was cleared only on StopDone. A stop of an axis that is disabled or standing still gives none, so
+// it stayed TRUE and held every following sweep until a Reset Cold.
+IF fbAxis.StopDone OR NOT bEnable OR bReset THEN
 	bStopAxis := FALSE;
 END_IF
 
@@ -129,18 +151,6 @@ fbReadParameter(
 				
 IF fbReadParameter.Valid THEN
 	fSlewtime := fbReadParameter.Value;
-END_IF
-
-IF bSoEReset THEN
-	fbSoEReset(
-		Axis 	:= axisRef,
-		Execute := TRUE,
-		Timeout := DEFAULT_ADS_TIMEOUT);
- 	IF NOT fbSoEReset.Busy THEN
-		fbSoEReset(Axis := axisRef, Execute := FALSE);
-		bSoEReset := FALSE;
-		bReset := TRUE;
-	END_IF
 END_IF
 
 

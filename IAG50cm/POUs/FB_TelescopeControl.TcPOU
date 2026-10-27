@@ -84,10 +84,15 @@ VAR
 	fbPointingForward	: FB_PointingModelForward;
 	fbPointingInversion : FB_PointingModelInversion;
 	
+	bAxesCalibrated		: BOOL;		// #161: horizon/pole stops only act on a referenced counter
+	bPowerOnHold		: BOOL;		// #166: a power-on is running and may be enabling a still axis inside a limit
+	bHaMoving, bDecMoving	: BOOL;	// #166
+	rtrigCalibLost		: F_TRIG;	// #161: calibration lost while enabled
 	rtrigHorizonError	: R_TRIG;		// if the set Coordinate is below the Horizon threshold fHorizon
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
 	rtrigReset		: R_TRIG;
+	rtrigPoweredClear	: R_TRIG;		// #100: error or E-stop edge: the telescope is no longer powered
 	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
 	tonAxisResetAfterAck	: TON;
 	// plan step 3.2: the axis feedback of this scan (1 hour angle, 2 declination), filled by _ReadAxes
@@ -109,12 +114,25 @@ VAR
 	bHomeCancelled		: BOOL;		// a pending home that never started was dropped (one scan): logs the reason (#75)
 	sHomeDropWhy		: STRING(160);	// why the pending home was dropped, for the WARN text (#108)
 	fbStopTx			: FB_StopTransaction;	// #108/#120: one stop per axis and stop transaction
+	rtHaMove			: R_TRIG;		// #92: MoveAxis of the axis went TRUE: the move command is out (MoveTo)
+	rtDecMove			: R_TRIG;
+	bHaMovePending		: BOOL;			// #92: a move was commanded and the NC does not report it yet: the axis is not at rest
+	bDecMovePending		: BOOL;
+	tonHaMovePending	: TON;			// #92: a command the NC never started (cancelled in time) is forgotten after 1 s
+	tonDecMovePending	: TON;
 	fbHomeDrop			: FB_HomeDropReason;	// #108/#120: why a pending home was dropped
 	tonHomePending		: FB_TimeoutTimer;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
 	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
 	bPowerParked		: BOOL;		// a park aborted a running power-on (one scan, #109)
+	bInHorizonLimit		: BOOL;		// #84: the mount is below the horizon limit (the safety block homes it out)
+	bInPoleLimit		: BOOL;		// #84: the mount (or the tracking target) is in the pole zone
+	bLimitHome			: BOOL;		// #84: the pending or running home was requested by a limit block; latched while bGoHome
+	bParkAfterHome		: BOOL;		// #84: a park waits for that home
+	bParkHomeDone		: BOOL;		// #84: the home finished for this park: the limit blocks do not home again, the park runs
+	bParkHomeFirst		: BOOL;		// #84: a park was requested in a limit, the home runs first (one scan): logs it
+	bSafeParked			: BOOL;		// an axes-off park closed the covers and parked the dome, the mount was not moved: READY_STATE 0, bIsParked stays FALSE (#110)
 	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: FB_TimeoutTimer;		// power on timeout
@@ -144,6 +162,7 @@ VAR
 	TCShomeCancelEvent,
 	TCSpowerBlockedEvent,
 	TCSpowerParkEvent,
+	TCSparkHomeEvent,
 	TCScommandRefusedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
@@ -245,6 +264,13 @@ fSlewTime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
 // ERROR (either one of the Axis or below safe Horizon (fHorizon))
 bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error OR bTestError OR bSoftwareError;
 			
+// #100: an error or an E-stop ends the powered state. Only a power-on or a park wrote bIsPowered, so it stayed TRUE and the
+// next power=1 could be taken for a running telescope. bReady needs bIsPowered, so this only forces the full power-on.
+rtrigPoweredClear(CLK := bError OR bEstopTriggered);
+IF rtrigPoweredClear.Q THEN
+	bIsPowered := FALSE;
+END_IF
+
 IF bError THEN
 	bGoHome := 	FALSE;
 	bTrack := 	FALSE;
@@ -363,21 +389,49 @@ fbEq2Hor(
 	alt => fElevationCurrentSky,
 	az => fAzimuthCurrentSky);
 //----------------------------------------------------------------------------------------------
+// #161: while an axis is uncalibrated (e.g. after a PLC activation) its counter is meaningless, so the horizon and
+// pole-zone stops must not act on it, otherwise the power-on sweep and the jog are stopped. Protection then is the NC
+// software limits, the sweep's DistanceLimit and the operator.
+bAxesCalibrated := fbHourAngle.Calibrated AND fbDeclination.Calibrated;
+// losing the reference while enabled and not homing: stop instead of silently releasing the horizon protection
+rtrigCalibLost(CLK := bAxesCalibrated);
+IF rtrigCalibLost.Q AND bReady AND NOT bError AND NOT aAxis[1].bHoming AND NOT aAxis[2].bHoming THEN
+	bStop := TRUE;
+END_IF
+// #166: a running power-on does not move a calibrated axis, but enabling it is not settled for a few scans and the mount
+// is not ready before stage 100, so a mount inside a limit was stopped and the power-on aborted (any bStop aborts it).
+// Skip the automatic stop only while the axes that matter stand still; stage 100 hands over to bGoHome. Any motion, a
+// user stop or an error still stops.
+bPowerOnHold := bPower AND NOT bUserStop AND NOT bError;
+bHaMoving := aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming;
+bDecMoving := aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming;
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
 // (also gated on fPointingSafeAltitude so tracking never lingers in the pointing model's chaotic zone)
-IF fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude) THEN
-	IF NOT bSettled AND NOT bGoHome THEN
+// #84: a park requested in a limit homes out of it first and then parks. The stop conditions are unchanged.
+IF NOT bGoHome THEN
+	bLimitHome := FALSE;
+END_IF
+IF NOT bPark THEN
+	bParkAfterHome := FALSE;
+	bParkHomeDone := FALSE;
+END_IF
+bInHorizonLimit := bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude);
+bInPoleLimit := (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)));
+IF bInHorizonLimit THEN
+	IF NOT bSettled AND NOT bGoHome AND NOT (bPowerOnHold AND NOT bHaMoving AND NOT bDecMoving) THEN
 		bStop := TRUE;
-	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
+	ELSIF bReady AND NOT bError AND NOT bParkHomeDone THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
+		bLimitHome := TRUE;		// #84: also when bGoHome was set already (Home(), power-on stage 100)
 	END_IF
 END_IF
 // If the Telescope goes into the forbidden polezone (e.g. while tracking, stop and gohome)
-IF (fDeclinationCurrent > (90.0 - fPoleZone)) OR (bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)))THEN
-	IF NOT bSettled AND NOT bGoHome THEN
+IF bInPoleLimit THEN
+	IF NOT bSettled AND NOT bGoHome AND NOT (bPowerOnHold AND NOT bDecMoving) THEN
 		bStop := TRUE;
-	ELSIF bReady AND NOT bError THEN	// #82: only when the home can run; the power-on homes (stage 100)
+	ELSIF bReady AND NOT bError AND NOT bParkHomeDone THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHome := TRUE;
+		bLimitHome := TRUE;		// #84
 	END_IF
 END_IF
 //----------------------------------------------------------------------------------------------
@@ -472,7 +526,7 @@ IF bPower AND bPark AND NOT bStop AND TCS_command = E_TCSCommand.poweron THEN
 	bPower := FALSE;
 END_IF
 // #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
-// time) do not abort a running power-on, as before.
+// time) are meant not to abort a running power-on, but _PowerOn aborts on any bStop, so they are held back in the checks above (#166).
 IF bStop AND (bUserStop OR NOT bPower) THEN
     fbStartup.MarkAbortedIfStarting(Power := bPower);
 	bTrack := FALSE;
@@ -484,10 +538,17 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 		IF _PowerOn() >= 40 THEN	// bStop is set: resets its stage; returns the stage it was in
 			fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
 		END_IF
-	ELSIF bPark THEN
+	ELSIF bPark AND (bUserStop OR TCS_command = E_TCSCommand.park OR NOT (bInHorizonLimit OR bInPoleLimit)) THEN
 		bPark := FALSE;
 		sParkEnd := 'cancelled by stop';
 		_ParkTelescope();
+		IF bGoHome THEN
+			// #84: the park was waiting for the limit home; the home goes with it (and its stage is reset, it would resume mid-way)
+			bGoHome := FALSE;
+			sHomeEnd := 'cancelled by stop';
+			_HomeTelescope();
+		END_IF
+	// #84: a park that is only pending survives the automatic stop of a limit: the stop settles, the limit home runs, then the park
 	ELSIF bGoto THEN
 		bGoto := FALSE;
 		_GotoTelescope();
@@ -602,7 +663,33 @@ ELSIF bPark THEN
 			END_IF
 			bParkInError := TRUE;
 		END_IF
+		// #110: with no error and no E-stop this leaves a known, covered state. READY_STATE reports it as parked once the
+		// covers are closed and the dome is parked; bIsParked stays FALSE, the mount is where it was.
+		bSafeParked := NOT bError AND NOT bEstopTriggered;
 		TCS_command := E_TCSCommand.no_command;
+	// #84: a park in a limit: the home out of the limit runs first, the park follows (see bParkHomeDone)
+	ELSIF bGoHome AND bLimitHome THEN
+		IF bGoto OR bSlew THEN
+			bGoto := FALSE;
+			bSlew := FALSE;
+			bInterupted := TRUE;
+			_GotoTelescope();
+			_SlewTelescope();
+			bInterupted := FALSE;
+			IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew THEN
+				bStopping := TRUE;
+			END_IF
+		ELSE
+			IF NOT bParkAfterHome THEN
+				bParkAfterHome := TRUE;
+				bParkHomeFirst := TRUE;
+				fbStartup.MarkAbortedIfInitializing();	// #109: a park during the startup makes the init fail
+			END_IF
+			IF TCS_command <> E_TCSCommand.gohome AND bReady AND NOT bBusy AND bSettled THEN
+				bInterupted := FALSE;
+				TCS_command := E_TCSCommand.gohome;
+			END_IF
+		END_IF
 	// If lower presedence commands are ongoing, let them know they are interupted
 	ELSIF bGoto OR bSlew OR bGoHome THEN
 		bGoHome := FALSE;
@@ -764,8 +851,37 @@ bSliding := NOT bTracking AND (aAxis[1].bInMotion OR aAxis[1].bInRamp OR
 tonTrackingDelay(in := aAxis[1].bTracking AND
 			aAxis[2].bTracking ,PT :=T#1000MS, Q => bTracking);
 
+// #92: a move that was commanded (MoveAxis -> MoveTo) is reported by the NC a few cycles later; until then the axis
+// reports StandStill. A stop in that window saw bStopped, so bStop was cleared after one scan, the stop only dropped
+// MoveAxis (which does not cancel a move that has started) and no axis stop was sent: the move ran to its end (T18.4,
+// park, Dec). The axis is not at rest while its move is on the way; the stop then lasts until the axis moves and gets
+// its axis stop from the stop transaction.
+rtHaMove(CLK := fbHourAngle.MoveAxis);
+rtDecMove(CLK := fbDeclination.MoveAxis);
+IF rtHaMove.Q THEN
+	bHaMovePending := TRUE;
+END_IF
+IF rtDecMove.Q THEN
+	bDecMovePending := TRUE;
+END_IF
+IF aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming OR fbHourAngle.MoveDone OR bError OR NOT fbHourAngle.bEnable THEN
+	bHaMovePending := FALSE;
+END_IF
+IF aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming OR fbDeclination.MoveDone OR bError OR NOT fbDeclination.bEnable THEN
+	bDecMovePending := FALSE;
+END_IF
+tonHaMovePending(IN := bHaMovePending, PT := T#1S);
+tonDecMovePending(IN := bDecMovePending, PT := T#1S);
+IF tonHaMovePending.Q THEN
+	bHaMovePending := FALSE;
+END_IF
+IF tonDecMovePending.Q THEN
+	bDecMovePending := FALSE;
+END_IF
+
 bStopped :=  (NOT fbHourAngle.bEnable OR aAxis[1].bStandStill) AND
-			(NOT fbDeclination.bEnable OR aAxis[2].bStandStill);
+			(NOT fbDeclination.bEnable OR aAxis[2].bStandStill) AND
+			NOT bHaMovePending AND NOT bDecMovePending;
 
 // #98: bStopped is TRUE for one scan at the start of every stop, before MC_Stop has taken hold (StandStill is still
 // TRUE), and a home commanded while MC_Stop locks the axis (StateDWord bit 29) fails with 17135. A stop transaction
@@ -810,9 +926,13 @@ bBusy := aAxis[1].bBusy OR aAxis[2].bBusy OR (fbFocus <> 0 AND_THEN fbFocus.Busy
 //----------------------------------------------------------------------------------------------
 (* STATUS STATES*)
 // Public completion is latched only by the final startup stage, never by mechanical bReady alone.
+// #110: the covered state ends with a power-on, an error or an E-stop.
+IF bPower OR bError OR bEstopTriggered THEN
+    bSafeParked := FALSE;
+END_IF
 fReadyState := fbStartup.Update(
     Error := bError OR bSoftwareError OR bPowerFailure OR bEstopTriggered,
-    Parked := bIsParked,
+    Parked := bIsParked OR (bSafeParked AND fbCovers.Closed AND fbDome.Parked),
     Parking := bPark AND NOT bPower,
     Operational := bReady AND bMainReady AND NOT bEstopTriggered,
     AbortExtra := bEstopTriggered);
@@ -843,7 +963,7 @@ END_IF
 //----------------------------------------------------------------------------------------------
 // The readiness field uses its existing topic and numeric format.
 IF fbStartup.PublishDue(CommValid := fbComm <> 0, Heartbeat := FALSE) THEN
-    fbComm.Publish('telescope', 'dome', 'TELESCOPE.READY_STATE', LREAL_TO_STRING(fReadyState));
+    fbComm.PublishLREAL('telescope', 'dome', 'TELESCOPE.READY_STATE', fReadyState);
 END_IF
 // send telemetry
 
@@ -921,7 +1041,7 @@ TCStargetHorizonEvent(	Trigger := rtrigHorizonError.Q,
 				OnMessage := 'Target below safe horizon, stopping telescope.',
 				OffMEssage := '', 
 				Comm := fbComm);
-TCSaltitudeEvent(	Trigger := fElevationCurrent<MAX(fHorizon+2.0, fPointingSafeAltitude+2.0),
+TCSaltitudeEvent(	Trigger := bAxesCalibrated AND fElevationCurrent<MAX(fHorizon+2.0, fPointingSafeAltitude+2.0),
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'Telescope below safe horizon, aboard and slew telescope to home position.',
@@ -955,6 +1075,12 @@ TCSpowerBlockedEvent(	Trigger := bPowerBlocked,
 				FormatString := '%s',
 				Comm := fbComm);
 bPowerBlocked := FALSE;
+TCSparkHomeEvent(	Trigger := bParkHomeFirst,
+				Level := ADSLOG_MSGTYPE_HINT,
+				FormatString := '%s',
+				OnMessage := 'Park in the horizon/pole-zone limit: homing out of it first, then parking',
+				Comm := fbComm);
+bParkHomeFirst := FALSE;
 TCSpowerParkEvent(	Trigger := bPowerParked,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
@@ -1291,12 +1417,13 @@ CASE nStage OF
         IF fbFocus <> 0 THEN
             fbFocus.Position := telescopeConfig.focusHome;
         END_IF
-        IF fbStartup.Initializing THEN
+        IF fbStartup.Initializing AND NOT bParkAfterHome THEN	// #84: a park follows, the startup was aborted
             // Only initialization waits for its remaining focus work; manual Home semantics stay unchanged.
             nStage := 110;
         ELSE
             fRightAscension := fRightAscensionCurrentICRS;
             fDeclination := fDeclinationCurrentICRS;
+            bParkHomeDone := bParkAfterHome;	// #84
             bGoHome := FALSE;
             nStage := 0;
         END_IF
@@ -1547,6 +1674,7 @@ END_VAR
 VAR_INST
 	nStage		: USINT := 0;
 	nLastStage	: USINT := 0;
+	tonCalibTimeout	: TON;		// #155: stage 40 had no timeout
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[// #59: also refused while the safety acknowledge after an E-stop is pending. While the reset is running
@@ -1579,6 +1707,26 @@ END_IF
 
 IF nStage >= 40 THEN
     fbStartup.MarkCalibrating();
+END_IF
+
+// #155: an axis that never starts its calibration (no error, no log) held the power-on in stage 40 for good. The sweep
+// of one axis takes about 35 s; end the power-on as a failed startup if it lasts three minutes.
+tonCalibTimeout(IN := nStage = 40, PT := T#3M);
+IF tonCalibTimeout.Q THEN
+	bPowerFailure := TRUE;
+	TCSpowerEvent.OnMessage := 'failed';
+	IF fbHourAngle.Calibrated THEN
+		TCSpowerBlockedEvent.OnMessage := 'POWER: calibration timeout (Declination is not calibrated)';
+	ELSIF fbDeclination.Calibrated THEN
+		TCSpowerBlockedEvent.OnMessage := 'POWER: calibration timeout (Hour Angle is not calibrated)';
+	ELSE
+		TCSpowerBlockedEvent.OnMessage := 'POWER: calibration timeout (neither axis is calibrated)';
+	END_IF
+	bPowerBlocked := TRUE;
+	fbStartup.MarkAborted();
+	bPower := FALSE;
+	nStage := 0;
+	RETURN;
 END_IF
 
 CASE nStage OF
@@ -1657,37 +1805,37 @@ END_VAR
 
 (* TELESCOPE module*)
 
-fbComm.Publish('telescope', 'dome', 'TELESCOPE.READY_STATE',	LREAL_TO_STRING(fReadyState));
-fbComm.Publish('telescope', 'dome', 'TELESCOPE.MOTION_STATE',	LREAL_TO_STRING(nMotionState));
+fbComm.PublishLREAL('telescope', 'dome', 'TELESCOPE.READY_STATE',	fReadyState);
+fbComm.PublishLREAL('telescope', 'dome', 'TELESCOPE.MOTION_STATE',	nMotionState);
 
 // INFO
-fbComm.Publish('telescope', 'dome', 'TELESCOPE.INFO.NAME',	telescopeConfig.name);
-fbComm.Publish('telescope', 'dome', 'TELESCOPE.INFO.DIAMETER',	LREAL_TO_STRING(telescopeConfig.diameter));
-fbComm.Publish('telescope', 'dome', 'TELESCOPE.INFO.CABINET',	telescopeConfig.cabinet);
-fbComm.Publish('telescope', 'dome', 'TELESCOPE.INFO.MANUFACTURER', telescopeConfig.manufacturer);
+fbComm.PublishString('telescope', 'dome', 'TELESCOPE.INFO.NAME',	telescopeConfig.name);
+fbComm.PublishLREAL('telescope', 'dome', 'TELESCOPE.INFO.DIAMETER',	telescopeConfig.diameter);
+fbComm.PublishString('telescope', 'dome', 'TELESCOPE.INFO.CABINET',	telescopeConfig.cabinet);
+fbComm.PublishString('telescope', 'dome', 'TELESCOPE.INFO.MANUFACTURER', telescopeConfig.manufacturer);
 
 // CONFIG
 IF fbDome <> 0 THEN
-	fbComm.Publish('telescope', 'dome', 'TELESCOPE.CONFIG.CAPABILITIES', INT_TO_STRING(fbDome.Capabilities));
+	fbComm.PublishINT('telescope', 'dome', 'TELESCOPE.CONFIG.CAPABILITIES', fbDome.Capabilities);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'TELESCOPE.CONFIG.CAPABILITIES', '0');
+	fbComm.PublishINT('telescope', 'dome', 'TELESCOPE.CONFIG.CAPABILITIES', 0);
 END_IF
-fbComm.Publish('telescope', 'dome', 'TELESCOPE.CONFIG.MOUNTOPTIONS', telescopeConfig.mountOptions);
-fbComm.Publish('telescope', 'dome', 'TELESCOPE.CONFIG.MOUNT', telescopeConfig.mount);
+fbComm.PublishString('telescope', 'dome', 'TELESCOPE.CONFIG.MOUNTOPTIONS', telescopeConfig.mountOptions);
+fbComm.PublishString('telescope', 'dome', 'TELESCOPE.CONFIG.MOUNT', telescopeConfig.mount);
 
 // STATUS
 IF bEstopTriggered THEN
-	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', '1');
+	fbComm.PublishINT('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', 1);
 ELSIF bError THEN
-	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', '2');
+	fbComm.PublishINT('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', 2);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', '0');
+	fbComm.PublishINT('telescope', 'dome', 'TELESCOPE.STATUS.GLOBAL', 0);
 END_IF
 
 IF bLocalMode THEN
-	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.LOCAL_MODE', '1');
+	fbComm.PublishINT('telescope', 'dome', 'TELESCOPE.STATUS.LOCAL_MODE', 1);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'TELESCOPE.STATUS.LOCAL_MODE', '0');
+	fbComm.PublishINT('telescope', 'dome', 'TELESCOPE.STATUS.LOCAL_MODE', 0);
 END_IF
 (* ERROR LIST: TO BE IMPLEMENTED!!!*)
 
@@ -1695,165 +1843,165 @@ END_IF
 // Set Coords from outside | GoTo:RA DEC | Slew:Alt Az
 
 // INSTRUMENTAL
-fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.DEC', LREAL_TO_STRING(fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset));
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.INSTRUMENTAL.DEC', fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset);
 // change to -180 to 180 degree in HA
 IF MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclination)+ fHourAnglePointingOffset, 360) > 180 THEN
-	fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.HA', LREAL_TO_STRING(MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset,360)- 360.0));
+	fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.INSTRUMENTAL.HA', MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset,360)- 360.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'OBJECT.INSTRUMENTAL.HA', LREAL_TO_STRING(MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset,360)));
+	fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.INSTRUMENTAL.HA', MODABS(fHourAngleApparent + F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)+ fHourAnglePointingOffset,360));
 END_IF
 
 // HORIZONTAL
 IF bSlew THEN
-	fbComm.Publish('telescope', 'dome', 'OBJECT.HORIZONTAL.ALT', LREAL_TO_STRING(fElevation));
-	fbComm.Publish('telescope', 'dome', 'OBJECT.HORIZONTAL.AZ', LREAL_TO_STRING(fAzimuth));
+	fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.HORIZONTAL.ALT', fElevation);
+	fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.HORIZONTAL.AZ', fAzimuth);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'OBJECT.HORIZONTAL.ALT', LREAL_TO_STRING(fElevationCalc));
-	fbComm.Publish('telescope', 'dome', 'OBJECT.HORIZONTAL.AZ', LREAL_TO_STRING(fAzimuthCalc));
+	fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.HORIZONTAL.ALT', fElevationCalc);
+	fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.HORIZONTAL.AZ', fAzimuthCalc);
 END_IF
 
 //EQUATORIAL
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.EPOCH', 'J2000.0');
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.EQUINOX', 'J2000.0');
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.RA_PM', '0.0');
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC_PM', '0.0');
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.RA_RATE', '0.0');
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC_RATE', '0.0');
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.RA', LREAL_TO_STRING(fRightAscension));	// degrees (BROTLib#37)
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC', LREAL_TO_STRING(fDeclination));
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.HA_APPARENT', LREAL_TO_STRING(fHourAngleApparent));
-fbComm.Publish('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC_APPARENT', LREAL_TO_STRING(fDeclinationApparent));
+fbComm.PublishString('telescope', 'dome', 'OBJECT.EQUATORIAL.EPOCH', 'J2000.0');
+fbComm.PublishString('telescope', 'dome', 'OBJECT.EQUATORIAL.EQUINOX', 'J2000.0');
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.EQUATORIAL.RA_PM', 0.0);
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC_PM', 0.0);
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.EQUATORIAL.RA_RATE', 0.0);
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC_RATE', 0.0);
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.EQUATORIAL.RA', fRightAscension);	// degrees (BROTLib#37)
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC', fDeclination);
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.EQUATORIAL.HA_APPARENT', fHourAngleApparent);
+fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.EQUATORIAL.DEC_APPARENT', fDeclinationApparent);
 
 
 (* POINTING *)
-fbComm.Publish('telescope', 'dome', 'POINTING.SLEWTIME', LREAL_TO_STRING(fSlewtime));
-fbComm.Publish('telescope', 'dome', 'POINTING.OFFSETS.HA', LREAL_TO_STRING(fHourAnglePointingOffset));
-fbComm.Publish('telescope', 'dome', 'POINTING.OFFSETS.DEC', LREAL_TO_STRING(fDeclinationPointingOffset));
+fbComm.PublishLREAL('telescope', 'dome', 'POINTING.SLEWTIME', fSlewtime);
+fbComm.PublishLREAL('telescope', 'dome', 'POINTING.OFFSETS.HA', fHourAnglePointingOffset);
+fbComm.PublishLREAL('telescope', 'dome', 'POINTING.OFFSETS.DEC', fDeclinationPointingOffset);
 
 
 (*POSITION*)
 //LOCAL
-fbComm.Publish('telescope', 'dome', 'POSITION.LOCAL.SIDEREAL_TIME', LREAL_TO_STRING(fLst));
-fbComm.Publish('telescope', 'dome', 'POSITION.LOCAL.JD', LREAL_TO_STRING(fJd));
-fbComm.Publish('telescope', 'dome', 'POSITION.LOCAL.LATITUDE', LREAL_TO_STRING(telescopeConfig.latitude));
-fbComm.Publish('telescope', 'dome', 'POSITION.LOCAL.LONGITUDE', LREAL_TO_STRING(telescopeConfig.longitude));
-fbComm.Publish('telescope', 'dome', 'POSITION.LOCAL.HEIGHT', LREAL_TO_STRING(telescopeConfig.altitude));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.LOCAL.SIDEREAL_TIME', fLst);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.LOCAL.JD', fJd);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.LOCAL.LATITUDE', telescopeConfig.latitude);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.LOCAL.LONGITUDE', telescopeConfig.longitude);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.LOCAL.HEIGHT', telescopeConfig.altitude);
 //INSTRUMENTAL
 // > DEC
 // POWER_STATE
 IF fbDeclination.Enable THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.POWER_STATE', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.POWER_STATE', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.POWER_STATE', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.POWER_STATE', 0.0);
 END_IF
 //REFERENCED
 IF fbDeclination.Calibrated THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.REFERENCED', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.REFERENCED', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.REFERENCED', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.REFERENCED', 0.0);
 END_IF
 //ERROR_STATE
 IF fbDeclination.Error THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.ERROR_STATE', UDINT_TO_STRING(fbDeclination.ErrorID));
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.ERROR_STATE', fbDeclination.ErrorID);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.ERROR_STATE', '0');
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.ERROR_STATE', 0);
 END_IF
 //MOTION_STATE
 IF fbDeclination.Busy THEN
 	IF fbDeclination.isTracking THEN
-		fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.MOTION_STATE', '8');
+		fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.MOTION_STATE', 8);
 	ELSE
-		fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.MOTION_STATE', '1');
+		fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.MOTION_STATE', 1);
 	END_IF
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.MOTION_STATE', '0');
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.MOTION_STATE', 0);
 END_IF
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.REALPOS', LREAL_TO_STRING(fDeclinationCurrent-fDeclinationOffset));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.CURRPOS', LREAL_TO_STRING(fDeclinationCurrent));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.TARGETPOS', LREAL_TO_STRING(fbDeclination.Position));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.CURRSPEED', LREAL_TO_STRING(fbDeclination.Velocity));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.TARGETDISTANCE', LREAL_TO_STRING(ABS(fDeclinationCurrent-fbDeclination.Position)));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.OFFSET', LREAL_TO_STRING(fDeclinationOffset));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.REALPOS', fDeclinationCurrent-fDeclinationOffset);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.CURRPOS', fDeclinationCurrent);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.TARGETPOS', fbDeclination.Position);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.CURRSPEED', fbDeclination.Velocity);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.TARGETDISTANCE', ABS(fDeclinationCurrent-fbDeclination.Position));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.DEC.OFFSET', fDeclinationOffset);
 
 // > HA
 // POWER_STATE
 IF fbHourAngle.Enable THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.POWER_STATE', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.POWER_STATE', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.POWER_STATE', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.POWER_STATE', 0.0);
 END_IF
 //REFERENCED
 IF fbHourAngle.Calibrated THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.REFERENCED', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.REFERENCED', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.REFERENCED', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.REFERENCED', 0.0);
 END_IF
 //ERROR_STATE
 IF fbHourAngle.Error THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.ERROR_STATE', UDINT_TO_STRING(fbHourAngle.ErrorID));
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.ERROR_STATE', fbHourAngle.ErrorID);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.ERROR_STATE', '0');
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.ERROR_STATE', 0);
 END_IF
 //MOTION_STATE
 IF fbHourAngle.Busy THEN
 	IF fbHourAngle.isTracking THEN
-		fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.MOTION_STATE', '8');
+		fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.MOTION_STATE', 8);
 	ELSE
-		fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.MOTION_STATE', '1');
+		fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.MOTION_STATE', 1);
 	END_IF
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.MOTION_STATE', '0');
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.MOTION_STATE', 0);
 END_IF
 
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.CURRPOS', LREAL_TO_STRING(fHourAngleCurrent));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.REALPOS', LREAL_TO_STRING(fHourAngleCurrent-F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.TARGETPOS', LREAL_TO_STRING(fbHourAngle.Position));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.CURRSPEED', LREAL_TO_STRING(fbHourAngle.Velocity));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.TARGETDISTANCE', LREAL_TO_STRING(ABS(fHourAngleCurrent-fbHourAngle.Position)));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.OFFSET', LREAL_TO_STRING(fHourAngleOffset));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.CURRPOS', fHourAngleCurrent);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.REALPOS', fHourAngleCurrent-F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.TARGETPOS', fbHourAngle.Position);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.CURRSPEED', fbHourAngle.Velocity);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.TARGETDISTANCE', ABS(fHourAngleCurrent-fbHourAngle.Position));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.HA.OFFSET', fHourAngleOffset);
 
 // > FOCUS
 // POWER_STATE
 IF fbFocus.Enable THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.POWER_STATE', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.POWER_STATE', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.POWER_STATE', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.POWER_STATE', 0.0);
 END_IF
 //REFERENCED
 IF fbFocus.Calibrated THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.REFERENCED', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.REFERENCED', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.REFERENCED', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.REFERENCED', 0.0);
 END_IF
 //ERROR_STATE
 IF fbFocus.Error THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.ERROR_STATE', UDINT_TO_STRING(fbHourAngle.ErrorID));
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.ERROR_STATE', fbHourAngle.ErrorID);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.ERROR_STATE', '0');
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.ERROR_STATE', 0);
 END_IF
 //MOTION_STATE
 IF fbFocus.Busy THEN
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.MOTION_STATE', '1');
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.MOTION_STATE', 1);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.MOTION_STATE', '0');
+	fbComm.PublishINT('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.MOTION_STATE', 0);
 END_IF
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.CURRPOS', LREAL_TO_STRING(fbFocus.ActualPosition));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.REALPOS', LREAL_TO_STRING(fbFocus.ActualPosition));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.TARGETPOS', LREAL_TO_STRING(fbFocus.Position));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.TARGETDISTANCE', LREAL_TO_STRING(ABS(fbFocus.ActualPosition-fbFocus.Position)));
-fbComm.Publish('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.CURRSPEED', LREAL_TO_STRING(fbFocus.Velocity));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.CURRPOS', fbFocus.ActualPosition);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.REALPOS', fbFocus.ActualPosition);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.TARGETPOS', fbFocus.Position);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.TARGETDISTANCE', ABS(fbFocus.ActualPosition-fbFocus.Position));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.INSTRUMENTAL.FOCUS.CURRSPEED', fbFocus.Velocity);
 
 
 (*HORIZONTAL*)
-fbComm.Publish('telescope', 'dome', 'POSITION.HORIZONTAL.ALT', LREAL_TO_STRING(fElevationCurrentSky));
-fbComm.Publish('telescope', 'dome', 'POSITION.HORIZONTAL.AZ', LREAL_TO_STRING(fAzimuthCurrentSky));
-fbComm.Publish('telescope', 'dome', 'POSITION.HORIZONTAL.DOME', LREAL_TO_STRING(fbDome.Position));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.HORIZONTAL.ALT', fElevationCurrentSky);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.HORIZONTAL.AZ', fAzimuthCurrentSky);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.HORIZONTAL.DOME', fbDome.Position);
 
 (*EQUITORIAL*)
-fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.RA_ICRS', LREAL_TO_STRING(fRightAscensionCurrentICRScorr));	// degrees (BROTLib#37)
-fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.DEC_ICRS', LREAL_TO_STRING(fDeclinationCurrentICRScorr));
-fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.HA_APPARENT', LREAL_TO_STRING(fHourAngleCurrent - fHourAngleInversionOffset - F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent)));
-fbComm.Publish('telescope', 'dome', 'POSITION.EQUATORIAL.DEC_APPARENT', LREAL_TO_STRING(fDeclinationCurrent - fDeclinationInversionOffset - fDeclinationOffset));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.EQUATORIAL.RA_ICRS', fRightAscensionCurrentICRScorr);	// degrees (BROTLib#37)
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.EQUATORIAL.DEC_ICRS', fDeclinationCurrentICRScorr);
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.EQUATORIAL.HA_APPARENT', fHourAngleCurrent - fHourAngleInversionOffset - F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent));
+fbComm.PublishLREAL('telescope', 'dome', 'POSITION.EQUATORIAL.DEC_APPARENT', fDeclinationCurrent - fDeclinationInversionOffset - fDeclinationOffset);
 ]]></ST>
       </Implementation>
     </Method>
@@ -2221,6 +2369,9 @@ END_VAR
 IF fbStartup.AcceptInit() THEN
     bPower := TRUE;
     fReadyState := 0.7;
+    // #159: an automatic stop leaves the sweep hold set with the axes enabled; a new power-on releases it
+    fbHourAngle.bReleaseHold := TRUE;
+    fbDeclination.bReleaseHold := TRUE;
 END_IF
 Init := TRUE;]]></ST>
       </Implementation>

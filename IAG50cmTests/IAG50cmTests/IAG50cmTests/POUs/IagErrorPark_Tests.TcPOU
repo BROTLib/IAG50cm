@@ -67,6 +67,8 @@ CASE nStep OF
 		F_Note(bFailed := (rig.fbTel.bPark OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'no emergency park'));
 		AssertTrue(Condition := rig.fbCovers.nCloseCalls = 0, Message := 'the covers were not closed');
 		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls = 0), sText := CONCAT(sTest, 'the covers were not closed'));
+		AssertFalse(Condition := rig.fbTel.bIsPowered, Message := 'the powered state is cleared by the error (#100)');
+		F_Note(bFailed := rig.fbTel.bIsPowered, sText := CONCAT(sTest, 'the powered state is cleared by the error (#100)'));
 		AssertTrue(Condition := rig.fbTel.ReadyState = -1.0, Message := 'READY_STATE is -1.0 (error)');
 		F_Note(bFailed := NOT (rig.fbTel.ReadyState = -1.0), sText := CONCAT(sTest, 'READY_STATE is -1.0 (error)'));
 		nStep := 99;

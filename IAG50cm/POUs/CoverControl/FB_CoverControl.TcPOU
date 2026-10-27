@@ -22,9 +22,11 @@ VAR
 	fbCoverClosingState : FB_CoverClosingState(THIS);
 	
 	ipState		: I_CoverState := fbCoverIdleState;
-	eCoverState	: E_MirrorCoverState := E_MirrorCoverState.closed;
-	// #71: TRUE only once an open or close cycle has completed since the PLC start. The initial "closed" is an
-	// assumption (the covers may be open after a restart), so a request is only ignored once the position is confirmed.
+	// #111: the PLC cannot know the position of the covers after a start (activation, Reset Cold), so it starts with
+	// "unknown" instead of assuming "closed". The first open or close cycle that completes sets the real end position.
+	eCoverState	: E_MirrorCoverState := E_MirrorCoverState.unknown;
+	// #71: TRUE only once an open or close cycle has completed since the PLC start. Until then the position is
+	// unknown (the covers may be open after a restart), so a request is only ignored once the position is confirmed.
 	bEndPositionConfirmed : BOOL := FALSE;
 	bRequestIgnored : BOOL;
 	// Trigger
@@ -185,11 +187,12 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF eCoverState = E_MirrorCoverState.closed THEN
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', 0.0);
 ELSIF eCoverState = E_MirrorCoverState.open THEN
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', '0.5');
+	// moving, stopped or unknown (#111): not at an end position
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.COVER.REALPOS', 0.5);
 END_IF
 ]]></ST>
       </Implementation>

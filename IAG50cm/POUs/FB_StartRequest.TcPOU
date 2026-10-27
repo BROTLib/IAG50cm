@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_StartRequest" Id="{3f0c6a52-8d1e-4b7a-9a43-5e2d7c1b6f08}" SpecialFunc="None">
+    <Declaration><![CDATA[// A start request that is kept until it is taken (#155). FB_LatchHome read the rising edge of Execute only in its idle
+// state, so an edge that arrived while the sequence was still aborting was lost: Execute stayed TRUE, no new edge came,
+// the axis never started its calibration and the power-on waited in stage 40 for good. The request is dropped when
+// Execute falls, and taking it does not restart anything while Execute stays TRUE. Pure logic, tested offline in IAG50cmTests.
+FUNCTION_BLOCK FB_StartRequest
+VAR_INPUT
+	Execute		: BOOL;
+END_VAR
+VAR_OUTPUT
+	Pending		: BOOL;		// a start was requested and not taken yet
+END_VAR
+VAR
+	fbEdge		: R_TRIG;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[fbEdge(CLK := Execute);
+Pending := (Pending OR fbEdge.Q) AND Execute;
+]]></ST>
+    </Implementation>
+    <Method Name="Rearm" Id="{d83b7a14-5c20-4e69-b1f7-0a9e4c26d583}">
+      <Declaration><![CDATA[METHOD Rearm
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// a start that ended without a result while Execute is still TRUE: there is no new edge, ask again
+Pending := Execute;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Take" Id="{a9d41e07-62b3-4c5f-8e1a-0b7f3c9d2a64}">
+      <Declaration><![CDATA[METHOD Take : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Take := Pending;
+Pending := FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

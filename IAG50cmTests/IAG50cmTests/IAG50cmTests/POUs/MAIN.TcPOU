@@ -7,6 +7,8 @@ VAR
 	fbStopTransactionTests	: FB_StopTransaction_Tests;
 	fbHomeDropReasonTests	: FB_HomeDropReason_Tests;
 	fbHomeHoldTests			: FB_HomeHold_Tests;
+	fbStartRequestTests		: FB_StartRequest_Tests;
+	fbStepDrainTests		: FB_StepDrain_Tests;
 	fbSweepStopTests		: FB_SweepStop_Tests;
 	fbPointingForwardTests	: FB_PointingModelForward_Tests;
 	fbIagRigTests			: FB_IagRig_Tests;
@@ -15,6 +17,8 @@ VAR
 	fbErrorParkTests		: IagErrorPark_Tests;
 	fbIagTimeoutsTests : IagTimeouts_Tests;
 	fbParkDuringPowerOnTests	: IagParkDuringPowerOn_Tests;
+	fbStopDuringParkTests	: IagStopDuringPark_Tests;
+	fbParkInLimitTests		: IagParkInLimit_Tests;
 END_VAR
 ]]></Declaration>
     <Implementation>

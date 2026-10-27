@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_StartRequest_Tests" Id="{c27e5b90-4a1d-4f36-b8e2-7d03a9f15c46}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_StartRequest, the start request of FB_LatchHome that must survive an abort in progress (#155).
+FUNCTION_BLOCK FB_StartRequest_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Edge_Is_Taken_Once();
+Edge_While_Busy_Is_Kept();
+No_Restart_While_Execute_Stays_True();
+Execute_Falling_Drops_The_Request();
+New_Edge_Starts_Again();
+Rearm_Asks_Again_While_Execute_Is_True();
+Rearm_Does_Nothing_Without_Execute();
+Pending_Survives_Until_Taken_Later();
+]]></ST>
+    </Implementation>
+    <Method Name="Edge_Is_Taken_Once" Id="{1b5d8c42-9e07-4a63-8f1c-2d6a40b7e931}">
+      <Declaration><![CDATA[METHOD PRIVATE Edge_Is_Taken_Once
+VAR
+	fbReq	: FB_StartRequest;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Edge_Is_Taken_Once');
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbReq.Take(), Message := 'first take');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbReq.Take(), Message := 'second take');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Edge_While_Busy_Is_Kept" Id="{6e3a9f17-d2b8-4c05-a741-9b0c58e2d364}">
+      <Declaration><![CDATA[METHOD PRIVATE Edge_While_Busy_Is_Kept
+VAR
+	fbReq	: FB_StartRequest;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Edge_While_Busy_Is_Kept');
+// the edge arrives while the block is aborting and nobody takes it for a number of scans (#155)
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+FOR i := 1 TO 20 DO
+	fbReq(Execute := TRUE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbReq.Take(), Message := 'taken once the abort is over');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="No_Restart_While_Execute_Stays_True" Id="{f0a42d68-3c91-4e7b-85d3-b6e1792ac05f}">
+      <Declaration><![CDATA[METHOD PRIVATE No_Restart_While_Execute_Stays_True
+VAR
+	fbReq	: FB_StartRequest;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('No_Restart_While_Execute_Stays_True');
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+fbReq.Take();
+fbReq(Execute := TRUE);
+fbReq(Execute := TRUE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbReq.Take(), Message := 'no new edge, no new start');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Execute_Falling_Drops_The_Request" Id="{8d17b3e5-a64f-4290-9c8a-31f5e0d7b2a9}">
+      <Declaration><![CDATA[METHOD PRIVATE Execute_Falling_Drops_The_Request
+VAR
+	fbReq	: FB_StartRequest;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Execute_Falling_Drops_The_Request');
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+fbReq(Execute := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbReq.Take(), Message := 'request withdrawn');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="New_Edge_Starts_Again" Id="{42c9e6a1-b78d-4d53-a0f2-5e8b1c397d06}">
+      <Declaration><![CDATA[METHOD PRIVATE New_Edge_Starts_Again
+VAR
+	fbReq	: FB_StartRequest;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('New_Edge_Starts_Again');
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+fbReq.Take();
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbReq.Take(), Message := 'second sweep');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Rearm_Asks_Again_While_Execute_Is_True" Id="{b5e82f0d-17a6-4c93-9d4e-6a31c8f70e25}">
+      <Declaration><![CDATA[METHOD PRIVATE Rearm_Asks_Again_While_Execute_Is_True
+VAR
+	fbReq	: FB_StartRequest;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Rearm_Asks_Again_While_Execute_Is_True');
+// the start was taken, ended in the abort state without a result and Execute stayed TRUE (#155)
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+fbReq.Take();
+fbReq(Execute := TRUE);
+fbReq.Rearm();
+AssertEquals_BOOL(Expected := TRUE, Actual := fbReq.Take(), Message := 'started again');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbReq.Take(), Message := 'once');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Rearm_Does_Nothing_Without_Execute" Id="{07c4d9a3-e61b-4f58-a2d0-93b5f1e8c74a}">
+      <Declaration><![CDATA[METHOD PRIVATE Rearm_Does_Nothing_Without_Execute
+VAR
+	fbReq	: FB_StartRequest;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Rearm_Does_Nothing_Without_Execute');
+fbReq(Execute := FALSE);
+fbReq.Rearm();
+AssertEquals_BOOL(Expected := FALSE, Actual := fbReq.Take(), Message := 'no request');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Pending_Survives_Until_Taken_Later" Id="{4b8c1d79-e350-4a62-9f07-d2a6c5e18b93}">
+      <Declaration><![CDATA[METHOD PRIVATE Pending_Survives_Until_Taken_Later
+VAR
+	fbReq	: FB_StartRequest;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Pending_Survives_Until_Taken_Later');
+// FB_LatchHome takes no start while a step block is still Busy (#113): the request must wait for it
+fbReq(Execute := FALSE);
+fbReq(Execute := TRUE);
+FOR i := 1 TO 50 DO
+	fbReq(Execute := TRUE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbReq.Pending, Message := 'still pending');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbReq.Take(), Message := 'taken later');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbReq.Take(), Message := 'once');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
