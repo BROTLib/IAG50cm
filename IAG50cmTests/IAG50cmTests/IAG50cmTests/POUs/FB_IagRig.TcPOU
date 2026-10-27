@@ -132,6 +132,20 @@ fbDec.nMockStartScans := nScans;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetStopWithoutDone" Id="{31dd82bd-7635-43b2-809d-d1cf60884bb0}">
+      <Declaration><![CDATA[// #120: the stop of the mock axis ends at rest but never reports Done (a lost Done, or a stop that was never allowed)
+METHOD SetStopWithoutDone
+VAR_INPUT
+	bHa		: BOOL;
+	bDec	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbHa.bMockNoStopDone := bHa;
+fbDec.bMockNoStopDone := bDec;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="InjectHaError" Id="{905dc23c-55b4-4eb7-a513-f6b52cccde02}">
       <Declaration><![CDATA[METHOD InjectHaError
 VAR_INPUT

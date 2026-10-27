@@ -1,0 +1,111 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagStuckStop_Tests" Id="{0e5aac26-81e8-4474-bd31-fb96a6243a44}" SpecialFunc="None">
+    <Declaration><![CDATA[// IAG50cm#120: a stop transaction whose axis never reports Done, on mock axes (SetStopWithoutDone). Before the fix the
+// transaction stayed open for good (bSettled FALSE) and held every home behind the stop. Same shape as IagStopDuringSlew_Tests:
+// one rig per test, one Scan() per PLC cycle, a step that does not happen within its budget fails the test.
+FUNCTION_BLOCK IagStuckStop_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Stuck_Stop_At_Rest_Is_Released_After_The_Timeout();
+]]></ST>
+    </Implementation>
+    <Method Name="Stuck_Stop_At_Rest_Is_Released_After_The_Timeout" Id="{53677b90-9a38-48fb-9936-5d38ca674ec7}">
+      <Declaration><![CDATA[// Slew, stop, and the moving axis never reports its stop Done. The axes are at rest at once, but the transaction stays
+// open (bSettled FALSE) until the 30 s timeout (the time seam divides it by 100: 0.3 s); then it settles with no second stop,
+// no error, and StopAxis of the axis is cleared so that the next stop gives a rising edge.
+METHOD PRIVATE Stuck_Stop_At_Rest_Is_Released_After_The_Timeout
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stuck_Stop_At_Rest_Is_Released_After_The_Timeout');
+sTest := 'Stuck_Stop_At_Rest_Is_Released_After_The_Timeout: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0), then slew with both mock stops losing their Done
+	IF rig.Online THEN
+		rig.SetStopWithoutDone(bHa := TRUE, bDec := TRUE);
+		rig.SetTimeDivisor(nValue := 100);
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// wait until one axis is moving, let it run a few scans, then stop
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		IF nCycles >= 5 THEN
+			rig.fbTel.Stop();
+			nStep := 30;
+			nCycles := 0;
+		END_IF
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not start an axis move'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// the stop has taken the axes to rest, but the transaction is still open: nothing has reported Done
+	IF rig.fbTel.bStopped AND NOT rig.fbTel.bStop AND nCycles > 3 THEN
+		AssertFalse(Condition := rig.fbTel.bSettled, Message := 'not settled before the timeout: the axis never reported Done');
+		F_Note(bFailed := rig.fbTel.bSettled, sText := CONCAT(sTest, 'not settled before the timeout: the axis never reported Done'));
+		nStep := 40;
+		nCycles := 0;
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not bring the axes to rest');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not bring the axes to rest'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+40:	// the timeout releases the transaction (0.3 s in the divided time)
+	IF rig.fbTel.bSettled THEN
+		AssertEquals_UINT(Expected := UINT#1, Actual := rig.fbHa.nStopEdges + rig.fbDec.nStopEdges, Message := 'one stop request in all, no second one after the timeout');
+		F_Note(bFailed := (UINT#1) <> (rig.fbHa.nStopEdges + rig.fbDec.nStopEdges), sText := CONCAT(sTest, 'one stop request in all, no second one after the timeout'));
+		AssertFalse(Condition := rig.fbTel.bError OR rig.fbTel.bSoftwareError, Message := 'no error: the release is not a fault');
+		F_Note(bFailed := rig.fbTel.bError OR rig.fbTel.bSoftwareError, sText := CONCAT(sTest, 'no error: the release is not a fault'));
+		AssertFalse(Condition := rig.fbHa.StopAxis OR rig.fbDec.StopAxis, Message := 'StopAxis cleared at the release');
+		F_Note(bFailed := rig.fbHa.StopAxis OR rig.fbDec.StopAxis, sText := CONCAT(sTest, 'StopAxis cleared at the release'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stuck stop was never released');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stuck stop was never released'));
+		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

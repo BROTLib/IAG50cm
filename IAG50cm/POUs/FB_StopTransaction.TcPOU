@@ -5,11 +5,14 @@
 // FB_TelescopeControl._StopTelescope calls the body while it stops the axes (request logic); Monitor() runs every
 // scan and decides when the stop has settled: every axis that was sent a stop has reported Done, the telescope is at
 // rest, and no axis has been locked for motion commands (MC_Stop, StateDWord bit 29) for 3 scans. A transaction is
-// started with Begin(). The capture of 2026-10-19 showed StandStill TRUE for one scan before the stop takes hold
+// started with Begin(). A transaction that has not settled 30 s after Begin() (an axis never reports Done: its stop was
+// never allowed, or the Done was lost) is released once the telescope is at rest, without the Done condition (#120);
+// the stop is not sent again (the retrigger of #108 is gone). The capture of 2026-10-19 showed StandStill TRUE for one scan before the stop takes hold
 // (bStopped alone released the home too early, HA error 17135). Pure logic (no axis access), tested offline in
 // IAG50cmTests (#120, #98).
 FUNCTION_BLOCK FB_StopTransaction
 VAR_INPUT
+	nTimeDivisor	: UDINT := 1;	// test seam: divides the 30 s timeout (FB_TelescopeControl.nTimeDivisor); production leaves it at 1
 	bHaStandStill	: BOOL;		// HA axis at standstill (a running MC_Stop reports FALSE)
 	bDecStandStill	: BOOL;
 END_VAR
@@ -18,6 +21,10 @@ VAR_OUTPUT
 	bStopDec		: BOOL;
 	bFinished		: BOOL;		// the stop has settled: release both stop requests, the stop is done
 	bActive			: BOOL;		// a transaction was begun and has not settled yet (homes and restarts wait for it)
+	bTimedOut		: BOOL;		// #120: TRUE in the one scan in which the transaction passed 30 s without settling
+	bHaNoDone		: BOOL;		// #120: at that moment HA was sent a stop and had not reported Done (latched until Begin/Cancel)
+	bDecNoDone		: BOOL;
+	bReleasedByTimeout	: BOOL;	// #120: TRUE in the one scan in which the transaction settled without a Done of a requested axis
 END_VAR
 VAR
 	bHaStopRequested	: BOOL;		// the HA axis was sent its stop in this transaction, never again
@@ -26,9 +33,12 @@ VAR
 	bDecDone			: BOOL;
 	nClearScans			: UINT;		// consecutive scans without a motion lock
 	bAtRest				: BOOL;		// bStopped as seen by the last Monitor() call
+	tonTimeout			: FB_TimeoutTimer;	// #120: 30 s from Begin()
+	bExpired			: BOOL;		// #120: the transaction passed 30 s; the Done condition is waived from now on
 END_VAR
 VAR CONSTANT
 	nSettleScans		: UINT := 3;	// 30 ms at the 10 ms task
+	tTimeout			: TIME := T#30S;	// #120: the stop command timeout of FB_TelescopeControl (#40: a stop from slew speed takes about 4 s)
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -59,6 +69,10 @@ bDecStopRequested := FALSE;
 bHaDone := FALSE;
 bDecDone := FALSE;
 nClearScans := 0;
+bExpired := FALSE;
+bHaNoDone := FALSE;
+bDecNoDone := FALSE;
+tonTimeout(IN := FALSE, PT := tTimeout, nDivisor := nTimeDivisor);
 bActive := TRUE;
 ]]></ST>
       </Implementation>
@@ -67,6 +81,9 @@ bActive := TRUE;
       <Declaration><![CDATA[// Call every scan. A transaction settles when every axis that was sent a stop has reported Done (a disabled axis
 // counts as done), the telescope is at rest and no enabled axis has been locked for nSettleScans scans.
 // A running calibration sweep (bHaHoming / bDecHoming) is aborted first (#113).
+// #120: 30 s after Begin() a transaction that has not settled stops waiting for the Done of the axes (bTimedOut); it
+// settles as soon as the telescope is at rest, no axis has been locked for nSettleScans scans and no sweep homing runs
+// (bReleasedByTimeout if an axis never reported Done).
 METHOD Monitor
 VAR_INPUT
 	bStopped		: BOOL;		// the whole telescope is at rest
@@ -81,7 +98,10 @@ VAR_INPUT
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[IF bHaStopDone THEN
+        <ST><![CDATA[bTimedOut := FALSE;
+bReleasedByTimeout := FALSE;
+
+IF bHaStopDone THEN
 	bHaDone := TRUE;
 END_IF
 IF bDecStopDone THEN
@@ -95,13 +115,24 @@ ELSIF nClearScans < nSettleScans THEN
 END_IF
 
 bAtRest := bStopped;
+
+tonTimeout(IN := bActive, PT := tTimeout, nDivisor := nTimeDivisor);
+IF bActive AND tonTimeout.Q AND NOT bExpired THEN
+	bExpired := TRUE;
+	bTimedOut := TRUE;
+	bHaNoDone := bHaStopRequested AND NOT bHaDone AND bHaEnabled;
+	bDecNoDone := bDecStopRequested AND NOT bDecDone AND bDecEnabled;
+END_IF
+
 IF bActive
 	AND bStopped
-	AND (NOT bHaStopRequested OR bHaDone OR NOT bHaEnabled)
-	AND (NOT bDecStopRequested OR bDecDone OR NOT bDecEnabled)
+	AND (NOT bHaStopRequested OR bHaDone OR NOT bHaEnabled OR bExpired)
+	AND (NOT bDecStopRequested OR bDecDone OR NOT bDecEnabled OR bExpired)
 	AND nClearScans >= nSettleScans
 	AND NOT bHaHoming AND NOT bDecHoming THEN
 	bActive := FALSE;
+	bReleasedByTimeout := bExpired AND
+		((bHaStopRequested AND NOT bHaDone AND bHaEnabled) OR (bDecStopRequested AND NOT bDecDone AND bDecEnabled));
 END_IF
 ]]></ST>
       </Implementation>
@@ -112,6 +143,10 @@ METHOD Cancel
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bActive := FALSE;
+bExpired := FALSE;
+bHaNoDone := FALSE;
+bDecNoDone := FALSE;
+tonTimeout(IN := FALSE, PT := tTimeout, nDivisor := nTimeDivisor);
 ]]></ST>
       </Implementation>
     </Method>
