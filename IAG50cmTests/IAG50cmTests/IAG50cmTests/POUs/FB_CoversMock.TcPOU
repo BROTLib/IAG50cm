@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_CoversMock" Id="{012aa109-a307-4f4a-912d-8723ceeda833}" SpecialFunc="None">
-    <Declaration><![CDATA[// Mock of the mirror covers (I_MirrorCovers): Open/Close take effect at once.
+    <Declaration><![CDATA[// Mock of the mirror covers (I_MirrorCovers): Open/Close take effect at once, unless bHoldClose is set: then Close is only counted
+// and the covers stay open until the test sets bClosed (a slow closing, IAG50cm#187).
 FUNCTION_BLOCK FB_CoversMock IMPLEMENTS BROTLib.I_MirrorCovers
 VAR
 	bOpened		: BOOL;
 	bClosed		: BOOL := TRUE;
 	bFailed		: BOOL;
+	bHoldClose	: BOOL;
 	nOpenCalls	: UINT;
 	nCloseCalls	: UINT;
 END_VAR
@@ -31,7 +33,9 @@ Open := TRUE;
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bOpened := FALSE;
-bClosed := TRUE;
+IF NOT bHoldClose THEN
+	bClosed := TRUE;
+END_IF
 nCloseCalls := nCloseCalls + 1;
 Close := TRUE;
 ]]></ST>
