@@ -41,6 +41,29 @@ Close := TRUE;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="HoldClose" Id="{d7d1cc71-70fb-451a-98a6-0959d77f9320}">
+      <Declaration><![CDATA[// while bHold is TRUE a Close() is only counted and the covers stay open (a slow closing, IAG50cm#187)
+METHOD HoldClose
+VAR_INPUT
+	bHold	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bHoldClose := bHold;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FinishClose" Id="{6550a56f-c343-4224-a85a-2f5a08bdcf22}">
+      <Declaration><![CDATA[// the held closing is done: the covers are closed now
+METHOD FinishClose
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bHoldClose := FALSE;
+bOpened := FALSE;
+bClosed := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="Reset" Id="{4ff33918-9b37-404a-9749-6f3afb8baa3c}">
       <Declaration><![CDATA[METHOD Reset : BOOL
 ]]></Declaration>

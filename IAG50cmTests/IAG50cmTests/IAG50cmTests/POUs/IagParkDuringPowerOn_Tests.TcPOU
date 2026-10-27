@@ -287,7 +287,7 @@ CASE nStep OF
 	END_IF
 20:	// the stop has settled: the covers now close slowly, park with the axes off
 	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
-		rig.fbCovers.bHoldClose := TRUE;
+		rig.fbCovers.HoldClose(bHold := TRUE);
 		rig.fbTel.Park();
 		nStep := 30;
 		nCycles := 0;
@@ -305,7 +305,7 @@ CASE nStep OF
 		F_Note(bFailed := NOT (NOT rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked stays FALSE until the covers are closed'));
 		AssertTrue(Condition := rig.fbTel.bSafeParked, Message := 'the axes-off park is pending');
 		F_Note(bFailed := NOT (rig.fbTel.bSafeParked), sText := CONCAT(sTest, 'the axes-off park is pending'));
-		rig.fbCovers.bClosed := TRUE;
+		rig.fbCovers.FinishClose();
 		nStep := 40;
 		nCycles := 0;
 	ELSIF nCycles > 400 THEN
@@ -379,7 +379,7 @@ CASE nStep OF
 	END_IF
 20:	// the stop has settled: the covers never close, park with the axes off; 120 s are 0.12 s
 	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
-		rig.fbCovers.bHoldClose := TRUE;
+		rig.fbCovers.HoldClose(bHold := TRUE);
 		rig.SetTimeDivisor(nValue := 1000);
 		rig.fbTel.Park();
 		nStep := 30;
