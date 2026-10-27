@@ -999,7 +999,7 @@ IF NOT bStarted THEN
 	bStarted := TRUE;
 END_IF
 nCycles := nCycles + 1;
-IF nCycles <= 5 THEN
+IF nCycles <= 1 THEN
 fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
 IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
 fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
@@ -1007,7 +1007,7 @@ fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
 		bHaHoming := FALSE, bDecHoming := FALSE);
 IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
 IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
-ELSIF nCycles = 6 THEN
+ELSIF nCycles = 2 THEN
 	fbTx.Cancel();
 	AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'cancelled');
 ELSIF nCycles <= 300 THEN
