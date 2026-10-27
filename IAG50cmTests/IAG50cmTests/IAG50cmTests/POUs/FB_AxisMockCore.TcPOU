@@ -16,6 +16,7 @@ VAR_INPUT
 	nHomeScans		: UINT := 3;
 	nMoveScans		: UINT := 4;
 	nStopScans		: UINT := 3;
+	bSuppressStopDone	: BOOL;	// the stop ends at rest but bStopDone is never reported (a lost Done, #120)
 	nStartScans		: UINT;		// scans between the move command and the axis reporting InMotion (the NC takes a few cycles; 0 = at once). #92
 END_VAR
 VAR_OUTPUT
@@ -59,7 +60,7 @@ IF bStopping THEN
 	nStopCount := nStopCount + 1;
 	IF nStopCount >= nStopScans THEN
 		bStopping := FALSE;
-		bStopDone := TRUE;
+		bStopDone := NOT bSuppressStopDone;
 	END_IF
 END_IF
 

@@ -1,8 +1,11 @@
 # Update-Libraries.ps1 (IAG50cm)
 #
-# Manually-run: checks GitHub for the latest release of each library IAG50cm actually
-# references, compares against what's currently installed on this machine, and
-# downloads/installs anything newer. Run from an elevated PowerShell prompt.
+# Manually-run: installs the libraries IAG50cm references that are missing on this
+# machine, each in exactly the version the project pins (DefaultResolution of its
+# PlaceholderReference in the .plcproj), downloaded from the GitHub release of that
+# version. Libraries without a pin (a "*" resolution, or not referenced directly, like
+# the transitive AstroBROT of BROTLib) get their latest release; so does everything
+# with -Latest. Run from an elevated PowerShell prompt.
 #
 # Requires: gh (GitHub CLI), already authenticated.
 #
@@ -33,7 +36,9 @@ param(
     # too for BROTLib's own reference to resolve. (Excludes Beckhoff Tc2_*/Tc3_* and
     # System_Visu*/VisuDialogs, which ship with XAE itself and aren't managed this way.)
     [string[]]$Libraries = @("BROTLib", "AstroBROT"),
-    [string]$TcProfile
+    [string]$TcProfile,
+    # Ignore the versions pinned in the project and install the newest release of each library.
+    [switch]$Latest
 )
 
 $LibraryRoot = "C:\TwinCAT\3.1\Components\Plc\Managed Libraries"
@@ -68,15 +73,45 @@ if (-not $TcProfile) {
     }
 }
 
+# Version a project pins for a library: DefaultResolution of its PlaceholderReference
+# (e.g. "BROTLib, 0.12.0 (BROT)" -> "0.12.0"). $null if there is none or it is a wildcard.
+function Get-PinnedVersion([string]$Library) {
+    $plcprojs = Get-ChildItem -Path (Join-Path $PSScriptRoot "..") -Recurse -Depth 2 -Filter "*.plcproj" -ErrorAction SilentlyContinue
+    foreach ($p in $plcprojs) {
+        $text = Get-Content -Raw -Path $p.FullName
+        # The placeholder name can differ from the repo name ("MONET Roof" for MONETRoof).
+        foreach ($m in [regex]::Matches($text, '<PlaceholderReference Include="([^"]+)">\s*<DefaultResolution>[^,<]+,\s*([^\s(<]+)')) {
+            if (($m.Groups[1].Value -replace ' ', '') -eq $Library -and $m.Groups[2].Value -ne "*") { return $m.Groups[2].Value }
+        }
+    }
+    return $null
+}
+
 foreach ($lib in $Libraries) {
     Write-Host "=== $lib ===" -ForegroundColor Cyan
 
-    $latestTag = gh release view -R "BROTLib/$lib" --json tagName -q .tagName
-    if (-not $latestTag) {
-        Write-Warning "Could not fetch latest release for $lib -- skipping"
-        continue
+    # Install exactly the version the project pins (DefaultResolution of the library's
+    # PlaceholderReference); only without a pin (e.g. "*", or a library the project does
+    # not reference directly) or with -Latest is the newest GitHub release taken.
+    $pinned = if ($Latest) { $null } else { Get-PinnedVersion $lib }
+    if ($pinned) {
+        $targetTag = "v$pinned"
+        $targetVersion = $pinned
+        gh release view $targetTag -R "BROTLib/$lib" --json tagName -q .tagName | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "$lib is pinned to $pinned but release $targetTag does not exist on GitHub -- skipping"
+            continue
+        }
+        Write-Host "  Pinned in project: $pinned"
+    } else {
+        $targetTag = gh release view -R "BROTLib/$lib" --json tagName -q .tagName
+        if (-not $targetTag) {
+            Write-Warning "Could not fetch latest release for $lib -- skipping"
+            continue
+        }
+        $targetVersion = $targetTag.TrimStart("v")
+        Write-Host "  No pin used (latest release): $targetVersion"
     }
-    $latestVersion = $latestTag.TrimStart("v")
 
     # Find any already-installed version, regardless of which "Company" folder it's under
     $installedDirs = Get-ChildItem -Path $LibraryRoot -Recurse -Directory -Filter $lib -ErrorAction SilentlyContinue
@@ -85,23 +120,23 @@ foreach ($lib in $Libraries) {
         $installedVersions += Get-ChildItem -Path $d.FullName -Directory | Select-Object -ExpandProperty Name
     }
 
-    if ($installedVersions -contains $latestVersion) {
-        Write-Host "  Already up to date ($latestVersion)"
+    if ($installedVersions -contains $targetVersion) {
+        Write-Host "  Already installed ($targetVersion)"
         continue
     }
 
-    Write-Host "  Installed: $($installedVersions -join ', '); latest: $latestVersion -- updating"
+    Write-Host "  Installed: $($installedVersions -join ', '); installing: $targetVersion"
 
     # Start from an empty folder: RepTool installs everything in it, so leftovers
     # from earlier runs would be reinstalled (and the wrong file name reported).
     $tempDir = Join-Path $env:TEMP "libupdate-$lib"
     if (Test-Path $tempDir) { Remove-Item -Recurse -Force -Path $tempDir }
     New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
-    gh release download $latestTag -R "BROTLib/$lib" -p "*.library" -D $tempDir --clobber
+    gh release download $targetTag -R "BROTLib/$lib" -p "*.library" -D $tempDir --clobber
 
     $libFile = Get-ChildItem -Path $tempDir -Filter "*.library" | Select-Object -First 1
     if (-not $libFile) {
-        Write-Warning "  No .library asset found on release $latestTag for $lib -- skipping"
+        Write-Warning "  No .library asset found on release $targetTag for $lib -- skipping"
         continue
     }
 
@@ -118,7 +153,7 @@ foreach ($lib in $Libraries) {
     $repToolCmd = "`"$RepTool`" --profile=`"$TcProfile`" --installLibsRecurs `"$tempDir`""
     cmd.exe /c $repToolCmd
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "  Installed $($libFile.Name) ($latestVersion)" -ForegroundColor Green
+        Write-Host "  Installed $($libFile.Name) ($targetVersion)" -ForegroundColor Green
     } else {
         Write-Warning "  RepTool exited $LASTEXITCODE installing $($libFile.Name) -- check output above"
     }

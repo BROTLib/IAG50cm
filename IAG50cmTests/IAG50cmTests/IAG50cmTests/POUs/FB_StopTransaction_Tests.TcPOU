@@ -16,7 +16,7 @@ Running_Stop_Is_Not_Retriggered_Per_Scan();
 First_Standstill_Sample_Does_Not_Settle();
 Settles_After_Done_And_Three_Clear_Scans();
 Lock_Restarts_The_Clear_Count();
-Missing_Done_Never_Settles();
+Missing_Done_Does_Not_Settle_Before_The_Timeout();
 Done_In_Different_Scans();
 Disabled_Axis_Counts_As_Done();
 Axis_Without_Stop_Needs_No_Done();
@@ -28,6 +28,12 @@ Without_Begin_Finishes_When_At_Rest();
 Not_Settled_While_Homing_Runs();
 Homing_Abort_After_Lock_Settles();
 Outputs_Are_One_Scan_Pulses();
+Timeout_Releases_A_Stop_Without_Done_When_At_Rest();
+Timeout_Does_Not_Release_While_The_Axes_Move();
+Timeout_Does_Not_Release_While_Locked();
+Timeout_Does_Not_Release_While_Homing();
+Cancel_Stops_The_Timeout_And_Begin_Restarts_It();
+Settled_Transaction_Does_Not_Time_Out();
 ]]></ST>
     </Implementation>
     <Method Name="Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis" Id="{a44efb43-09ce-47be-9280-43477da45e79}">
@@ -270,8 +276,8 @@ TEST_FINISHED();
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Missing_Done_Never_Settles" Id="{8e262666-f0de-40a1-a488-838f90d88111}">
-      <Declaration><![CDATA[METHOD PRIVATE Missing_Done_Never_Settles
+    <Method Name="Missing_Done_Does_Not_Settle_Before_The_Timeout" Id="{8e262666-f0de-40a1-a488-838f90d88111}">
+      <Declaration><![CDATA[METHOD PRIVATE Missing_Done_Does_Not_Settle_Before_The_Timeout
 VAR
 	fbTx	: FB_StopTransaction;
 	i		: INT;
@@ -280,7 +286,7 @@ VAR
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[TEST('Missing_Done_Never_Settles');
+        <ST><![CDATA[TEST('Missing_Done_Does_Not_Settle_Before_The_Timeout');
 fbTx.Begin();
 fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
 IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
@@ -734,6 +740,354 @@ fbTx(bHaStandStill := FALSE, bDecStandStill := FALSE);
 AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bStopHa, Message := 'second scan: bStopHa');
 AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bStopDec, Message := 'second scan: bStopDec');
 TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Timeout_Releases_A_Stop_Without_Done_When_At_Rest" Id="{8c2fd188-0171-4f6d-b18a-d66f1ff66556}">
+      <Declaration><![CDATA[// #120: HA is sent its stop and never reports Done, the telescope is at rest: after the timeout the transaction settles once, with no second stop.
+METHOD PRIVATE Timeout_Releases_A_Stop_Without_Done_When_At_Rest
+VAR_INST
+	fbTx			: FB_StopTransaction;
+	nCycles			: UINT;
+	nStops			: INT;
+	nTimedOut		: INT;
+	nReleased		: INT;
+	nTimeoutCycle	: UINT;
+	nReleaseCycle	: UINT;
+	nAfter			: UINT;
+	bActiveBefore	: BOOL;
+	bActiveHeld		: BOOL;
+	bStarted		: BOOL;
+	bFinished		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Timeout_Releases_A_Stop_Without_Done_When_At_Rest');
+IF bFinished THEN
+	RETURN;
+END_IF
+IF NOT bStarted THEN
+	fbTx.nTimeDivisor := 1000;	// 30 s are 30 ms: a few PLC cycles
+	fbTx.Begin();
+	bStarted := TRUE;
+END_IF
+nCycles := nCycles + 1;
+fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
+IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
+IF nCycles = 1 THEN
+	bActiveBefore := fbTx.bActive;
+END_IF
+IF nReleased > 0 THEN
+	nAfter := nAfter + 1;
+END_IF
+IF nAfter >= 20 THEN
+	AssertEquals_BOOL(Expected := TRUE, Actual := bActiveBefore, Message := 'active before the timeout');
+	AssertEquals_INT(Expected := 1, Actual := nStops, Message := 'HA stops sent');
+	AssertEquals_INT(Expected := 1, Actual := nTimedOut, Message := 'bTimedOut pulses');
+	AssertEquals_INT(Expected := 1, Actual := nReleased, Message := 'bReleasedByTimeout pulses');
+	AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'settled by the timeout');
+	AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bHaNoDone, Message := 'HA had no Done');
+	AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bDecNoDone, Message := 'Dec was not stopped');
+	bFinished := TRUE;
+	TEST_FINISHED();
+END_IF
+IF nCycles > 3000 THEN
+	AssertTrue(Condition := FALSE, Message := 'the transaction never timed out');
+	bFinished := TRUE;
+	TEST_FINISHED();
+	RETURN;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Timeout_Does_Not_Release_While_The_Axes_Move" Id="{da747fc0-3328-4fda-8eaf-1c85717f5945}">
+      <Declaration><![CDATA[// #120: at the timeout the axes still move: nothing is released; the transaction settles without Done once they are at rest.
+METHOD PRIVATE Timeout_Does_Not_Release_While_The_Axes_Move
+VAR_INST
+	fbTx			: FB_StopTransaction;
+	nCycles			: UINT;
+	nStops			: INT;
+	nTimedOut		: INT;
+	nReleased		: INT;
+	nTimeoutCycle	: UINT;
+	nReleaseCycle	: UINT;
+	nAfter			: UINT;
+	bActiveBefore	: BOOL;
+	bActiveHeld		: BOOL;
+	bStarted		: BOOL;
+	bFinished		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Timeout_Does_Not_Release_While_The_Axes_Move');
+IF bFinished THEN
+	RETURN;
+END_IF
+IF NOT bStarted THEN
+	fbTx.nTimeDivisor := 1000;	// 30 s are 30 ms: a few PLC cycles
+	fbTx.Begin();
+	bStarted := TRUE;
+END_IF
+nCycles := nCycles + 1;
+fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
+fbTx.Monitor(bStopped := (nTimeoutCycle > 0 AND nCycles >= nTimeoutCycle + 20), bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
+IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
+IF nTimeoutCycle > 0 AND nCycles = nTimeoutCycle + 10 THEN
+	bActiveHeld := fbTx.bActive AND nReleased = 0;
+END_IF
+IF nReleased > 0 THEN
+	AssertEquals_BOOL(Expected := TRUE, Actual := bActiveHeld, Message := 'held while moving');
+	AssertTrue(Condition := nReleaseCycle >= nTimeoutCycle + 20 + 0, Message := 'released only after the condition ended');
+	AssertEquals_INT(Expected := 1, Actual := nStops, Message := 'HA stops sent');
+	bFinished := TRUE;
+	TEST_FINISHED();
+END_IF
+IF nCycles > 3000 THEN
+	AssertTrue(Condition := FALSE, Message := 'the transaction never timed out');
+	bFinished := TRUE;
+	TEST_FINISHED();
+	RETURN;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Timeout_Does_Not_Release_While_Locked" Id="{0931f10a-5d7a-4acf-81f7-2953b9fdf96c}">
+      <Declaration><![CDATA[// #120: an axis is locked (MC_Stop active, StateDWord bit 29) at the timeout: held until the lock has been clear for 3 scans.
+METHOD PRIVATE Timeout_Does_Not_Release_While_Locked
+VAR_INST
+	fbTx			: FB_StopTransaction;
+	nCycles			: UINT;
+	nStops			: INT;
+	nTimedOut		: INT;
+	nReleased		: INT;
+	nTimeoutCycle	: UINT;
+	nReleaseCycle	: UINT;
+	nAfter			: UINT;
+	bActiveBefore	: BOOL;
+	bActiveHeld		: BOOL;
+	bStarted		: BOOL;
+	bFinished		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Timeout_Does_Not_Release_While_Locked');
+IF bFinished THEN
+	RETURN;
+END_IF
+IF NOT bStarted THEN
+	fbTx.nTimeDivisor := 1000;	// 30 s are 30 ms: a few PLC cycles
+	fbTx.Begin();
+	bStarted := TRUE;
+END_IF
+nCycles := nCycles + 1;
+fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := NOT (nTimeoutCycle > 0 AND nCycles >= nTimeoutCycle + 20), bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
+IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
+IF nTimeoutCycle > 0 AND nCycles = nTimeoutCycle + 10 THEN
+	bActiveHeld := fbTx.bActive AND nReleased = 0;
+END_IF
+IF nReleased > 0 THEN
+	AssertEquals_BOOL(Expected := TRUE, Actual := bActiveHeld, Message := 'held while locked');
+	AssertTrue(Condition := nReleaseCycle >= nTimeoutCycle + 20 + 2, Message := 'released only after the condition ended');
+	AssertEquals_INT(Expected := 1, Actual := nStops, Message := 'HA stops sent');
+	bFinished := TRUE;
+	TEST_FINISHED();
+END_IF
+IF nCycles > 3000 THEN
+	AssertTrue(Condition := FALSE, Message := 'the transaction never timed out');
+	bFinished := TRUE;
+	TEST_FINISHED();
+	RETURN;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Timeout_Does_Not_Release_While_Homing" Id="{43429099-2f83-4175-8a1f-35147aa45521}">
+      <Declaration><![CDATA[// #113/#120: the calibration sweep is still aborting at the timeout: held until it ends.
+METHOD PRIVATE Timeout_Does_Not_Release_While_Homing
+VAR_INST
+	fbTx			: FB_StopTransaction;
+	nCycles			: UINT;
+	nStops			: INT;
+	nTimedOut		: INT;
+	nReleased		: INT;
+	nTimeoutCycle	: UINT;
+	nReleaseCycle	: UINT;
+	nAfter			: UINT;
+	bActiveBefore	: BOOL;
+	bActiveHeld		: BOOL;
+	bStarted		: BOOL;
+	bFinished		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Timeout_Does_Not_Release_While_Homing');
+IF bFinished THEN
+	RETURN;
+END_IF
+IF NOT bStarted THEN
+	fbTx.nTimeDivisor := 1000;	// 30 s are 30 ms: a few PLC cycles
+	fbTx.Begin();
+	bStarted := TRUE;
+END_IF
+nCycles := nCycles + 1;
+fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := NOT (nTimeoutCycle > 0 AND nCycles >= nTimeoutCycle + 20), bDecHoming := FALSE);
+IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
+IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
+IF nTimeoutCycle > 0 AND nCycles = nTimeoutCycle + 10 THEN
+	bActiveHeld := fbTx.bActive AND nReleased = 0;
+END_IF
+IF nReleased > 0 THEN
+	AssertEquals_BOOL(Expected := TRUE, Actual := bActiveHeld, Message := 'held while homing');
+	AssertTrue(Condition := nReleaseCycle >= nTimeoutCycle + 20 + 0, Message := 'released only after the condition ended');
+	AssertEquals_INT(Expected := 1, Actual := nStops, Message := 'HA stops sent');
+	bFinished := TRUE;
+	TEST_FINISHED();
+END_IF
+IF nCycles > 3000 THEN
+	AssertTrue(Condition := FALSE, Message := 'the transaction never timed out');
+	bFinished := TRUE;
+	TEST_FINISHED();
+	RETURN;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Cancel_Stops_The_Timeout_And_Begin_Restarts_It" Id="{cddb105c-948e-4b77-a0f4-dea33f1ead58}">
+      <Declaration><![CDATA[// #120: a cancelled transaction never times out; a new Begin() starts the 30 s again.
+METHOD PRIVATE Cancel_Stops_The_Timeout_And_Begin_Restarts_It
+VAR_INST
+	fbTx			: FB_StopTransaction;
+	nCycles			: UINT;
+	nStops			: INT;
+	nTimedOut		: INT;
+	nReleased		: INT;
+	nTimeoutCycle	: UINT;
+	nReleaseCycle	: UINT;
+	nAfter			: UINT;
+	bActiveBefore	: BOOL;
+	bActiveHeld		: BOOL;
+	bStarted		: BOOL;
+	bFinished		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Cancel_Stops_The_Timeout_And_Begin_Restarts_It');
+IF bFinished THEN
+	RETURN;
+END_IF
+IF NOT bStarted THEN
+	fbTx.nTimeDivisor := 1000;	// 30 s are 30 ms: a few PLC cycles
+	fbTx.Begin();
+	bStarted := TRUE;
+END_IF
+nCycles := nCycles + 1;
+IF nCycles <= 1 THEN
+fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
+IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
+ELSIF nCycles = 2 THEN
+	fbTx.Cancel();
+	AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'cancelled');
+ELSIF nCycles <= 300 THEN
+fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
+IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
+	AssertEquals_INT(Expected := 0, Actual := nTimedOut, Message := 'no timeout after Cancel');
+ELSIF nCycles = 301 THEN
+	fbTx.Begin();
+ELSE
+fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
+fbTx.Monitor(bStopped := FALSE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
+IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
+	IF nTimedOut > 0 THEN
+		AssertEquals_INT(Expected := 1, Actual := nTimedOut, Message := 'timeout after the new Begin');
+		AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bHaNoDone, Message := 'HA had no Done');
+		bFinished := TRUE;
+		TEST_FINISHED();
+	END_IF
+END_IF
+IF nCycles > 6000 THEN
+	AssertTrue(Condition := FALSE, Message := 'the transaction never timed out');
+	bFinished := TRUE;
+	TEST_FINISHED();
+	RETURN;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Settled_Transaction_Does_Not_Time_Out" Id="{eb475260-55d0-4a67-96bc-b6dfdfdf25f1}">
+      <Declaration><![CDATA[// #120: a stop that reports Done in time settles normally and never raises the timeout.
+METHOD PRIVATE Settled_Transaction_Does_Not_Time_Out
+VAR_INST
+	fbTx			: FB_StopTransaction;
+	nCycles			: UINT;
+	nStops			: INT;
+	nTimedOut		: INT;
+	nReleased		: INT;
+	nTimeoutCycle	: UINT;
+	nReleaseCycle	: UINT;
+	nAfter			: UINT;
+	bActiveBefore	: BOOL;
+	bActiveHeld		: BOOL;
+	bStarted		: BOOL;
+	bFinished		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Settled_Transaction_Does_Not_Time_Out');
+IF bFinished THEN
+	RETURN;
+END_IF
+IF NOT bStarted THEN
+	fbTx.nTimeDivisor := 1000;	// 30 s are 30 ms: a few PLC cycles
+	fbTx.Begin();
+	bStarted := TRUE;
+END_IF
+nCycles := nCycles + 1;
+fbTx(bHaStandStill := FALSE, bDecStandStill := TRUE);
+IF fbTx.bStopHa THEN nStops := nStops + 1; END_IF
+fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := (nCycles = 2), bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+IF fbTx.bTimedOut THEN nTimedOut := nTimedOut + 1; nTimeoutCycle := nCycles; END_IF
+IF fbTx.bReleasedByTimeout THEN nReleased := nReleased + 1; nReleaseCycle := nCycles; END_IF
+IF nCycles > 300 THEN
+	AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bActive, Message := 'settled with the Done');
+	AssertEquals_INT(Expected := 0, Actual := nTimedOut, Message := 'no timeout');
+	AssertEquals_INT(Expected := 0, Actual := nReleased, Message := 'not released by the timeout');
+	bFinished := TRUE;
+	TEST_FINISHED();
+END_IF
 ]]></ST>
       </Implementation>
     </Method>
