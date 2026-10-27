@@ -19,6 +19,7 @@ VAR
 	fbParkDuringPowerOnTests	: IagParkDuringPowerOn_Tests;
 	fbStopDuringParkTests	: IagStopDuringPark_Tests;
 	fbParkInLimitTests		: IagParkInLimit_Tests;
+	fbStuckStopTests		: IagStuckStop_Tests;
 END_VAR
 ]]></Declaration>
     <Implementation>

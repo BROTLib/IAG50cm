@@ -137,6 +137,8 @@ VAR
 	bParkInPlaceDone	: BOOL;		// an axes-off park just finished (one scan): logs it
 	tonParkInPlace		: FB_TimeoutTimer;		// #187: an axes-off park gives up after 120 s if the covers or the dome do not finish
 	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
+	sStopNoDone			: STRING(10);	// #120: the axes named in the stop timeout text
+	bStopTimeoutLog		: BOOL;		// #120: the stop transaction timed out or was released by the timeout (one scan); text in TCSstopTimeoutEvent.OnMessage
 	tpPowerOnWarning		: TP;		// triggers power warning
 	tonPowerTimeout		: FB_TimeoutTimer;		// power on timeout
 	tonCommandTimeout		: FB_TimeoutTimer;		// command timeout
@@ -168,6 +170,7 @@ VAR
 	TCSpowerParkEvent,
 	TCSparkHomeEvent,
 	TCScommandRefusedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
+	TCSstopTimeoutEvent		: FB_Eventlog;	// #120: a stop transaction passed 30 s without a Done of an axis, and its release
 	tonMQTTTimer 			: TON := (PT:=T#5S);
 	
 	
@@ -894,6 +897,7 @@ IF bReset OR bError OR bEstopTriggered THEN
 	fbStopTx.Cancel();
 	fbSweepStop.Cancel();
 END_IF
+fbStopTx.nTimeDivisor := nTimeDivisor;
 fbStopTx.Monitor(	bStopped := bStopped,
 					bHaEnabled := fbHourAngle.bEnable, bDecEnabled := fbDeclination.bEnable,
 					bHaStopDone := aAxis[1].bStopDone, bDecStopDone := aAxis[2].bStopDone,
@@ -901,6 +905,38 @@ fbStopTx.Monitor(	bStopped := bStopped,
 					bDecLocked := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
 					bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy);
 bSettled := bStopped AND NOT fbStopTx.bActive;
+
+// #120: a stop transaction that is not settled 30 s after it began (an axis never reported Done) no longer waits for the
+// Done: it settles as soon as the telescope is at rest. The stop is not sent again. Clear StopAxis of the axes without a
+// Done so that the next stop gives a rising edge (FB_AxisControl.StopAxis) and the home hold does not see a stale stop.
+IF fbStopTx.bTimedOut THEN
+	IF fbStopTx.bHaNoDone AND fbStopTx.bDecNoDone THEN
+		sStopNoDone := 'HA and Dec';
+	ELSIF fbStopTx.bHaNoDone THEN
+		sStopNoDone := 'HA';
+	ELSE
+		sStopNoDone := 'Dec';
+	END_IF
+	IF NOT fbStopTx.bActive THEN
+		TCSstopTimeoutEvent.OnMessage := CONCAT(CONCAT('STOP: no stop Done from ', sStopNoDone), ' within 30 s; telescope at rest, stop released.');
+	ELSIF NOT bStopped THEN
+		TCSstopTimeoutEvent.OnMessage := CONCAT(CONCAT('STOP: no stop Done from ', sStopNoDone), ' within 30 s; axes still moving, released when at rest.');
+	ELSE
+		TCSstopTimeoutEvent.OnMessage := CONCAT(CONCAT('STOP: no stop Done from ', sStopNoDone), ' within 30 s; axis locked (stop active) or homing, released when it ends.');
+	END_IF
+	bStopTimeoutLog := TRUE;
+ELSIF fbStopTx.bReleasedByTimeout THEN
+	TCSstopTimeoutEvent.OnMessage := 'STOP released: at rest without a stop Done from an axis (30 s timeout).';
+	bStopTimeoutLog := TRUE;
+END_IF
+IF fbStopTx.bReleasedByTimeout THEN
+	IF fbStopTx.bHaNoDone THEN
+		fbHourAngle.StopAxis := FALSE;
+	END_IF
+	IF fbStopTx.bDecNoDone THEN
+		fbDeclination.StopAxis := FALSE;
+	END_IF
+END_IF
 
 // #113: a stop in the calibration sweep leaves the axes enabled and uncalibrated; once the stop has settled and the
 // homing is aborted, switch the uncalibrated axes off (the next power-on starts the sweep again), READY_STATE -2
@@ -1120,6 +1156,11 @@ TCScommandRefusedEvent(	Trigger := bCommandRefused,
 				FormatString := '%s',
 				Comm := fbComm);
 bCommandRefused := FALSE;
+TCSstopTimeoutEvent(	Trigger := bStopTimeoutLog,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				Comm := fbComm);
+bStopTimeoutLog := FALSE;
 TCSsoftErrorEvent(	Trigger := bSoftwareError,
 				Level := ADSLOG_MSGTYPE_ERROR,
 				FormatString := 'Command timeout error %s',	// 16 goto, 32 park, 48 gohome, 64 slew (16#10, 16#20, 16#30, 16#40)
