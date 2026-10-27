@@ -360,41 +360,41 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF eDomeShutterState = E_RoofState.opened THEN
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', 1.0);
 ELSIF eDomeShutterState = E_RoofState.closing OR eDomeShutterState = E_RoofState.opening OR eDomeShutterState = E_RoofState.unknown THEN
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '0.5');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', 0.5);
 ELSIF eDomeShutterState = E_RoofState.closed THEN
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', 0.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', '-1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.REALPOS', -1.0);
 END_IF
 
 IF ipState.StateID = 'Opening State' THEN
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.TARGETPOS', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.TARGETPOS', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.TARGETPOS', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.TARGETPOS', 0.0);
 END_IF
 
 IF bDomeError THEN
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.ERROR_STATE', '1');
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', '-1.0');
+	fbComm.PublishINT('telescope', 'dome', 'AUXILIARY.DOME.ERROR_STATE', 1);
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', -1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.ERROR_STATE', '0');
+	fbComm.PublishINT('telescope', 'dome', 'AUXILIARY.DOME.ERROR_STATE', 0);
 	IF bParked THEN
-		fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', '0.0');
+		fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', 0.0);
 	ELSIF bTrack THEN
-		fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', '8.0');
+		fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', 8.0);
 	ELSE
-		fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', '1.0');
+		fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.READY_STATE', 1.0);
 	END_IF
 END_IF
 
 IF eDomeRotationState = E_DomeRotationState.slewing OR eDomeRotationState = E_DomeRotationState.unknown THEN
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.MOTION_STATE', '1.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.MOTION_STATE', 1.0);
 ELSE
-	fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.MOTION_STATE', '0.0');
+	fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.MOTION_STATE', 0.0);
 END_IF
-fbComm.Publish('telescope', 'dome', 'AUXILIARY.DOME.AZ', LREAL_TO_STRING(THIS^.Position));
+fbComm.PublishLREAL('telescope', 'dome', 'AUXILIARY.DOME.AZ', THIS^.Position);
 ]]></ST>
       </Implementation>
     </Method>
