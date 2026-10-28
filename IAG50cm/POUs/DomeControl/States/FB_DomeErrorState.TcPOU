@@ -8,6 +8,17 @@ END_VAR
     <Implementation>
       <ST><![CDATA[]]></ST>
     </Implementation>
+    <Method Name="CloseCommand" Id="{2211e3ad-15ee-4774-946f-138090512f81}">
+      <Declaration><![CDATA[
+METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// #202: a close is accepted in every state, it is the way to shut the roof
+// the error is cleared like a reset does it: the shutter command must not wait for a dome_reset
+ResetCommand();
+pDome^.SetState(pDome^.fbDomeCloseingState);]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="ResetCommand" Id="{f76344eb-46e9-441e-956f-e4feed1005b3}">
       <Declaration><![CDATA[
 METHOD ResetCommand : BOOL

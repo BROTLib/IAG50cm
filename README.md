@@ -190,6 +190,10 @@ replace the curved horizon stop.
   state machine `Idle / Opening / Closing / Moving / Parking / Stopping / Homing / Error`.
   `dome_stop` (#96) holds the azimuth: the baader has no stop command, so `Stopping`
   reads the azimuth and sends it back as the new target; a shutter movement is not stopped.
+  `dome_close` (#202) is accepted in every state except while the dome rotates in `Idle`; a command a state
+  does not handle is logged (`Dome: <command> ignored in <state>`, `50cm/Log`). A shutter command the dome
+  acknowledges but does not execute (`d#closhut` answered by `d#shutope`, `d#opeshut` by `d#shutclo`) is sent
+  3 times in all, then the dome goes to `Error` with a log line.
 - `FB_CoverControl` — two mirror covers, each driven by two relay outputs
   (EL2652); staggered open/close (`Delta` 5 s, `TimeToCycle` 15 s), state
   machine `Idle / Opening / Closing / Stopping`; state enum `E_MirrorCoverState`.

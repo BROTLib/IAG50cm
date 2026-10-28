@@ -6,16 +6,35 @@ VAR
 	Stage		: UINT:= 0;
 	tonSleep	: TON := (PT:=T#5S);
 	tonTimeout	: TON:= (PT:=T#3M); // see Baader Handbook
+	// #202: d#closhut is acknowledged (d#gotmess) but the shutter stays open (d#shutope): the command is sent again at
+	// most nMaxAttempts times in all, then it is an error. Before, it was sent for ever, because the timeout is stopped
+	// at every poll, and nothing was logged.
+	nAttempts	: UINT;
+	nMaxAttempts: UINT := 3;
 END_VAR
 ]]></Declaration>
     <Implementation>
       <ST><![CDATA[]]></ST>
     </Implementation>
+    <Method Name="CloseCommand" Id="{f429e250-eab4-46cf-960e-227731c324e9}">
+      <Declaration><![CDATA[
+METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// #202: a new close starts the shutter command again, with a fresh count
+LogEvent(sText := 'Dome: close received while closing, the shutter command is started again', sLevel := 'WARNING');
+nAttempts := 0;
+Stage := 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="FoundError" Id="{96dff545-3011-469a-a894-b669fe57425f}">
       <Declaration><![CDATA[METHOD FoundError : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[Stage:= 0;
+        <ST><![CDATA[nAttempts := 0;
+Stage:= 0;
 tonSleep(IN:=FALSE);
 tonTimeout(IN:=FALSE);
 pDome^._Error := TRUE;
@@ -27,7 +46,8 @@ pDome^.SetState(pDome^.fbDomeErrorState);]]></ST>
 METHOD OpenCommand : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[Stage:= 0;
+        <ST><![CDATA[nAttempts := 0;
+Stage:= 0;
 tonSleep(IN:=FALSE);
 tonTimeout(IN:=FALSE);
 pDome^.SetState(pDome^.fbDomeOpeningState);]]></ST>
@@ -96,7 +116,13 @@ END_VAR
 				Stage := 6;
 			ELSIF pDome^._ReceivedString = 'd#shutope' THEN
 				pDome^._DomeShutterState := E_RoofState.opened;
-				Stage := 0;
+				nAttempts := nAttempts + 1;
+				IF nAttempts >= nMaxAttempts THEN
+					LogEvent(sText := 'Dome: the shutter does not close, d#closhut is acknowledged but the shutter stays open', sLevel := 'WARNING');
+					FoundError();
+				ELSE
+					Stage := 0;
+				END_IF
 			ELSIF pDome^._ReceivedString = 'd#shutrun' THEN
 				pDome^._DomeShutterState := E_RoofState.closing;
 				Stage := 3;
@@ -140,7 +166,8 @@ END_VAR
 METHOD SuccessfulFinished : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[Stage:= 0;
+        <ST><![CDATA[nAttempts := 0;
+Stage:= 0;
 tonSleep(IN:=FALSE);
 tonTimeout(IN:=FALSE);
 pDome^.SetState(pDome^.fbDomeIdleState);]]></ST>
