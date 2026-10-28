@@ -461,14 +461,19 @@ CASE nStep OF
 	END_IF
 10:	// both axes are enabled and sweeping (power-on stage 40): park now
 	IF rig.fbHa.bEnable AND rig.fbDec.bEnable AND NOT rig.fbHa.bCalibrated AND NOT rig.fbDec.bCalibrated THEN
-		rig.fbTel.Park();
-		nStep := 20;
+		nStep := 15;
 		nCycles := 0;
 	ELSIF nCycles > 3000 THEN
 		AssertTrue(Condition := FALSE, Message := 'the power-on never reached the sweep');
 		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the power-on never reached the sweep'));
 		nStep := 99;
 		TEST_FINISHED();
+	END_IF
+15:	// the mock axes are ready after a few scans and then sweep (400 scans): park in the middle of it
+	IF nCycles >= 20 THEN
+		rig.fbTel.Park();
+		nStep := 20;
+		nCycles := 0;
 	END_IF
 20:	// the power-on is aborted at once
 	IF nCycles = 3 THEN
