@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
-  <POU Name="FB_IagCoordinatesLegacy" Id="{63ce1b77-d63c-4e5b-b76d-6fbeb1a7a17d}" SpecialFunc="None">
+  <POU Name="FB_IagCoordinatesLegacy" Id="{0ab47c5e-8cee-4af8-85a1-e4290671ffec}" SpecialFunc="None">
     <Declaration><![CDATA[// The coordinate chain of IAG50cm's FB_TelescopeControl as it is at IAG50cm develop 0df040e (FB_TelescopeControl.TcPOU
 // lines 297-397 and 217-222 minus the clock), frozen into a block of its own: the oracle for IAG50cm#17 (step 0 of
 // specs/plans/2026-10-28-radec-telescope-control-migration-17.md). The same AstroBROT calls in the same order with the
