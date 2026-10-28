@@ -189,9 +189,9 @@ bRecording := TRUE;
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="IndexOf" Id="{9e9ccefe-b5e0-4803-af39-8b7116da0597}">
+    <Method Name="FindName" Id="{9e9ccefe-b5e0-4803-af39-8b7116da0597}">
       <Declaration><![CDATA[// first record with this parameter name, 0 if none
-METHOD IndexOf : INT
+METHOD FindName : INT
 VAR_INPUT
 	sName	: STRING(80);
 END_VAR
@@ -200,10 +200,10 @@ VAR
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[IndexOf := 0;
+        <ST><![CDATA[FindName := 0;
 FOR i := 1 TO nCount DO
 	IF aNames[i] = sName THEN
-		IndexOf := i;
+		FindName := i;
 		RETURN;
 	END_IF
 END_FOR

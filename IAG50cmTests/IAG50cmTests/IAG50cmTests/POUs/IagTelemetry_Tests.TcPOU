@@ -169,20 +169,20 @@ CASE nStep OF
 		rig.fbComm.Start(sNameFilter := '');
 		rig.fbTel._SendTelemetryEquitorial();
 		rig.fbComm.Stop();
-		nIdx := rig.fbComm.IndexOf('POSITION.INSTRUMENTAL.HA.OFFSET');
+		nIdx := rig.fbComm.FindName('POSITION.INSTRUMENTAL.HA.OFFSET');
 		AssertTrue(Condition := nIdx > 0, Message := 'HA.OFFSET is published');
 		F_Note(bFailed := nIdx <= 0, sText := CONCAT(sTest, 'HA.OFFSET is published'));
 		IF nIdx > 0 THEN
 			AssertFalse(Condition := F_NoteNear(sTest, 0.01, rig.fbComm.aValues[nIdx], 1.0E-12), Message := 'HA.OFFSET value');
 		END_IF
-		nIdx := rig.fbComm.IndexOf('POSITION.INSTRUMENTAL.DEC.OFFSET');
+		nIdx := rig.fbComm.FindName('POSITION.INSTRUMENTAL.DEC.OFFSET');
 		AssertTrue(Condition := nIdx > 0, Message := 'DEC.OFFSET is published');
 		F_Note(bFailed := nIdx <= 0, sText := CONCAT(sTest, 'DEC.OFFSET is published'));
 		IF nIdx > 0 THEN
 			AssertFalse(Condition := F_NoteNear(sTest, -0.02, rig.fbComm.aValues[nIdx], 1.0E-12), Message := 'DEC.OFFSET value');
 		END_IF
 		// BROTLib's FB_RaDecTelescopeControl publishes the hour-angle offset under RA.OFFSET (F3 of the plan); IAG must not
-		nIdx := rig.fbComm.IndexOf('POSITION.INSTRUMENTAL.RA.OFFSET');
+		nIdx := rig.fbComm.FindName('POSITION.INSTRUMENTAL.RA.OFFSET');
 		AssertEquals_INT(Expected := 0, Actual := nIdx, Message := 'no RA.OFFSET field');
 		F_Note(bFailed := nIdx <> 0, sText := CONCAT(sTest, 'no RA.OFFSET field'));
 		nStep := 99;
