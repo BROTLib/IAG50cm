@@ -134,7 +134,12 @@ VAR
 	bParkHomeFirst		: BOOL;		// #84: a park was requested in a limit, the home runs first (one scan): logs it
 	bSafeParked			: BOOL;		// an axes-off park is closing the covers and parking the dome, the mount was not moved: READY_STATE 0.3 until done (#110, #187)
 	bParkedInPlace		: BOOL;		// the last park ended where the mount stood (axes off, covers closed, dome parked): bIsParked is TRUE, the mount may not be at the park position (#187)
-	bParkInPlaceDone	: BOOL;		// an axes-off park just finished (one scan): logs it
+	bParkInPlaceDone	: BOOL;		// an axes-off park just ended (one scan): logs it
+	bParkInPlaceOpen	: BOOL;		// #197/#200: the park that logged PARK commencing goes on as an in-place park; its end line is the PARK end line
+	sParkInPlaceEnd		: STRING(160);	// #200: how the in-place park ended: completed in place, or why it was aborted
+	nParkInPlaceLevel	: DWORD := ADSLOG_MSGTYPE_HINT;
+	tonParkPending		: FB_TimeoutTimer;		// #197: a park that is requested but never starts is forced into an in-place park after 2 min
+	bParkForceInPlace	: BOOL;		// #197: the pending-park watchdog fired
 	tonParkInPlace		: FB_TimeoutTimer;		// #187: an axes-off park gives up after 120 s if the covers or the dome do not finish
 	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	sStopNoDone			: STRING(10);	// #120: the axes named in the stop timeout text
@@ -421,6 +426,7 @@ END_IF
 IF NOT bPark THEN
 	bParkAfterHome := FALSE;
 	bParkHomeDone := FALSE;
+	bParkForceInPlace := FALSE;
 END_IF
 bInHorizonLimit := bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude);
 bInPoleLimit := (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)));
@@ -514,6 +520,16 @@ IF tonHomePending.Q THEN
 	sHomeDropWhy := fbHomeDrop.sWhy;
 	bHomeCancelled := TRUE;
 END_IF
+// #197: a park that is requested but not started (not dispatched, not in the axes-off path, no stop or home running)
+// waited without a timeout: tonParkTimeout counts only a running park (#75). After 2 min: say why and park in place.
+tonParkPending(IN := bPark AND TCS_command <> E_TCSCommand.park AND TCS_command <> E_TCSCommand.gohome
+	AND NOT bStopping AND NOT bError AND NOT bEstopTriggered AND NOT bParkForceInPlace, PT := T#2M, nDivisor := nTimeDivisor);
+IF tonParkPending.Q THEN
+	bParkForceInPlace := TRUE;
+	fbHomeDrop(bReady := bReady, bStopPending := TCS_command = E_TCSCommand.stop OR NOT bSettled);
+	TCSparkErrorEvent.OnMessage := CONCAT(CONCAT('Park did not start within 2 min (', fbHomeDrop.sWhy), '): parking in place with the axes off.');
+	bParkInError := TRUE;
+END_IF
 IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	bPark := TRUE;
 	// #83: fire once. With the axes off or in error the park does not set bIsParked, so Q stayed TRUE and bPark was
@@ -528,7 +544,12 @@ END_IF
 IF bPower AND bPark AND NOT bStop AND TCS_command = E_TCSCommand.poweron THEN
 	bPowerParked := TRUE;
 	bInterupted := TRUE;
-	_PowerOn();					// bInterupted: marks the startup aborted, clears bPower, resets its stage
+	IF _PowerOn() >= 40 THEN	// bInterupted: marks the startup aborted, clears bPower, resets its stage; returns the stage it was in
+		// #197: the axes are on and may be sweeping: stop them. The park then switches them off (nothing else can: bReady
+		// needs the completed power-on) and parks in place.
+		bStopping := TRUE;
+		fbSweepStop.ArmAll();
+	END_IF
 	bInterupted := FALSE;
 	bPower := FALSE;
 END_IF
@@ -548,6 +569,7 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 	ELSIF bPark AND (bUserStop OR TCS_command = E_TCSCommand.park OR NOT (bInHorizonLimit OR bInPoleLimit)) THEN
 		bPark := FALSE;
 		sParkEnd := 'cancelled by stop';
+		fbSweepStop.Cancel();		// #197: the park is gone, the axes stay as they are
 		_ParkTelescope();
 		IF bGoHome THEN
 			// #84: the park was waiting for the limit home; the home goes with it (and its stage is reset, it would resume mid-way)
@@ -653,12 +675,14 @@ ELSIF bPark THEN
 			// A running park ends with ONE line, the PARK line, at WARN (E8 logged "PARK completed" and "Park refused").
 			IF bEstopTriggered THEN
 				sParkEnd := CONCAT('aborted: ', sParkWhy);
+				TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_WARN;
 			ELSIF bError THEN
 				sParkEnd := CONCAT('aborted by an error: ', sParkWhy);
+				TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_WARN;
 			ELSE
-				sParkEnd := CONCAT('ended with the axes off: ', sParkWhy);
+				// #197/#200: the park goes on as an in-place park (covers, dome); its end is this park's one end line
+				bParkInPlaceOpen := TRUE;
 			END_IF
-			TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_WARN;
 		ELSE
 			// A request during an error or with the axes off was never logged: the separate WARN.
 			IF bEstopTriggered THEN
@@ -673,6 +697,13 @@ ELSIF bPark THEN
 		// #110/#187: with no error and no E-stop this leaves a known, covered state. READY_STATE reports 0.3 while the covers
 		// close, and bIsParked is set once the covers are closed and the dome is parked (see below); the mount is where it was.
 		bSafeParked := NOT bError AND NOT bEstopTriggered;
+		TCS_command := E_TCSCommand.no_command;
+	// #197: no completed power-on (aborted by this park, or stopped in stage 40 or later) but an axis is on: the park can
+	// never be dispatched (bReady needs bIsPowered and the focus enable of stages 70 and 100). Switch the axes off once they
+	// are at rest (FB_SweepStop waits for the stop and the homing to end), then the axes-off park above parks in place.
+	// TCS_command must not stay on poweron: _PowerOn and its 12 h timeout would stay selected.
+	ELSIF (NOT bIsPowered OR bParkForceInPlace) AND TCS_command <> E_TCSCommand.park THEN
+		fbSweepStop.ArmAll();
 		TCS_command := E_TCSCommand.no_command;
 	// #84: a park in a limit: the home out of the limit runs first, the park follows (see bParkHomeDone)
 	ELSIF bGoHome AND bLimitHome THEN
@@ -945,7 +976,8 @@ IF bPower THEN
 END_IF
 fbSweepStop(bSettled := bSettled,
 			bHaCalibrated := fbHourAngle.bCalibrated, bDecCalibrated := fbDeclination.bCalibrated,
-			bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy);
+			bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy,
+			bOtherBusy := fbFocus <> 0 AND_THEN fbFocus.Busy);
 IF fbSweepStop.bDisableHa THEN
 	fbHourAngle.Enable := FALSE;
 END_IF
@@ -967,6 +999,24 @@ bBusy := aAxis[1].bBusy OR aAxis[2].bBusy OR (fbFocus <> 0 AND_THEN fbFocus.Busy
 (* STATUS STATES*)
 // Public completion is latched only by the final startup stage, never by mechanical bReady alone.
 // #110: the covered state ends with a power-on, an error or an E-stop.
+IF bSafeParked AND (bPower OR bError OR bEstopTriggered) THEN
+	// #200: every exit of the in-place park has an end line
+	IF bEstopTriggered THEN
+		sParkInPlaceEnd := 'aborted: E-stop pressed, the covers and the dome cannot move. Release it, reset, then park again.';
+		nParkInPlaceLevel := ADSLOG_MSGTYPE_WARN;
+	ELSIF bError THEN
+		IF fbCovers.Closed THEN
+			sParkInPlaceEnd := 'aborted by an error: covers closed, the mount was not moved. Reset, then park again.';
+		ELSE
+			sParkInPlaceEnd := 'aborted by an error: covers closing, the mount was not moved. Reset, then park again.';
+		END_IF
+		nParkInPlaceLevel := ADSLOG_MSGTYPE_WARN;
+	ELSE
+		sParkInPlaceEnd := 'cancelled by power-on';
+		nParkInPlaceLevel := ADSLOG_MSGTYPE_HINT;
+	END_IF
+	bParkInPlaceDone := TRUE;
+END_IF
 IF bPower OR bError OR bEstopTriggered THEN
     bSafeParked := FALSE;
 END_IF
@@ -975,18 +1025,21 @@ END_IF
 // Without it bIsParked stayed FALSE, and the 12 h idle park fired again every 12 h.
 tonParkInPlace(IN := bSafeParked AND NOT bIsParked, PT := T#120S, nDivisor := nTimeDivisor);
 IF bSafeParked AND fbCovers.Closed AND fbDome.Parked THEN
-	IF NOT bIsParked THEN
+	IF NOT bIsParked OR bParkInPlaceOpen THEN
 		bIsParked := TRUE;
 		bParkedInPlace := TRUE;
+		sParkInPlaceEnd := 'completed in place: covers closed, dome parked, the mount stays where it stood (#187)';
+		nParkInPlaceLevel := ADSLOG_MSGTYPE_HINT;
 		bParkInPlaceDone := TRUE;
 	END_IF
 	bIsPowered := FALSE;
 	bSafeParked := FALSE;
 ELSIF bSafeParked AND (tonParkInPlace.Q OR fbDome.Error) THEN
-	// give up: not 0.3 for ever. The axes-off WARN already said what was requested.
+	// give up: not 0.3 for ever. The park start line said what was requested; this is the end line (#200).
 	bSafeParked := FALSE;
-	TCSparkErrorEvent.OnMessage := 'Park with the axes off did not finish: the covers did not close or the dome did not park within 120 s, or the dome is in error.';
-	bParkInError := TRUE;
+	sParkInPlaceEnd := 'aborted: the covers did not close or the dome did not park within 120 s, or the dome is in error.';
+	nParkInPlaceLevel := ADSLOG_MSGTYPE_WARN;
+	bParkInPlaceDone := TRUE;
 END_IF
 fReadyState := fbStartup.Update(
     Error := bError OR bSoftwareError OR bPowerFailure OR bEstopTriggered,
@@ -1065,16 +1118,23 @@ TCSgohomeEvent(	Trigger := bGoHome,
 				OnMessage := 'commencing',
 				Comm := fbComm);
 sHomeEnd := 'completed';
+// #197/#200: the in-place park that goes on from a logged park ends with the PARK end line, one per park
+IF bParkInPlaceDone AND bParkInPlaceOpen THEN
+	sParkEnd := sParkInPlaceEnd;
+	TCSparkEvent.OffLevel := nParkInPlaceLevel;
+	bParkInPlaceOpen := FALSE;
+	bParkInPlaceDone := FALSE;
+END_IF
 TCSparkEvent.OffMessage := sParkEnd;		// #57: "PARK completed" was also logged when the park was cancelled
-TCSparkEvent(	Trigger := bPark,
+TCSparkEvent(	Trigger := bPark OR bParkInPlaceOpen,
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'PARK %s',
 				OnMessage := 'commencing',
 				Comm := fbComm);
 TCSparkInPlaceEvent(	Trigger := bParkInPlaceDone,
-				Level := ADSLOG_MSGTYPE_HINT,
+				Level := nParkInPlaceLevel,
 				FormatString := 'PARK %s',
-				OnMessage := 'completed in place: covers closed, dome parked, the mount stays where it stood (#187)',
+				OnMessage := sParkInPlaceEnd,
 				Comm := fbComm);
 bParkInPlaceDone := FALSE;
 bParkLogged := bPark;

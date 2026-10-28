@@ -119,6 +119,20 @@ fbDec.nMockMoveScans := nScans;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetHomeScans" Id="{3b8e5d17-6a42-4c90-8f1d-72e4a0c9b315}">
+      <Declaration><![CDATA[// scans the calibration sweep (homing) of each mock axis takes (default 3, #197)
+METHOD SetHomeScans
+VAR_INPUT
+	nHa		: UINT;
+	nDec	: UINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbHa.nMockHomeScans := nHa;
+fbDec.nMockHomeScans := nDec;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SetStartScans" Id="{933a0b2d-7791-43fd-bb42-99ec4e6a5ddf}">
       <Declaration><![CDATA[// scans from a move command until the mock axes report InMotion (default 0: at once); the NC on the real axes takes a few cycles
 METHOD SetStartScans

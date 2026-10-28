@@ -5,6 +5,8 @@
 // stop has settled (for 3 scans) and no homing is running any more, the uncalibrated axes are switched off for one scan, so
 // the telescope ends like a stop in the covers phase (READY_STATE -2, no error) and the next power-on starts the sweep
 // again. Calibrated axes stay enabled. Pure logic, tested offline in IAG50cmTests.
+// #197: ArmAll() is the same for a park without a completed power-on (the axes are on, but the telescope can never be
+// ready): every axis is switched off once at rest, calibrated or not, and the axes-off park then parks in place.
 FUNCTION_BLOCK FB_SweepStop
 VAR_INPUT
 	bSettled		: BOOL;		// FB_TelescopeControl.bSettled: at rest and no stop transaction running
@@ -12,6 +14,7 @@ VAR_INPUT
 	bDecCalibrated	: BOOL;
 	bHaHoming		: BOOL;		// FB_LatchHome.Busy
 	bDecHoming		: BOOL;
+	bOtherBusy		: BOOL;		// #197: the focus is moving; waited for in the all-axes mode only
 END_VAR
 VAR_OUTPUT
 	bDisableHa		: BOOL;		// one scan
@@ -19,6 +22,7 @@ VAR_OUTPUT
 END_VAR
 VAR
 	bPending		: BOOL;
+	bAll			: BOOL;		// #197: switch every axis off, not only the uncalibrated ones
 	nSettledScans	: UINT;
 END_VAR
 VAR CONSTANT
@@ -29,7 +33,7 @@ END_VAR
       <ST><![CDATA[bDisableHa := FALSE;
 bDisableDec := FALSE;
 IF bPending THEN
-	IF bSettled AND NOT bHaHoming AND NOT bDecHoming THEN
+	IF bSettled AND NOT bHaHoming AND NOT bDecHoming AND NOT (bAll AND bOtherBusy) THEN
 		IF nSettledScans < nConfirmScans THEN
 			nSettledScans := nSettledScans + 1;
 		END_IF
@@ -37,9 +41,10 @@ IF bPending THEN
 		nSettledScans := 0;
 	END_IF
 	IF nSettledScans >= nConfirmScans THEN
-		bDisableHa := NOT bHaCalibrated;
-		bDisableDec := NOT bDecCalibrated;
+		bDisableHa := bAll OR NOT bHaCalibrated;
+		bDisableDec := bAll OR NOT bDecCalibrated;
 		bPending := FALSE;
+		bAll := FALSE;
 	END_IF
 END_IF
 ]]></ST>
@@ -49,8 +54,23 @@ END_IF
 METHOD Arm
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[bPending := TRUE;
-nSettledScans := 0;
+        <ST><![CDATA[IF NOT (bPending AND bAll) THEN	// a pending ArmAll() is not narrowed
+	bPending := TRUE;
+	nSettledScans := 0;
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ArmAll" Id="{7c1d4a52-3b6e-4f0a-9d28-5e8a1c3b7f64}">
+      <Declaration><![CDATA[// A park without a completed power-on (#197): switch every axis off once at rest. Idempotent: it may be called every scan.
+METHOD ArmAll
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT (bPending AND bAll) THEN
+	bPending := TRUE;
+	bAll := TRUE;
+	nSettledScans := 0;
+END_IF
 ]]></ST>
       </Implementation>
     </Method>
@@ -60,6 +80,7 @@ METHOD Cancel
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bPending := FALSE;
+bAll := FALSE;
 nSettledScans := 0;
 ]]></ST>
       </Implementation>

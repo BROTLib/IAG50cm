@@ -15,6 +15,8 @@ Stop_During_PowerOn_Aborts_The_Startup();
 AxesOff_Park_After_Stopped_Startup_Reports_Parked();
 AxesOff_Park_With_Slow_Covers_Reports_Parking_Then_Parked();
 AxesOff_Park_Gives_Up_When_The_Covers_Do_Not_Close();
+Park_In_The_Sweep_Parks_In_Place();
+Park_After_Stage_100_Still_Moves_To_The_Park_Position();
 ]]></ST>
     </Implementation>
     <Method Name="Park_During_PowerOn_Aborts_The_Startup_And_Parks" Id="{fee3a10b-b0ce-4b59-b6ed-58da01277209}">
@@ -406,6 +408,155 @@ CASE nStep OF
 		AssertTrue(Condition := FALSE, Message := 'the axes-off park never gave up');
 		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the axes-off park never gave up'));
 		rig.SetTimeDivisor(nValue := 1);
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Park_In_The_Sweep_Parks_In_Place" Id="{b7c20e41-93d5-4f68-a1e2-5c0d8f4a6b11}">
+      <Declaration><![CDATA[// IAG50cm#197 (T38 step 2): a park in the calibration sweep (power-on stage 40 and later) aborts the startup, the axes are on, so the park
+// can neither be dispatched (bReady needs the completed power-on) nor take the axes-off path. It used to hang at READY_STATE 0.3 for good.
+// Now the axes are stopped and switched off once at rest, and the park ends parked in place (axes off, covers closed, dome parked).
+// The mock axes do not hold the sweep after a stop (the real FB_HomeHold does), so the sweep runs to its end here: the park must still end.
+METHOD PRIVATE Park_In_The_Sweep_Parks_In_Place
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Park_In_The_Sweep_Parks_In_Place');
+sTest := 'Park_In_The_Sweep_Parks_In_Place: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+IF nStep >= 20 THEN
+	// the startup never completes, and the telescope is never ready
+	IF rig.fbTel.ReadyState = 1.0 OR rig.Online THEN
+		AssertTrue(Condition := FALSE, Message := 'the startup went on to the end');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the startup went on to the end'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_IF
+CASE nStep OF
+0:	// wait for the clock, then power on with a long calibration sweep
+	IF rig.ClockValid THEN
+		rig.SetHomeScans(nHa := 400, nDec := 400);
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// both axes are enabled and sweeping (power-on stage 40): park now
+	IF rig.fbHa.bEnable AND rig.fbDec.bEnable AND NOT rig.fbHa.bCalibrated AND NOT rig.fbDec.bCalibrated AND rig.fbHa.bReady AND rig.fbDec.bReady THEN
+		rig.fbTel.Park();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the power-on never reached the sweep');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the power-on never reached the sweep'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the power-on is aborted at once
+	IF nCycles = 3 THEN
+		AssertTrue(Condition := NOT rig.fbTel.bPower, Message := 'the power-on is aborted');
+		F_Note(bFailed := (rig.fbTel.bPower), sText := CONCAT(sTest, 'the power-on is aborted'));
+		nStep := 30;
+		nCycles := 0;
+	END_IF
+30:	// it ends parked in place: no hang at 0.3
+	IF rig.fbTel.ReadyState = 0.0 AND rig.fbTel.bIsParked THEN
+		AssertTrue(Condition := NOT rig.fbHa.bEnable AND NOT rig.fbDec.bEnable, Message := 'both axes are switched off');
+		F_Note(bFailed := NOT (NOT rig.fbHa.bEnable AND NOT rig.fbDec.bEnable), sText := CONCAT(sTest, 'both axes are switched off'));
+		AssertTrue(Condition := rig.fbHa.nStopEdges >= 1 AND rig.fbDec.nStopEdges >= 1, Message := 'both axes were sent a stop (#197 A1)');
+		F_Note(bFailed := NOT (rig.fbHa.nStopEdges >= 1 AND rig.fbDec.nStopEdges >= 1), sText := CONCAT(sTest, 'both axes were sent a stop (#197 A1)'));
+		AssertTrue(Condition := rig.fbTel.bParkedInPlace, Message := 'bParkedInPlace is TRUE');
+		F_Note(bFailed := NOT (rig.fbTel.bParkedInPlace), sText := CONCAT(sTest, 'bParkedInPlace is TRUE'));
+		AssertTrue(Condition := rig.fbCovers.nCloseCalls >= 1, Message := 'the covers were closed');
+		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the covers were closed'));
+		AssertFalse(Condition := rig.fbTel.bError, Message := 'no error');
+		F_Note(bFailed := (rig.fbTel.bError), sText := CONCAT(sTest, 'no error'));
+		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park request ended');
+		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park request ended'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park hangs (READY_STATE stays 0.3)');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park hangs (READY_STATE stays 0.3)'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Park_After_Stage_100_Still_Moves_To_The_Park_Position" Id="{b7c20e41-93d5-4f68-a1e2-5c0d8f4a6b12}">
+      <Declaration><![CDATA[// IAG50cm#197 regression: a park of a completed power-on (bIsPowered TRUE, ready) takes the normal path (the mount is driven to the park
+// position), not the in-place path: bParkedInPlace stays FALSE.
+METHOD PRIVATE Park_After_Stage_100_Still_Moves_To_The_Park_Position
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Park_After_Stage_100_Still_Moves_To_The_Park_Position');
+sTest := 'Park_After_Stage_100_Still_Moves_To_The_Park_Position: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the startup is complete: park
+	IF rig.Online THEN
+		rig.fbTel.Park();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the power-on never completed');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the power-on never completed'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the park ends
+	IF rig.fbTel.ReadyState = 0.0 AND rig.fbTel.bIsParked THEN
+		AssertFalse(Condition := rig.fbTel.bParkedInPlace, Message := 'a park of a ready telescope is not an in-place park');
+		F_Note(bFailed := (rig.fbTel.bParkedInPlace), sText := CONCAT(sTest, 'a park of a ready telescope is not an in-place park'));
+		AssertFalse(Condition := rig.fbTel.bError, Message := 'no error');
+		F_Note(bFailed := (rig.fbTel.bError), sText := CONCAT(sTest, 'no error'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 4000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park did not finish'));
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF

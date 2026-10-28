@@ -4,6 +4,7 @@
     <Declaration><![CDATA[// Mock of FB_DeclinationControl for the telescope state machine tests (BROTLib plan 2026-10-21-telescope-state-machine-unification D1).
 FUNCTION_BLOCK FB_DeclinationMock EXTENDS FB_DeclinationControl
 VAR_INPUT
+	nMockHomeScans	: UINT := 3;	// scans the calibration sweep (homing) takes (#197)
 	nMockMoveScans	: UINT := 60;	// scans a move takes (the telescope sees Busy meanwhile)
 	nMockStopScans	: UINT := 3;	// scans an MC_Stop takes until Done
 	bMockNoStopDone	: BOOL;			// #120: the mock stop never reports Done (SetStopWithoutDone of the rig)
@@ -27,7 +28,7 @@ END_VAR
 // homes an enabled, uncalibrated axis by itself; the model does the same (bHome := bEnable). The model writes what the
 // telescope reads: the base outputs and, through pointers (FB_Axis outputs are not writable from outside), the nested fbAxis outputs.
 fbCore(bEnable := bEnable, bHome := bEnable, bMove := bMoveAxis, bStop := bStopAxis, fTarget := fPosition,
-	nMoveScans := nMockMoveScans, nStopScans := nMockStopScans, nStartScans := nMockStartScans, bSuppressStopDone := bMockNoStopDone);
+	nHomeScans := nMockHomeScans, nMoveScans := nMockMoveScans, nStopScans := nMockStopScans, nStartScans := nMockStartScans, bSuppressStopDone := bMockNoStopDone);
 
 pBool := ADR(fbAxis.Ready);			pBool^ := fbCore.bReady;
 pBool := ADR(fbAxis.Calibrated);	pBool^ := fbCore.bCalibrated;
