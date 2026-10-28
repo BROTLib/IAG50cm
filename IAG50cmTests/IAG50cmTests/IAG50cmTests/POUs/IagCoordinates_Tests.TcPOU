@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagCoordinates_Tests" Id="{fa1a4d5d-93ee-4456-a753-7a58ae367a4e}" SpecialFunc="None">
+    <Declaration><![CDATA[// Hand-value checks of FB_IagCoordinatesLegacy, the frozen coordinate chain of IAG50cm's FB_TelescopeControl (IAG50cm#17,
+// step 0 of specs/plans/2026-10-28-radec-telescope-control-migration-17.md), so that the oracle is known to be sane before
+// BROTLib's FB_RaDecCoordinates is compared against it (step 4). Site: the IAG 50 cm, JD 2461000.5. The expected values
+// are geometry (zenith, meridian, pole), round trips between the two AstroBROT directions, and the sign and size of the
+// offsets; tolerances are 0.01 deg where refraction or the frame could move the value, and written before the first CI run.
+FUNCTION_BLOCK IagCoordinates_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Current_At_The_Zenith_Is_90();
+Current_On_The_Meridian_South();
+Current_Near_The_Pole();
+Current_Icrs_Roundtrips_Through_Target();
+Corrected_Equals_Raw_Without_Offsets();
+Offsets_Shift_The_Corrected_Position();
+Inversion_Is_Held_When_Invalid();
+Slew_Target_South_At_45();
+Target_Below_The_Horizon();
+Time_Offset_Shifts_The_Hour_Angle();
+]]></ST>
+    </Implementation>
+    <Method Name="Current_At_The_Zenith_Is_90" Id="{f8299266-ef11-416b-90b9-760ca41f8b43}">
+      <Declaration><![CDATA[// HA 0 and Dec = latitude is the zenith. Raw current position (no refraction): elevation 90 within 0.01 deg.
+METHOD PRIVATE Current_At_The_Zenith_Is_90
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Current_At_The_Zenith_Is_90');
+sTest := 'Current_At_The_Zenith_Is_90: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fHourAngleCurrent := 0.0;
+fbA.fDeclinationCurrent := 51.5592378;
+fbA();
+AssertEquals_LREAL(Expected := 90.0, Actual := fbA.fElevationCurrent, Delta := 0.01, Message := 'elevation at the zenith');
+bNote := F_NoteNear(CONCAT(sTest, 'elevation at the zenith'), 90.0, fbA.fElevationCurrent, 0.01);
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Current_On_The_Meridian_South" Id="{97c423bb-5083-4add-8379-9c04996e1903}">
+      <Declaration><![CDATA[// HA 0, Dec 0: culminates south at geometric elevation 90 - latitude = 38.44 deg, azimuth 180. The elevation of the current
+// position (refract_to_observed := FALSE) is lower than the geometric one by the refraction (CI measured 38.4207, 0.020 deg
+// less; Bennett's formula gives 0.021 deg at that height), so the tolerance is 0.05 deg.
+METHOD PRIVATE Current_On_The_Meridian_South
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Current_On_The_Meridian_South');
+sTest := 'Current_On_The_Meridian_South: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fHourAngleCurrent := 0.0;
+fbA.fDeclinationCurrent := 0.0;
+fbA();
+AssertEquals_LREAL(Expected := 90.0 - 51.5592378, Actual := fbA.fElevationCurrent, Delta := 0.05, Message := 'elevation');
+bNote := F_NoteNear(CONCAT(sTest, 'elevation'), 90.0 - 51.5592378, fbA.fElevationCurrent, 0.05);
+AssertEquals_LREAL(Expected := 180.0, Actual := fbA.fAzimuthCurrent, Delta := 0.05, Message := 'azimuth');
+bNote := F_NoteNear(CONCAT(sTest, 'azimuth'), 180.0, fbA.fAzimuthCurrent, 0.05);
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Current_Near_The_Pole" Id="{cff08347-1acb-41f3-8583-ae151f77f57c}">
+      <Declaration><![CDATA[// HA 0, Dec 89.9: north of the zenith on the meridian, geometric elevation 90 - (89.9 - latitude) = 51.66 deg; CI measured
+// 51.6464 (0.013 deg less, the refraction again, Bennett 0.013 deg), so the tolerance is 0.05 deg.
+METHOD PRIVATE Current_Near_The_Pole
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Current_Near_The_Pole');
+sTest := 'Current_Near_The_Pole: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fHourAngleCurrent := 0.0;
+fbA.fDeclinationCurrent := 89.9;
+fbA();
+AssertEquals_LREAL(Expected := 90.0 - (89.9 - 51.5592378), Actual := fbA.fElevationCurrent, Delta := 0.05, Message := 'elevation');
+bNote := F_NoteNear(CONCAT(sTest, 'elevation'), 90.0 - (89.9 - 51.5592378), fbA.fElevationCurrent, 0.05);
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Current_Icrs_Roundtrips_Through_Target" Id="{84980e83-a99f-41a2-95c3-f62bf572f29c}">
+      <Declaration><![CDATA[// HA/Dec of the axes -> ICRS (current path) -> apparent HA/Dec of that target (target path): the inverse of each other.
+METHOD PRIVATE Current_Icrs_Roundtrips_Through_Target
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Current_Icrs_Roundtrips_Through_Target');
+sTest := 'Current_Icrs_Roundtrips_Through_Target: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fHourAngleCurrent := 30.0;
+fbA.fDeclinationCurrent := 40.0;
+fbA();
+fbB.fRightAscension := fbA.fRightAscensionCurrentICRS;
+fbB.fDeclination := fbA.fDeclinationCurrentICRS;
+fbB();
+AssertEquals_LREAL(Expected := 30.0, Actual := fbB.fHourAngleApparent, Delta := 0.001, Message := 'hour angle');
+bNote := F_NoteNear(CONCAT(sTest, 'hour angle'), 30.0, fbB.fHourAngleApparent, 0.001);
+AssertEquals_LREAL(Expected := 40.0, Actual := fbB.fDeclinationApparent, Delta := 0.001, Message := 'declination');
+bNote := F_NoteNear(CONCAT(sTest, 'declination'), 40.0, fbB.fDeclinationApparent, 0.001);
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Corrected_Equals_Raw_Without_Offsets" Id="{0865a49e-3788-46e9-bb71-400f2e734aac}">
+      <Declaration><![CDATA[// No offset and a zero inversion: the corrected ICRS position is the raw one, exactly.
+METHOD PRIVATE Corrected_Equals_Raw_Without_Offsets
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Corrected_Equals_Raw_Without_Offsets');
+sTest := 'Corrected_Equals_Raw_Without_Offsets: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fHourAngleCurrent := 30.0;
+fbA.fDeclinationCurrent := 40.0;
+fbA.bPointingInversionValid := TRUE;
+fbA();
+AssertEquals_LREAL(Expected := fbA.fRightAscensionCurrentICRS, Actual := fbA.fRightAscensionCurrentICRScorr, Delta := 1.0E-9, Message := 'RA');
+bNote := F_NoteNear(CONCAT(sTest, 'RA'), fbA.fRightAscensionCurrentICRS, fbA.fRightAscensionCurrentICRScorr, 1.0E-9);
+AssertEquals_LREAL(Expected := fbA.fDeclinationCurrentICRS, Actual := fbA.fDeclinationCurrentICRScorr, Delta := 1.0E-9, Message := 'Dec');
+bNote := F_NoteNear(CONCAT(sTest, 'Dec'), fbA.fDeclinationCurrentICRS, fbA.fDeclinationCurrentICRScorr, 1.0E-9);
+AssertEquals_LREAL(Expected := fbA.fElevationCurrent, Actual := fbA.fElevationCurrentSky, Delta := 1.0E-9, Message := 'sky elevation');
+bNote := F_NoteNear(CONCAT(sTest, 'sky elevation'), fbA.fElevationCurrent, fbA.fElevationCurrentSky, 1.0E-9);
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Offsets_Shift_The_Corrected_Position" Id="{23ba1f7f-9a77-45f3-841f-adcc3eb909d8}">
+      <Declaration><![CDATA[// A declination offset of 0.1 deg lowers the corrected Dec by 0.1 deg; an hour-angle offset of 0.05 deg on the sky moves the
+// corrected RA by 0.05 / COS(Dec apparent) (F_HourAngleOffsetOnAxis), the sign being RA = LST - HA.
+METHOD PRIVATE Offsets_Shift_The_Corrected_Position
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+	fRaShift	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Offsets_Shift_The_Corrected_Position');
+sTest := 'Offsets_Shift_The_Corrected_Position: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fHourAngleCurrent := 30.0;
+fbA.fDeclinationCurrent := 40.0;
+fbA.fDeclinationOffset := 0.1;
+fbA.fHourAngleOffset := 0.05;
+fbA.fRightAscension := 100.0;
+fbA.fDeclination := 40.0;
+fbA();
+AssertEquals_LREAL(Expected := -0.1, Actual := fbA.fDeclinationCurrentICRScorr - fbA.fDeclinationCurrentICRS, Delta := 0.001, Message := 'Dec shift');
+bNote := F_NoteNear(CONCAT(sTest, 'Dec shift'), -0.1, fbA.fDeclinationCurrentICRScorr - fbA.fDeclinationCurrentICRS, 0.001);
+fRaShift := fbA.fRightAscensionCurrentICRScorr - fbA.fRightAscensionCurrentICRS;
+IF fRaShift > 180.0 THEN
+	fRaShift := fRaShift - 360.0;
+ELSIF fRaShift < -180.0 THEN
+	fRaShift := fRaShift + 360.0;
+END_IF
+AssertEquals_LREAL(Expected := F_HourAngleOffsetOnAxis(0.05, fbA.fDeclinationApparent), Actual := fRaShift, Delta := 0.01, Message := 'RA shift');
+bNote := F_NoteNear(CONCAT(sTest, 'RA shift'), F_HourAngleOffsetOnAxis(0.05, fbA.fDeclinationApparent), fRaShift, 0.01);
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Inversion_Is_Held_When_Invalid" Id="{67c3c6c2-4722-4f48-a39a-0a989d3977ef}">
+      <Declaration><![CDATA[// FB_PointingModelInversion does not converge near the horizon (bValid FALSE): the last valid correction is kept (I:350-355)
+// and used for the corrected position.
+METHOD PRIVATE Inversion_Is_Held_When_Invalid
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+	fHaCorr	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Inversion_Is_Held_When_Invalid');
+sTest := 'Inversion_Is_Held_When_Invalid: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fHourAngleCurrent := 30.0;
+fbA.fDeclinationCurrent := 40.0;
+fbA.fHourAngleInversionOffsetCalc := 0.5;
+fbA.fDeclinationInversionOffsetCalc := 0.25;
+fbA.bPointingInversionValid := TRUE;
+fbA();
+AssertEquals_LREAL(Expected := 0.5, Actual := fbA.fHourAngleInversionOffset, Delta := 1.0E-12, Message := 'held HA correction');
+bNote := F_NoteNear(CONCAT(sTest, 'held HA correction'), 0.5, fbA.fHourAngleInversionOffset, 1.0E-12);
+AssertEquals_LREAL(Expected := 0.25, Actual := fbA.fDeclinationInversionOffset, Delta := 1.0E-12, Message := 'held Dec correction');
+bNote := F_NoteNear(CONCAT(sTest, 'held Dec correction'), 0.25, fbA.fDeclinationInversionOffset, 1.0E-12);
+fHaCorr := fbA.fRightAscensionCurrentICRScorr;
+fbA.fHourAngleInversionOffsetCalc := 9.0;
+fbA.fDeclinationInversionOffsetCalc := 9.0;
+fbA.bPointingInversionValid := FALSE;
+fbA();
+AssertEquals_LREAL(Expected := 0.5, Actual := fbA.fHourAngleInversionOffset, Delta := 1.0E-12, Message := 'HA correction kept');
+bNote := F_NoteNear(CONCAT(sTest, 'HA correction kept'), 0.5, fbA.fHourAngleInversionOffset, 1.0E-12);
+AssertEquals_LREAL(Expected := 0.25, Actual := fbA.fDeclinationInversionOffset, Delta := 1.0E-12, Message := 'Dec correction kept');
+bNote := F_NoteNear(CONCAT(sTest, 'Dec correction kept'), 0.25, fbA.fDeclinationInversionOffset, 1.0E-12);
+AssertEquals_LREAL(Expected := fHaCorr, Actual := fbA.fRightAscensionCurrentICRScorr, Delta := 1.0E-9, Message := 'corrected RA unchanged');
+bNote := F_NoteNear(CONCAT(sTest, 'corrected RA unchanged'), fHaCorr, fbA.fRightAscensionCurrentICRScorr, 1.0E-9);
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Slew_Target_South_At_45" Id="{e68b2aef-4923-4080-b19f-18c9c2738a1b}">
+      <Declaration><![CDATA[// Slew to azimuth 180, elevation 45 (alt_is_observed := FALSE, IAG50cm#3): on the meridian, Dec about latitude - 45 =
+// 6.56 deg (J2000 and refraction move it by well under 0.5 deg), hour angle about 0.
+METHOD PRIVATE Slew_Target_South_At_45
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_Target_South_At_45');
+sTest := 'Slew_Target_South_At_45: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fElevation := 45.0;
+fbA.fAzimuth := 180.0;
+fbA();
+AssertEquals_LREAL(Expected := 51.5592378 - 45.0, Actual := fbA.fDeclinationCalc, Delta := 0.5, Message := 'Dec');
+bNote := F_NoteNear(CONCAT(sTest, 'Dec'), 51.5592378 - 45.0, fbA.fDeclinationCalc, 0.5);
+AssertTrue(Condition := COS(fbA.fHourAngleCalc * 0.017453292519943295) > 0.9999, Message := 'hour angle about 0');
+F_Note(bFailed := NOT (COS(fbA.fHourAngleCalc * 0.017453292519943295) > 0.9999), sText := CONCAT(sTest, CONCAT('hour angle about 0, got ', LREAL_TO_STRING(fbA.fHourAngleCalc))));
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Target_Below_The_Horizon" Id="{a12bd545-6018-45ea-b14c-31839f3af00d}">
+      <Declaration><![CDATA[// Dec -60 never rises at 51.6 deg north (maximum elevation 90 - 51.56 - 60 = -21.6 deg): the target elevation is negative.
+METHOD PRIVATE Target_Below_The_Horizon
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Target_Below_The_Horizon');
+sTest := 'Target_Below_The_Horizon: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fRightAscension := 100.0;
+fbA.fDeclination := -60.0;
+fbA();
+AssertTrue(Condition := fbA.fElevationCalc < 0.0, Message := 'target below the horizon');
+F_Note(bFailed := NOT (fbA.fElevationCalc < 0.0), sText := CONCAT(sTest, CONCAT('elevation ', LREAL_TO_STRING(fbA.fElevationCalc))));
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Time_Offset_Shifts_The_Hour_Angle" Id="{e84d9967-a4fc-4b33-8d92-6bdf89cd6206}">
+      <Declaration><![CDATA[// fTimeOffset is days added to the Julian date: half a day moves the hour angle by half a sidereal rotation, 180.49 deg.
+METHOD PRIVATE Time_Offset_Shifts_The_Hour_Angle
+VAR
+	fbA			: FB_IagCoordinatesLegacy;
+	fbB			: FB_IagCoordinatesLegacy;
+	sTest		: STRING(80);
+	fDiff		: LREAL;
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Time_Offset_Shifts_The_Hour_Angle');
+sTest := 'Time_Offset_Shifts_The_Hour_Angle: ';
+fbA.fJd := 2461000.5;
+fbA.fLongitude := 9.9452433;
+fbA.fLatitude := 51.5592378;
+fbA.fAltitude := 100.0;
+fbB.fJd := 2461000.5;
+fbB.fLongitude := 9.9452433;
+fbB.fLatitude := 51.5592378;
+fbB.fAltitude := 100.0;
+fbA.fRightAscension := 100.0;
+fbA.fDeclination := 20.0;
+fbA();
+fbB.fRightAscension := 100.0;
+fbB.fDeclination := 20.0;
+fbB.fTimeOffset := 0.5;
+fbB();
+fDiff := fbB.fHourAngleApparent - fbA.fHourAngleApparent;
+WHILE fDiff < 0.0 DO
+	fDiff := fDiff + 360.0;
+END_WHILE
+WHILE fDiff >= 360.0 DO
+	fDiff := fDiff - 360.0;
+END_WHILE
+AssertEquals_LREAL(Expected := 180.4928, Actual := fDiff, Delta := 0.02, Message := 'hour angle shift');
+bNote := F_NoteNear(CONCAT(sTest, 'hour angle shift'), 180.4928, fDiff, 0.02);
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

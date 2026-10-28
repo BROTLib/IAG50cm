@@ -8,7 +8,7 @@
 // Plan: BROTLib specs/plans/2026-10-21-telescope-state-machine-unification.md (D1, step 2).
 FUNCTION_BLOCK FB_IagRig
 VAR
-	fbComm			: FB_NullComm;
+	fbComm			: FB_RecordingComm;	// records nothing until a test calls Start (IagTelemetry_Tests)
 	fbHa			: FB_HourAngleMock(comm := fbComm);
 	fbDec			: FB_DeclinationMock(comm := fbComm);
 	fbFocus			: FB_FocusMock;
@@ -143,6 +143,32 @@ END_VAR
       <Implementation>
         <ST><![CDATA[fbHa.bMockNoStopDone := bHa;
 fbDec.bMockNoStopDone := bDec;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetOffsets" Id="{7c1d4a52-3be0-4f0b-9a5e-0d6a1c2f8b11}">
+      <Declaration><![CDATA[// the user offsets of the telescope under test (degrees; IAG50cm#17 telemetry tests)
+METHOD SetOffsets
+VAR_INPUT
+	fHourAngle	: LREAL;
+	fDeclination	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.HourAngleOffset := fHourAngle;
+fbTel.DeclinationOffset := fDeclination;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetEstop" Id="{2e9b6f03-51a7-4c8d-b3f4-8a7d90e1c622}">
+      <Declaration><![CDATA[// the E-stop input of the telescope under test (#14)
+METHOD SetEstop
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bEstopTriggered := bValue;
 ]]></ST>
       </Implementation>
     </Method>

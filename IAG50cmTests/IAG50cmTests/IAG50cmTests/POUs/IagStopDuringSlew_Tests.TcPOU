@@ -64,6 +64,16 @@ CASE nStep OF
 		bHaMoving := rig.fbHa.MoveAxis;
 		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'bSlew is set while the slew runs');
 		F_Note(bFailed := NOT (rig.fbTel.bSlew), sText := CONCAT(sTest, 'bSlew is set while the slew runs'));
+		// IAG50cm#17 step 0.3: the coordinate chain runs inside the telescope (the migration must keep it running). The slew
+		// target az 180 / alt 45 is on the meridian: Dec about latitude - 45 = 6.56 deg, hour angle about 0.
+		AssertFalse(Condition := F_NoteNear(CONCAT(sTest, 'Julian date'), 2461000.0, rig.fbTel.fJd, 2000.0), Message := 'fJd follows the clock');
+		AssertFalse(Condition := F_NoteNear(CONCAT(sTest, 'slew target Dec'), 51.5592378 - 45.0, rig.fbTel.fDeclinationCalc, 0.5), Message := 'slew target declination');
+		AssertTrue(Condition := COS(rig.fbTel.fHourAngleCalc * 0.017453292519943295) > 0.9999, Message := 'slew target hour angle about 0');
+		F_Note(bFailed := NOT (COS(rig.fbTel.fHourAngleCalc * 0.017453292519943295) > 0.9999), sText := CONCAT(sTest, 'slew target hour angle about 0'));
+		AssertTrue(Condition := ABS(rig.fbTel.fDeclinationApparent) <= 90.0, Message := 'apparent declination is finite');
+		F_Note(bFailed := NOT (ABS(rig.fbTel.fDeclinationApparent) <= 90.0), sText := CONCAT(sTest, 'apparent declination is finite'));
+		AssertTrue(Condition := ABS(rig.fbTel.fElevationCalc) <= 90.0, Message := 'target elevation is finite');
+		F_Note(bFailed := NOT (ABS(rig.fbTel.fElevationCalc) <= 90.0), sText := CONCAT(sTest, 'target elevation is finite'));
 		nStep := 30;
 		nCycles := 0;
 	ELSIF nCycles > 300 THEN

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_IagCoordinatesLegacy" Id="{142332ab-a8a7-43ef-a24f-3709fe96ab6e}" SpecialFunc="None">
+    <Declaration><![CDATA[// The coordinate chain of IAG50cm's FB_TelescopeControl as it is at IAG50cm develop 0df040e (FB_TelescopeControl.TcPOU
+// lines 297-397 and 217-222 minus the clock), frozen into a block of its own: the oracle for IAG50cm#17 (step 0 of
+// specs/plans/2026-10-28-radec-telescope-control-migration-17.md). The same AstroBROT calls in the same order with the
+// same instances (the one fbEq2Hor is called three times, as in the telescope). Do not "improve" it: step 4 of the plan
+// compares BROTLib's FB_RaDecCoordinates against this block. The pointing models stay in the telescope, so their
+// results come in as inputs (fHourAngleInversionOffsetCalc/fDeclinationInversionOffsetCalc/bPointingInversionValid).
+FUNCTION_BLOCK FB_IagCoordinatesLegacy
+VAR_INPUT
+	fJd								: LREAL;	// Julian date of the clock; the block adds fTimeOffset like the telescope
+	fTimeOffset						: LREAL;
+	fLongitude						: LREAL;	// telescopeConfig.longitude
+	fLatitude						: LREAL;
+	fAltitude						: LREAL;
+	fRightAscension					: LREAL;	// target, ICRS degrees (TCS input)
+	fDeclination					: LREAL;
+	fElevation						: LREAL;	// slew target (TCS input)
+	fAzimuth						: LREAL;
+	fHourAngleCurrent				: LREAL;	// axis positions
+	fDeclinationCurrent				: LREAL;
+	fHourAngleOffset				: LREAL;	// user offsets
+	fDeclinationOffset				: LREAL;
+	fHourAngleInversionOffsetCalc	: LREAL;	// raw outputs of FB_PointingModelInversion this scan
+	fDeclinationInversionOffsetCalc	: LREAL;
+	bPointingInversionValid			: BOOL;
+END_VAR
+VAR_OUTPUT
+	fHourAngleApparent				: LREAL;
+	fDeclinationApparent			: LREAL;
+	fElevationCalc					: LREAL;
+	fAzimuthCalc					: LREAL;
+	fRightAscensionCalc				: LREAL;
+	fDeclinationCalc				: LREAL;
+	fHourAngleCalc					: LREAL;
+	fHourAngleInversionOffset		: LREAL;	// the last valid inversion correction
+	fDeclinationInversionOffset		: LREAL;
+	fRightAscensionCurrentICRS		: LREAL;
+	fDeclinationCurrentICRS			: LREAL;
+	fRightAscensionCurrentICRScorr	: LREAL;
+	fDeclinationCurrentICRScorr		: LREAL;
+	fElevationCurrent				: LREAL;
+	fAzimuthCurrent					: LREAL;
+	fElevationCurrentSky			: LREAL;
+	fAzimuthCurrentSky				: LREAL;
+END_VAR
+VAR
+	fbEq2Hor			: FB_EQ2HOR;
+	fbHor2Eq			: FB_HOR2EQ;
+	fbHaDec2RaDec		: FB_HADEC2RADEC;
+	fbRaDec2HaDec		: FB_RADEC2HADEC;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// calculate fHourAngleApparent, fDeclinationApparent
+
+fbRaDec2HaDec(
+	ra := fRightAscension,
+	dec := fDeclination,
+	lon := fLongitude,
+	JD := fJd + fTimeOffset,
+	ha_out => fHourAngleApparent,
+	dec_out => fDeclinationApparent);
+// (and also horizontal coord. -> used for checking if target is on sky or in ground)
+fbEq2Hor(
+	ra := fRightAscension,
+	dec := fDeclination,
+	lon := fLongitude,
+	lat := fLatitude,
+	altitude := fAltitude,
+	JD := fJd + fTimeOffset,
+	refract_to_observed := TRUE,
+	alt => fElevationCalc,
+	az => fAzimuthCalc);
+
+// calculate equatorial coordinates (used by Slew command, takes Alt/Az -> moves telescope)
+fbHor2Eq(alt := fElevation,
+		az := fAzimuth,
+		jd := fJd+fTimeOffset,
+		lat := fLatitude,
+		lon := fLongitude,
+		altitude := fAltitude,
+		alt_is_observed := FALSE,
+		ra => fRightAscensionCalc,
+		dec => fDeclinationCalc,
+		ha => fHourAngleCalc);
+// (the pointing forward model sits here in the telescope; it does not feed back into these outputs)
+// near the horizon the inversion is chaotic and does not converge (see FB_PointingModelInversion);
+// keep reporting the last trustworthy correction rather than whatever garbage it would return
+IF bPointingInversionValid THEN
+	fHourAngleInversionOffset := fHourAngleInversionOffsetCalc;
+	fDeclinationInversionOffset := fDeclinationInversionOffsetCalc;
+END_IF
+(*--------------------------------------------------------------*)
+// transform from apparent to icrs
+
+//current
+fbHaDec2RaDec(
+	ha := fHourAngleCurrent,
+	dec := fDeclinationCurrent,
+	jd := fJd+fTimeOffset,
+	lon := fLongitude,
+	ra_out => fRightAscensionCurrentICRS,
+	dec_out => fDeclinationCurrentICRS);
+//current corrected
+fbHaDec2RaDec(
+	ha := fHourAngleCurrent - fHourAngleInversionOffset - F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent),
+	dec := fDeclinationCurrent - fDeclinationInversionOffset- fDeclinationOffset,
+	jd := fJd+fTimeOffset,
+	lon := fLongitude,
+	ra_out => fRightAscensionCurrentICRScorr,
+	dec_out => fDeclinationCurrentICRScorr);
+(*--------------------------------------------------------------*)
+// to ALT AZ
+fbEq2Hor(
+	ra := fRightAscensionCurrentICRS,
+	dec := fDeclinationCurrentICRS,
+	lon := fLongitude,
+	lat := fLatitude,
+	altitude := fAltitude,
+	refract_to_observed := FALSE,
+	JD := fJd + fTimeOffset,
+	alt => fElevationCurrent,
+	az => fAzimuthCurrent);
+
+fbEq2Hor(
+	ra := fRightAscensionCurrentICRScorr,
+	dec := fDeclinationCurrentICRScorr,
+	lon := fLongitude,
+	lat := fLatitude,
+	altitude := fAltitude,
+	refract_to_observed := FALSE,
+	JD := fJd + fTimeOffset,
+	alt => fElevationCurrentSky,
+	az => fAzimuthCurrentSky);
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>
