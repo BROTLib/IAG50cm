@@ -20,6 +20,8 @@ VAR
 	fbStopDuringParkTests	: IagStopDuringPark_Tests;
 	fbParkInLimitTests		: IagParkInLimit_Tests;
 	fbStuckStopTests		: IagStuckStop_Tests;
+	fbTelemetryTests		: IagTelemetry_Tests;
+	fbCoordinatesTests		: IagCoordinates_Tests;
 END_VAR
 ]]></Declaration>
     <Implementation>

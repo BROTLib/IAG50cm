@@ -20,6 +20,18 @@ END_VAR
     <Implementation>
       <ST><![CDATA[]]></ST>
     </Implementation>
+    <Method Name="CloseCommand" Id="{63fb69fe-fe3a-4c2e-9bdd-67823dedd47b}">
+      <Declaration><![CDATA[
+METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// #202: a close is accepted in every state, it is the way to shut the roof
+Stage := 0;
+tonSleep(IN:=FALSE);
+tonTimeout(IN:=FALSE);
+pDome^.SetState(pDome^.fbDomeCloseingState);]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="FoundError" Id="{3eaa0e89-0c43-4938-abfd-96f91ab9506b}">
       <Declaration><![CDATA[
 METHOD FoundError : BOOL

@@ -14,6 +14,9 @@ VAR
 	sAzi			: STRING;
 	fAzi			: LREAL;
 	fAzi_Old		: LREAL;
+	// #202: two azimuth readings closer than this (deg) are the same position: the dome reports tenths of a degree
+	// and a single step of jitter must not keep the rotation state at slewing (dome_close is refused while slewing)
+	fAziTolerance	: LREAL := 0.5;
 	bSplitSuccess 	: BOOL;
 	
 END_VAR
@@ -32,6 +35,9 @@ METHOD CloseCommand : BOOL
 	tonTimeout(IN:=FALSE);
 	tonDelay(IN:=FALSE);
 	pDome^.SetState(pDome^.fbDomeCloseingState);
+ELSE
+	// #202: not silently. The rotation state is slewing as long as two azimuth readings differ.
+	LogIgnored(sCommand := 'close (dome rotating)', sLevel := 'WARNING');
 END_IF
 ]]></ST>
       </Implementation>
@@ -170,7 +176,7 @@ CASE Stage OF
 					ELSE
 						pDome^._Position := fAzi + 180.0;
 					END_IF
-					IF fAzi = fAzi_Old THEN
+					IF ABS(fAzi - fAzi_Old) < fAziTolerance THEN
 						IF ABS(pDome^.Position - 180.0) < 5.0 THEN
 							pDome^._DomeRotationState := E_DomeRotationState.parked;
 						ELSE

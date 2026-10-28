@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagTelemetry_Tests" Id="{ba9a16c0-3ade-4f01-872e-7601ed852313}" SpecialFunc="None">
+    <Declaration><![CDATA[// Characterization of the telemetry of FB_TelescopeControl (IAG50cm#17, step 0 of specs/plans/2026-10-28-radec-telescope-control-migration-17.md):
+// the field names and types that _SendTelemetryEquitorial (I:1868-2078) publishes, in order, and the values the clients
+// depend on (pyBROT, BROTgui). The migration onto FB_RaDecTelescopeControl must not change them. FB_RecordingComm records
+// the calls; the method is called once, directly, so the record holds exactly one telemetry run. The expected list was
+// written from the code at IAG50cm develop 0df040e; where the code has an IF/ELSE with the same field in both branches the
+// field is listed once.
+FUNCTION_BLOCK IagTelemetry_Tests EXTENDS TcUnit.FB_TestSuite
+VAR CONSTANT
+	// kinds: 1 LREAL, 2 INT, 4 STRING (FB_RecordingComm)
+	aExpectedNames : ARRAY[1..69] OF STRING(80) := [
+		'TELESCOPE.READY_STATE',
+		'TELESCOPE.MOTION_STATE',
+		'TELESCOPE.INFO.NAME',
+		'TELESCOPE.INFO.DIAMETER',
+		'TELESCOPE.INFO.CABINET',
+		'TELESCOPE.INFO.MANUFACTURER',
+		'TELESCOPE.CONFIG.CAPABILITIES',
+		'TELESCOPE.CONFIG.MOUNTOPTIONS',
+		'TELESCOPE.CONFIG.MOUNT',
+		'TELESCOPE.STATUS.GLOBAL',
+		'TELESCOPE.STATUS.LOCAL_MODE',
+		'OBJECT.INSTRUMENTAL.DEC',
+		'OBJECT.INSTRUMENTAL.HA',
+		'OBJECT.HORIZONTAL.ALT',
+		'OBJECT.HORIZONTAL.AZ',
+		'OBJECT.EQUATORIAL.EPOCH',
+		'OBJECT.EQUATORIAL.EQUINOX',
+		'OBJECT.EQUATORIAL.RA_PM',
+		'OBJECT.EQUATORIAL.DEC_PM',
+		'OBJECT.EQUATORIAL.RA_RATE',
+		'OBJECT.EQUATORIAL.DEC_RATE',
+		'OBJECT.EQUATORIAL.RA',
+		'OBJECT.EQUATORIAL.DEC',
+		'OBJECT.EQUATORIAL.HA_APPARENT',
+		'OBJECT.EQUATORIAL.DEC_APPARENT',
+		'POINTING.SLEWTIME',
+		'POINTING.OFFSETS.HA',
+		'POINTING.OFFSETS.DEC',
+		'POSITION.LOCAL.SIDEREAL_TIME',
+		'POSITION.LOCAL.JD',
+		'POSITION.LOCAL.LATITUDE',
+		'POSITION.LOCAL.LONGITUDE',
+		'POSITION.LOCAL.HEIGHT',
+		'POSITION.INSTRUMENTAL.DEC.POWER_STATE',
+		'POSITION.INSTRUMENTAL.DEC.REFERENCED',
+		'POSITION.INSTRUMENTAL.DEC.ERROR_STATE',
+		'POSITION.INSTRUMENTAL.DEC.MOTION_STATE',
+		'POSITION.INSTRUMENTAL.DEC.REALPOS',
+		'POSITION.INSTRUMENTAL.DEC.CURRPOS',
+		'POSITION.INSTRUMENTAL.DEC.TARGETPOS',
+		'POSITION.INSTRUMENTAL.DEC.CURRSPEED',
+		'POSITION.INSTRUMENTAL.DEC.TARGETDISTANCE',
+		'POSITION.INSTRUMENTAL.DEC.OFFSET',
+		'POSITION.INSTRUMENTAL.HA.POWER_STATE',
+		'POSITION.INSTRUMENTAL.HA.REFERENCED',
+		'POSITION.INSTRUMENTAL.HA.ERROR_STATE',
+		'POSITION.INSTRUMENTAL.HA.MOTION_STATE',
+		'POSITION.INSTRUMENTAL.HA.CURRPOS',
+		'POSITION.INSTRUMENTAL.HA.REALPOS',
+		'POSITION.INSTRUMENTAL.HA.TARGETPOS',
+		'POSITION.INSTRUMENTAL.HA.CURRSPEED',
+		'POSITION.INSTRUMENTAL.HA.TARGETDISTANCE',
+		'POSITION.INSTRUMENTAL.HA.OFFSET',
+		'POSITION.INSTRUMENTAL.FOCUS.POWER_STATE',
+		'POSITION.INSTRUMENTAL.FOCUS.REFERENCED',
+		'POSITION.INSTRUMENTAL.FOCUS.ERROR_STATE',
+		'POSITION.INSTRUMENTAL.FOCUS.MOTION_STATE',
+		'POSITION.INSTRUMENTAL.FOCUS.CURRPOS',
+		'POSITION.INSTRUMENTAL.FOCUS.REALPOS',
+		'POSITION.INSTRUMENTAL.FOCUS.TARGETPOS',
+		'POSITION.INSTRUMENTAL.FOCUS.TARGETDISTANCE',
+		'POSITION.INSTRUMENTAL.FOCUS.CURRSPEED',
+		'POSITION.HORIZONTAL.ALT',
+		'POSITION.HORIZONTAL.AZ',
+		'POSITION.HORIZONTAL.DOME',
+		'POSITION.EQUATORIAL.RA_ICRS',
+		'POSITION.EQUATORIAL.DEC_ICRS',
+		'POSITION.EQUATORIAL.HA_APPARENT',
+		'POSITION.EQUATORIAL.DEC_APPARENT'];
+	aExpectedKinds : ARRAY[1..69] OF INT := [1, 1, 4, 1, 4, 4, 2, 4, 4, 2, 2, 1, 1, 1, 1, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Telemetry_Field_Set_Is_Unchanged();
+Telemetry_Offsets();
+Telemetry_Estop_Global_1();
+ReadyState_Is_Published_At_Power_On();
+]]></ST>
+    </Implementation>
+    <Method Name="Telemetry_Field_Set_Is_Unchanged" Id="{4d066b6c-3e6f-47e1-9b36-eb8d8a65facb}">
+      <Declaration><![CDATA[METHOD PRIVATE Telemetry_Field_Set_Is_Unchanged
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+	i			: INT;
+	nFirstBad	: INT;
+	nIdx		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Telemetry_Field_Set_Is_Unchanged');
+sTest := 'Telemetry_Field_Set_Is_Unchanged: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// the telemetry method is called directly once the clock is valid, so nothing else publishes into the record
+	IF rig.ClockValid THEN
+		rig.fbComm.Start(sNameFilter := '');
+		rig.fbTel._SendTelemetryEquitorial();
+		rig.fbComm.Stop();
+		nFirstBad := 0;
+		FOR i := 1 TO 69 DO
+			IF rig.fbComm.aNames[i] <> aExpectedNames[i] OR rig.fbComm.aKinds[i] <> aExpectedKinds[i] THEN
+				nFirstBad := i;
+				EXIT;
+			END_IF
+		END_FOR
+		AssertEquals_INT(Expected := 69, Actual := rig.fbComm.nCount, Message := 'number of published fields');
+		F_Note(bFailed := rig.fbComm.nCount <> 69, sText := CONCAT(sTest, CONCAT('number of published fields: ', INT_TO_STRING(rig.fbComm.nCount))));
+		AssertEquals_INT(Expected := 0, Actual := nFirstBad, Message := 'first field that differs in name or type (index)');
+		IF nFirstBad > 0 THEN
+			F_Note(bFailed := TRUE, sText := CONCAT(CONCAT(CONCAT(sTest, CONCAT('field ', INT_TO_STRING(nFirstBad))), CONCAT(' is ', rig.fbComm.aNames[nFirstBad])), CONCAT(', expected ', aExpectedNames[nFirstBad])));
+		END_IF
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Telemetry_Offsets" Id="{9a1629fc-8cef-4bc9-8416-2f1a1c32cdc7}">
+      <Declaration><![CDATA[METHOD PRIVATE Telemetry_Offsets
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+	i			: INT;
+	nFirstBad	: INT;
+	nIdx		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Telemetry_Offsets');
+sTest := 'Telemetry_Offsets: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// the telemetry method is called directly once the clock is valid, so nothing else publishes into the record
+	IF rig.ClockValid THEN
+		rig.SetOffsets(fHourAngle := 0.01, fDeclination := -0.02);
+		rig.fbComm.Start(sNameFilter := '');
+		rig.fbTel._SendTelemetryEquitorial();
+		rig.fbComm.Stop();
+		nIdx := rig.fbComm.FindName('POSITION.INSTRUMENTAL.HA.OFFSET');
+		AssertTrue(Condition := nIdx > 0, Message := 'HA.OFFSET is published');
+		F_Note(bFailed := nIdx <= 0, sText := CONCAT(sTest, 'HA.OFFSET is published'));
+		IF nIdx > 0 THEN
+			AssertFalse(Condition := F_NoteNear(sTest, 0.01, rig.fbComm.aValues[nIdx], 1.0E-12), Message := 'HA.OFFSET value');
+		END_IF
+		nIdx := rig.fbComm.FindName('POSITION.INSTRUMENTAL.DEC.OFFSET');
+		AssertTrue(Condition := nIdx > 0, Message := 'DEC.OFFSET is published');
+		F_Note(bFailed := nIdx <= 0, sText := CONCAT(sTest, 'DEC.OFFSET is published'));
+		IF nIdx > 0 THEN
+			AssertFalse(Condition := F_NoteNear(sTest, -0.02, rig.fbComm.aValues[nIdx], 1.0E-12), Message := 'DEC.OFFSET value');
+		END_IF
+		// BROTLib's FB_RaDecTelescopeControl publishes the hour-angle offset under RA.OFFSET (F3 of the plan); IAG must not
+		nIdx := rig.fbComm.FindName('POSITION.INSTRUMENTAL.RA.OFFSET');
+		AssertEquals_INT(Expected := 0, Actual := nIdx, Message := 'no RA.OFFSET field');
+		F_Note(bFailed := nIdx <> 0, sText := CONCAT(sTest, 'no RA.OFFSET field'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Telemetry_Estop_Global_1" Id="{306602fe-c239-47d2-a2d4-c80be962d0c7}">
+      <Declaration><![CDATA[METHOD PRIVATE Telemetry_Estop_Global_1
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+	i			: INT;
+	nFirstBad	: INT;
+	nIdx		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Telemetry_Estop_Global_1');
+sTest := 'Telemetry_Estop_Global_1: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// the telemetry method is called directly once the clock is valid, so nothing else publishes into the record
+	IF rig.ClockValid THEN
+		rig.SetEstop(bValue := TRUE);
+		rig.fbComm.Start(sNameFilter := 'TELESCOPE.STATUS.GLOBAL');
+		rig.fbTel._SendTelemetryEquitorial();
+		rig.fbComm.Stop();
+		AssertEquals_INT(Expected := 1, Actual := rig.fbComm.nCount, Message := 'one STATUS.GLOBAL record');
+		F_Note(bFailed := rig.fbComm.nCount <> 1, sText := CONCAT(sTest, 'one STATUS.GLOBAL record'));
+		IF rig.fbComm.nCount >= 1 THEN
+			AssertFalse(Condition := F_NoteNear(sTest, 1.0, rig.fbComm.aValues[1], 1.0E-12), Message := 'E-stop is STATUS.GLOBAL 1 (#14)');
+		END_IF
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ReadyState_Is_Published_At_Power_On" Id="{4896d495-5859-4b2b-8c3d-cbf9da4d9a4f}">
+      <Declaration><![CDATA[METHOD PRIVATE ReadyState_Is_Published_At_Power_On
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+	i			: INT;
+	nFirstBad	: INT;
+	nIdx		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('ReadyState_Is_Published_At_Power_On');
+sTest := 'ReadyState_Is_Published_At_Power_On: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then record only READY_STATE (the telemetry timer and PublishDue both publish it) and power on
+	IF rig.ClockValid THEN
+		rig.fbComm.Start(sNameFilter := 'TELESCOPE.READY_STATE');
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// READY_STATE 1.0 reached
+	IF rig.Online THEN
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// a few more scans so a publish on the change can come out (PublishDue, I:1023-1025)
+	IF nCycles >= 10 THEN
+		rig.fbComm.Stop();
+		AssertTrue(Condition := rig.fbComm.nCount >= 1, Message := 'READY_STATE was published');
+		F_Note(bFailed := rig.fbComm.nCount < 1, sText := CONCAT(sTest, 'READY_STATE was published'));
+		IF rig.fbComm.nCount >= 1 THEN
+			AssertEquals_INT(Expected := 1, Actual := rig.fbComm.aKinds[rig.fbComm.nCount], Message := 'published as LREAL');
+			F_Note(bFailed := rig.fbComm.aKinds[rig.fbComm.nCount] <> 1, sText := CONCAT(sTest, 'published as LREAL'));
+			AssertFalse(Condition := F_NoteNear(sTest, 1.0, rig.fbComm.aValues[rig.fbComm.nCount], 1.0E-12), Message := 'the last READY_STATE is 1.0');
+		END_IF
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

@@ -14,6 +14,12 @@ Not_Settled_Restarts_The_Count();
 No_Disable_Without_Arm();
 Disable_Is_A_One_Scan_Pulse();
 Cancel_Drops_The_Request();
+ArmAll_Disables_Calibrated_Axes_Too();
+ArmAll_Is_Idempotent();
+ArmAll_Waits_For_The_Focus();
+Arm_Ignores_OtherBusy();
+Arm_Does_Not_Narrow_A_Pending_ArmAll();
+Cancel_Clears_All_Mode();
 ]]></ST>
     </Implementation>
     <Method Name="Disables_Uncalibrated_Axes_After_Three_Settled_Scans" Id="{45680a00-18a4-4788-9e68-873e3787f22d}">
@@ -163,6 +169,136 @@ FOR i := 1 TO 10 DO
 fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
 END_FOR
 AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'cancelled');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ArmAll_Disables_Calibrated_Axes_Too" Id="{a1f0c3d2-5b6e-4a71-8c94-0d2e7f3a1b01}">
+      <Declaration><![CDATA[// #197: a park without a completed power-on switches every axis off, calibrated or not
+METHOD PRIVATE ArmAll_Disables_Calibrated_Axes_Too
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('ArmAll_Disables_Calibrated_Axes_Too');
+fbSw.ArmAll();
+FOR i := 1 TO 2 DO
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'two scans: not yet');
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableHa, Message := 'HA off although calibrated');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableDec, Message := 'Dec off although calibrated');
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'one scan only');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ArmAll_Is_Idempotent" Id="{a1f0c3d2-5b6e-4a71-8c94-0d2e7f3a1b02}">
+      <Declaration><![CDATA[// #197: the arbitration calls ArmAll every scan
+METHOD PRIVATE ArmAll_Is_Idempotent
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('ArmAll_Is_Idempotent');
+FOR i := 1 TO 2 DO
+fbSw.ArmAll();
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+fbSw.ArmAll();
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableHa, Message := 'ArmAll every scan does not restart the count');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ArmAll_Waits_For_The_Focus" Id="{a1f0c3d2-5b6e-4a71-8c94-0d2e7f3a1b03}">
+      <Declaration><![CDATA[// #197: the focus must not be moving when the axes are switched off (#56)
+METHOD PRIVATE ArmAll_Waits_For_The_Focus
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('ArmAll_Waits_For_The_Focus');
+fbSw.ArmAll();
+FOR i := 1 TO 20 DO
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE, bOtherBusy := TRUE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'the focus is moving');
+FOR i := 1 TO 3 DO
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE, bOtherBusy := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableDec, Message := 'off when the focus is at rest');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Arm_Ignores_OtherBusy" Id="{a1f0c3d2-5b6e-4a71-8c94-0d2e7f3a1b04}">
+      <Declaration><![CDATA[// #113 mode unchanged
+METHOD PRIVATE Arm_Ignores_OtherBusy
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Arm_Ignores_OtherBusy');
+fbSw.Arm();
+FOR i := 1 TO 3 DO
+fbSw(bSettled := TRUE, bHaCalibrated := FALSE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE, bOtherBusy := TRUE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableHa, Message := 'the stop of #113 does not wait for the focus');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableDec, Message := 'calibrated axis stays on');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Arm_Does_Not_Narrow_A_Pending_ArmAll" Id="{a1f0c3d2-5b6e-4a71-8c94-0d2e7f3a1b05}">
+      <Declaration><![CDATA[// a stop after the park request must not undo the all-axes mode
+METHOD PRIVATE Arm_Does_Not_Narrow_A_Pending_ArmAll
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Arm_Does_Not_Narrow_A_Pending_ArmAll');
+fbSw.ArmAll();
+fbSw.Arm();
+FOR i := 1 TO 3 DO
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := TRUE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableHa, Message := 'still the all-axes mode');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Cancel_Clears_All_Mode" Id="{a1f0c3d2-5b6e-4a71-8c94-0d2e7f3a1b06}">
+      <Declaration><![CDATA[// Cancel drops the all-axes mode
+METHOD PRIVATE Cancel_Clears_All_Mode
+VAR
+	fbSw	: FB_SweepStop;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Cancel_Clears_All_Mode');
+fbSw.ArmAll();
+fbSw.Cancel();
+fbSw.Arm();
+FOR i := 1 TO 3 DO
+fbSw(bSettled := TRUE, bHaCalibrated := TRUE, bDecCalibrated := FALSE, bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbSw.bDisableHa, Message := 'calibrated axis stays on after Cancel');
+AssertEquals_BOOL(Expected := TRUE, Actual := fbSw.bDisableDec, Message := 'uncalibrated axis off');
 TEST_FINISHED();
 ]]></ST>
       </Implementation>
