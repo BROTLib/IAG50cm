@@ -164,8 +164,7 @@ nCycles := nCycles + 1;
 CASE nStep OF
 0:	// the telemetry method is called directly once the clock is valid, so nothing else publishes into the record
 	IF rig.ClockValid THEN
-		rig.fbTel.HourAngleOffset := 0.01;
-		rig.fbTel.DeclinationOffset := -0.02;
+		rig.SetOffsets(fHourAngle := 0.01, fDeclination := -0.02);
 		rig.fbComm.Start(sNameFilter := '');
 		rig.fbTel._SendTelemetryEquitorial();
 		rig.fbComm.Stop();
@@ -220,7 +219,7 @@ nCycles := nCycles + 1;
 CASE nStep OF
 0:	// the telemetry method is called directly once the clock is valid, so nothing else publishes into the record
 	IF rig.ClockValid THEN
-		rig.fbTel.bEstopTriggered := TRUE;
+		rig.SetEstop(bValue := TRUE);
 		rig.fbComm.Start(sNameFilter := 'TELESCOPE.STATUS.GLOBAL');
 		rig.fbTel._SendTelemetryEquitorial();
 		rig.fbComm.Stop();

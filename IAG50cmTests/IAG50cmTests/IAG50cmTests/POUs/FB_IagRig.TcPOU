@@ -146,6 +146,32 @@ fbDec.bMockNoStopDone := bDec;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetOffsets" Id="{7c1d4a52-3be0-4f0b-9a5e-0d6a1c2f8b11}">
+      <Declaration><![CDATA[// the user offsets of the telescope under test (degrees; IAG50cm#17 telemetry tests)
+METHOD SetOffsets
+VAR_INPUT
+	fHourAngle	: LREAL;
+	fDeclination	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.HourAngleOffset := fHourAngle;
+fbTel.DeclinationOffset := fDeclination;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetEstop" Id="{2e9b6f03-51a7-4c8d-b3f4-8a7d90e1c622}">
+      <Declaration><![CDATA[// the E-stop input of the telescope under test (#14)
+METHOD SetEstop
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bEstopTriggered := bValue;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="InjectHaError" Id="{905dc23c-55b4-4eb7-a513-f6b52cccde02}">
       <Declaration><![CDATA[METHOD InjectHaError
 VAR_INPUT
