@@ -8,7 +8,7 @@
 // Plan: BROTLib specs/plans/2026-10-21-telescope-state-machine-unification.md (D1, step 2).
 FUNCTION_BLOCK FB_IagRig
 VAR
-	fbComm			: FB_NullComm;
+	fbComm			: FB_RecordingComm;	// records nothing until a test calls Start (IagTelemetry_Tests)
 	fbHa			: FB_HourAngleMock(comm := fbComm);
 	fbDec			: FB_DeclinationMock(comm := fbComm);
 	fbFocus			: FB_FocusMock;

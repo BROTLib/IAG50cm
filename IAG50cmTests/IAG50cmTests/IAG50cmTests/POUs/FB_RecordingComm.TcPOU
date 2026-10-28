@@ -1,0 +1,214 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_RecordingComm" Id="{16e8d6e3-62c4-4300-b64b-3dddd69dc399}" SpecialFunc="None">
+    <Declaration><![CDATA[// I_Comm stub that records the Publish* calls of a test (parameter name, kind, value), for the telemetry characterization
+// (IagTelemetry_Tests). Like FB_NullComm every call reports success. Recording is off until Start(), so the suites that
+// do not look at the telemetry pay only the memory.
+// Kinds: 1 LREAL, 2 INT (value as LREAL), 3 BOOL (0.0/1.0), 4 STRING (value not kept), 5 Publish (not kept).
+FUNCTION_BLOCK FB_RecordingComm IMPLEMENTS BROTLib.I_Comm
+VAR_OUTPUT
+	nCount		: INT;			// records in aNames/aKinds/aValues (1..nCount)
+	bOverflow	: BOOL;			// more than 160 calls: the last slot holds the newest call
+	aNames		: ARRAY[1..160] OF STRING(80);
+	aKinds		: ARRAY[1..160] OF INT;
+	aValues		: ARRAY[1..160] OF LREAL;
+END_VAR
+VAR
+	bRecording	: BOOL;
+	sFilter		: STRING(80);
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="Publish" Id="{d09c4159-f8aa-400f-be89-f06f0ddd0a4a}">
+      <Declaration><![CDATA[METHOD Publish : BOOL
+VAR_INPUT
+	domain			: STRING(255) := 'environment';
+	location		: STRING(255) := 'roof';
+	parameter		: STRING(255);
+	value			: STRING(255);
+END_VAR
+VAR_OUTPUT
+	published	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Record(sName := parameter, nKind := 5, fValue := 0.0);
+Publish := TRUE;
+published := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="PublishLREAL" Id="{455f469c-4b43-4249-896f-d7439b51c2c5}">
+      <Declaration><![CDATA[METHOD PublishLREAL : BOOL
+VAR_INPUT
+	domain			: STRING(255) := 'environment';
+	location		: STRING(255) := 'roof';
+	parameter		: STRING(255);
+	value			: LREAL;
+END_VAR
+VAR_OUTPUT
+	published	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Record(sName := parameter, nKind := 1, fValue := value);
+PublishLREAL := TRUE;
+published := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="PublishINT" Id="{ec3142d8-e5ea-4779-aa0b-4ef06ffa9c51}">
+      <Declaration><![CDATA[METHOD PublishINT : BOOL
+VAR_INPUT
+	domain			: STRING(255) := 'environment';
+	location		: STRING(255) := 'roof';
+	parameter		: STRING(255);
+	value			: LINT;
+END_VAR
+VAR_OUTPUT
+	published	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Record(sName := parameter, nKind := 2, fValue := LINT_TO_LREAL(value));
+PublishINT := TRUE;
+published := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="PublishBOOL" Id="{8aecab3e-bd9d-48e3-8165-b7d92bebd1d5}">
+      <Declaration><![CDATA[METHOD PublishBOOL : BOOL
+VAR_INPUT
+	domain			: STRING(255) := 'environment';
+	location		: STRING(255) := 'roof';
+	parameter		: STRING(255);
+	value			: BOOL;
+END_VAR
+VAR_OUTPUT
+	published	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Record(sName := parameter, nKind := 3, fValue := SEL(value, 0.0, 1.0));
+PublishBOOL := TRUE;
+published := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="PublishString" Id="{05a26dcd-a3b8-4a40-a81c-bc8e3af7bb52}">
+      <Declaration><![CDATA[METHOD PublishString : BOOL
+VAR_INPUT
+	domain			: STRING(255) := 'environment';
+	location		: STRING(255) := 'roof';
+	parameter		: STRING(255);
+	value			: STRING(255);
+END_VAR
+VAR_OUTPUT
+	published	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Record(sName := parameter, nKind := 4, fValue := 0.0);
+PublishString := TRUE;
+published := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="PublishLog" Id="{6ba5f234-0740-44d5-8971-260f7df4f23a}">
+      <Declaration><![CDATA[METHOD PublishLog : BOOL
+VAR_INPUT
+	level		: STRING(255) := 'INFO';
+	message		: STRING(255);
+END_VAR
+VAR_OUTPUT
+	published	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[PublishLog := TRUE;
+published := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Record" Id="{c242eb64-765d-4bf2-b5a7-6ed49034b742}">
+      <Declaration><![CDATA[METHOD PRIVATE Record
+VAR_INPUT
+	sName	: STRING(255);
+	nKind	: INT;
+	fValue	: LREAL;
+END_VAR
+VAR
+	nIndex	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bRecording THEN
+	RETURN;
+END_IF
+IF sFilter <> '' AND sFilter <> sName THEN
+	RETURN;
+END_IF
+IF nCount >= 160 THEN
+	// full: the last slot keeps the latest call, so a filtered recording still ends with the newest value
+	bOverflow := TRUE;
+	nIndex := 160;
+ELSE
+	nCount := nCount + 1;
+	nIndex := nCount;
+END_IF
+aNames[nIndex] := sName;
+aKinds[nIndex] := nKind;
+aValues[nIndex] := fValue;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Start" Id="{5af6e0a8-b4c6-411c-a029-00684622728b}">
+      <Declaration><![CDATA[// Clears the record and starts recording; sNameFilter <> '' records only calls with that parameter name.
+METHOD Start
+VAR_INPUT
+	sNameFilter	: STRING(80);
+END_VAR
+VAR
+	i	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO 160 DO
+	aNames[i] := '';
+	aKinds[i] := 0;
+	aValues[i] := 0.0;
+END_FOR
+nCount := 0;
+bOverflow := FALSE;
+sFilter := sNameFilter;
+bRecording := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop" Id="{e2e8b470-f139-4271-8923-62aa6ed0aac3}">
+      <Declaration><![CDATA[METHOD Stop
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bRecording := FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IndexOf" Id="{9e9ccefe-b5e0-4803-af39-8b7116da0597}">
+      <Declaration><![CDATA[// first record with this parameter name, 0 if none
+METHOD IndexOf : INT
+VAR_INPUT
+	sName	: STRING(80);
+END_VAR
+VAR
+	i	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IndexOf := 0;
+FOR i := 1 TO nCount DO
+	IF aNames[i] = sName THEN
+		IndexOf := i;
+		RETURN;
+	END_IF
+END_FOR
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

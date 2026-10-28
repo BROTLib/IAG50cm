@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="F_NoteNear" Id="{5d898a12-ea87-485c-802f-9b673162e25d}" SpecialFunc="None">
+    <Declaration><![CDATA[// TRUE (and a line in GVL_Diag.sFailures through F_Note) if fActual is not within fDelta of fExpected. NaN counts as failed.
+FUNCTION F_NoteNear : BOOL
+VAR_INPUT
+	sText		: STRING(120);
+	fExpected	: LREAL;
+	fActual		: LREAL;
+	fDelta		: LREAL;
+END_VAR
+VAR
+	bNote		: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[F_NoteNear := NOT (ABS(fExpected - fActual) <= fDelta);
+IF F_NoteNear THEN
+	bNote := F_Note(bFailed := TRUE, sText := CONCAT(CONCAT(CONCAT(CONCAT(CONCAT(sText, ': expected '), LREAL_TO_STRING(fExpected)), ' +-'), LREAL_TO_STRING(fDelta)), CONCAT(', got ', LREAL_TO_STRING(fActual))));
+END_IF
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>
