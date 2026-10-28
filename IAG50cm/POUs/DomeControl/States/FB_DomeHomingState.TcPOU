@@ -8,6 +8,15 @@ END_VAR
     <Implementation>
       <ST><![CDATA[]]></ST>
     </Implementation>
+    <Method Name="CloseCommand" Id="{96eb34ec-9bda-4062-8e6e-6efc1b49e119}">
+      <Declaration><![CDATA[
+METHOD CloseCommand : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// #202: a close is accepted in every state, it is the way to shut the roof
+pDome^.SetState(pDome^.fbDomeCloseingState);]]></ST>
+      </Implementation>
+    </Method>
     <Property Name="StateID" Id="{ea9d5ebe-24bb-49b3-9665-3a8e0bb9c382}">
       <Declaration><![CDATA[
 PROPERTY StateID : STRING

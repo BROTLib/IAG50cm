@@ -17,7 +17,7 @@ END_VAR
 METHOD CloseCommand : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
+        <ST><![CDATA[LogIgnored(sCommand := 'close', sLevel := 'WARNING');]]></ST>
       </Implementation>
     </Method>
     <Method Name="FB_init" Id="{22775cbc-30f9-4d1f-bce5-a59c9bbf2750}">
@@ -46,7 +46,42 @@ METHOD FoundError : BOOL
 METHOD HomeCommand : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
+        <ST><![CDATA[LogIgnored(sCommand := 'home', sLevel := 'INFO');]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="LogEvent" Id="{498ac7c6-4fe1-4a20-8711-0abc6d706da5}">
+      <Declaration><![CDATA[// #202: a line to the ADS log and to 50cm/Log (level WARNING or INFO)
+METHOD LogEvent : BOOL
+VAR_INPUT
+	sText		: STRING(255);
+	sLevel		: STRING(20) := 'INFO';
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF sLevel = 'WARNING' THEN
+	ADSLOGSTR(ADSLOG_MSGTYPE_WARN OR ADSLOG_MSGTYPE_LOG, '%s', sText);
+ELSE
+	ADSLOGSTR(ADSLOG_MSGTYPE_HINT OR ADSLOG_MSGTYPE_LOG, '%s', sText);
+END_IF
+IF pDome <> 0 THEN
+	IF pDome^.fbComm <> 0 THEN
+		pDome^.fbComm.PublishLog(level := sLevel, message := sText);
+	END_IF
+END_IF
+LogEvent := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="LogIgnored" Id="{3f1c7a52-8d44-4b0e-9a6e-5b2f0c7d1e21}">
+      <Declaration><![CDATA[// #202: a command that the state does not handle is dropped. Before, it was dropped without a trace: four dome_close
+// went unnoticed while the dome was stuck in Closing.
+METHOD LogIgnored : BOOL
+VAR_INPUT
+	sCommand	: STRING(20);
+	sLevel		: STRING(20) := 'INFO';
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[LogIgnored := LogEvent(sText := CONCAT(CONCAT(CONCAT('Dome: ', sCommand), ' ignored in '), THIS^.StateID), sLevel := sLevel);]]></ST>
       </Implementation>
     </Method>
     <Method Name="MoveCommand" Id="{4d982227-1478-4c88-8c1e-b787654c2e0b}">
@@ -61,7 +96,7 @@ METHOD HomeCommand : BOOL
 METHOD OpenCommand : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
+        <ST><![CDATA[LogIgnored(sCommand := 'open', sLevel := 'INFO');]]></ST>
       </Implementation>
     </Method>
     <Method Name="ParkCommand" Id="{cf08df73-a434-4c35-812b-6a2a7fad3eb0}">
@@ -69,7 +104,7 @@ METHOD OpenCommand : BOOL
 METHOD ParkCommand : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
+        <ST><![CDATA[LogIgnored(sCommand := 'park', sLevel := 'INFO');]]></ST>
       </Implementation>
     </Method>
     <Method Name="ResetCommand" Id="{885bf905-2242-4d03-aaf3-a4eea3c12535}">
@@ -77,7 +112,7 @@ METHOD ParkCommand : BOOL
 METHOD ResetCommand : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
+        <ST><![CDATA[LogIgnored(sCommand := 'reset', sLevel := 'INFO');]]></ST>
       </Implementation>
     </Method>
     <Method Name="RunState" Id="{551f815e-d0a0-47f3-a1bf-76df06e0e526}">
@@ -107,7 +142,7 @@ END_VAR
 METHOD StopCommand : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[]]></ST>
+        <ST><![CDATA[LogIgnored(sCommand := 'stop', sLevel := 'INFO');]]></ST>
       </Implementation>
     </Method>
     <Method Name="SuccessfulFinished" Id="{062c433e-903b-4e33-8ead-c5a8ea2c9e66}">
