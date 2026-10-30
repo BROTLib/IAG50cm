@@ -74,7 +74,7 @@ END_IF
 comm(	
 	sHostName			:= '169.254.149.100',
     nHostPort  			:= 1883,
-    nKeepAlive  		:= 60,
+    nKeepAlive  		:= 10,
 	sTopicSub  		 	:= '50cm/Telescope/SET',
 	sTopicPublish		:= '50cm/Telemetry',
 	sTopicLog			:= '50cm/Log',
