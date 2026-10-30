@@ -134,6 +134,7 @@ VAR
 	bParkHomeFirst		: BOOL;		// #84: a park was requested in a limit, the home runs first (one scan): logs it
 	bSafeParked			: BOOL;		// an axes-off park is closing the covers and parking the dome, the mount was not moved: READY_STATE 0.3 until done (#110, #187)
 	bParkedInPlace		: BOOL;		// the last park ended where the mount stood (axes off, covers closed, dome parked): bIsParked is TRUE, the mount may not be at the park position (#187)
+	bStopIgnored		: BOOL;		// #196: a stop arrived during the in-place park (one scan): logs that it is ignored
 	bParkInPlaceDone	: BOOL;		// an axes-off park just ended (one scan): logs it
 	bParkInPlaceOpen	: BOOL;		// #197/#200: the park that logged PARK commencing goes on as an in-place park; its end line is the PARK end line
 	sParkInPlaceEnd		: STRING(160);	// #200: how the in-place park ended: completed in place, or why it was aborted
@@ -170,6 +171,7 @@ VAR
 	TCSsoftErrorEvent,
 	TCSparkErrorEvent,
 	TCSparkInPlaceEvent,
+	TCSstopIgnoredEvent,
 	TCShomeCancelEvent,
 	TCSpowerBlockedEvent,
 	TCSpowerParkEvent,
@@ -588,6 +590,9 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 		bGoHome := FALSE;
 		sHomeEnd := 'cancelled by stop';
 		_HomeTelescope();
+	ELSIF bSafeParked THEN
+		// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
+		bStopIgnored := TRUE;
 	END_IF
 	TCS_command := E_TCSCommand.stop;
 
@@ -1159,6 +1164,12 @@ TCSstopEvent(	Trigger := bStop,
 				OffMEssage := 'completed',
 				OffLevel := ADSLOG_MSGTYPE_HINT, 
 				Comm := fbComm);
+TCSstopIgnoredEvent(	Trigger := bStopIgnored,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := '%s',
+				OnMessage := 'Stop ignored: the covers and the dome cannot be stopped, the in-place park continues.',
+				Comm := fbComm);
+bStopIgnored := FALSE;
 TCStargetHorizonEvent(	Trigger := rtrigHorizonError.Q, 
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
@@ -1832,6 +1843,7 @@ IF NOT bPower OR bReset OR bError OR bStop OR bInterupted THEN
         bPower := FALSE;
     END_IF
 	nStage := 0;
+	nLastStage := 0;	// #195: else the stages up to the aborted one are not logged in the next power-on
 	RETURN;
 END_IF
 
@@ -1856,6 +1868,7 @@ IF tonCalibTimeout.Q THEN
 	fbStartup.MarkAborted();
 	bPower := FALSE;
 	nStage := 0;
+	nLastStage := 0;	// #195
 	RETURN;
 END_IF
 

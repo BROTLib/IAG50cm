@@ -14,6 +14,7 @@ END_VAR
 Stop_During_PowerOn_Aborts_The_Startup();
 AxesOff_Park_After_Stopped_Startup_Reports_Parked();
 AxesOff_Park_With_Slow_Covers_Reports_Parking_Then_Parked();
+Stop_During_AxesOff_Park_Does_Not_Cancel_It();
 AxesOff_Park_Gives_Up_When_The_Covers_Do_Not_Close();
 Park_In_The_Sweep_Parks_In_Place();
 Park_After_Stage_100_Still_Moves_To_The_Park_Position();
@@ -313,6 +314,112 @@ CASE nStep OF
 	ELSIF nCycles > 400 THEN
 		AssertTrue(Condition := FALSE, Message := 'the covers were never commanded to close');
 		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the covers were never commanded to close'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+40:	// the covers closed: parked in place
+	IF rig.fbTel.ReadyState = 0.0 THEN
+		AssertTrue(Condition := rig.fbTel.bIsParked, Message := 'bIsParked is TRUE once the covers are closed (#187)');
+		F_Note(bFailed := NOT (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked is TRUE once the covers are closed (#187)'));
+		AssertTrue(Condition := rig.fbTel.bParkedInPlace, Message := 'bParkedInPlace is TRUE, the mount was not moved');
+		F_Note(bFailed := NOT (rig.fbTel.bParkedInPlace), sText := CONCAT(sTest, 'bParkedInPlace is TRUE, the mount was not moved'));
+		AssertTrue(Condition := NOT rig.fbTel.bSafeParked, Message := 'the axes-off park is finished');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bSafeParked), sText := CONCAT(sTest, 'the axes-off park is finished'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'READY_STATE did not reach 0.0 after the covers closed');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'READY_STATE did not reach 0.0 after the covers closed'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_During_AxesOff_Park_Does_Not_Cancel_It" Id="{70041238-b305-4e87-8d55-d75d370cfc1c}">
+      <Declaration><![CDATA[// IAG50cm#196: a stop during the axes-off park (covers closing) is ignored and logged ('Stop ignored'): the park goes on and ends parked in place.
+METHOD PRIVATE Stop_During_AxesOff_Park_Does_Not_Cancel_It
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_During_AxesOff_Park_Does_Not_Cancel_It');
+sTest := 'Stop_During_AxesOff_Park_Does_Not_Cancel_It: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the power-on has commanded the covers: stop now
+	IF rig.fbCovers.nOpenCalls >= 1 THEN
+		rig.fbTel.Stop();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the power-on never commanded the covers');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the power-on never commanded the covers'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the stop has settled: the covers now close slowly, park with the axes off
+	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		rig.fbCovers.HoldClose(bHold := TRUE);
+		rig.fbTel.Park();
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not settle'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// the covers were commanded but are not closed: 0.3 (parking), not parked, not 0 and not -2
+	IF rig.fbCovers.nCloseCalls >= 1 AND nCycles > 20 THEN
+		AssertTrue(Condition := rig.fbTel.ReadyState = 0.3, Message := 'READY_STATE is 0.3 while the covers close (#187)');
+		F_Note(bFailed := NOT (rig.fbTel.ReadyState = 0.3), sText := CONCAT(sTest, 'READY_STATE is 0.3 while the covers close (#187)'));
+		AssertTrue(Condition := NOT rig.fbTel.bIsParked, Message := 'bIsParked stays FALSE until the covers are closed');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked stays FALSE until the covers are closed'));
+		AssertTrue(Condition := rig.fbTel.bSafeParked, Message := 'the axes-off park is pending');
+		F_Note(bFailed := NOT (rig.fbTel.bSafeParked), sText := CONCAT(sTest, 'the axes-off park is pending'));
+		rig.fbTel.Stop();
+		nStep := 35;
+		nCycles := 0;
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the covers were never commanded to close');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the covers were never commanded to close'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+35:	// the stop has settled: the park was not cancelled
+	IF NOT rig.fbTel.bStop AND nCycles > 5 THEN
+		AssertTrue(Condition := rig.fbTel.bSafeParked, Message := 'the stop does not cancel the axes-off park (#196)');
+		F_Note(bFailed := NOT (rig.fbTel.bSafeParked), sText := CONCAT(sTest, 'the stop does not cancel the axes-off park (#196)'));
+		AssertTrue(Condition := rig.fbTel.ReadyState = 0.3, Message := 'READY_STATE stays 0.3 after the stop (#196)');
+		F_Note(bFailed := NOT (rig.fbTel.ReadyState = 0.3), sText := CONCAT(sTest, 'READY_STATE stays 0.3 after the stop (#196)'));
+		rig.fbCovers.FinishClose();
+		nStep := 40;
+		nCycles := 0;
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not settle'));
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
