@@ -17,5 +17,4 @@ FB_PointingModelInversion.TcPOU
 F_HourAngleOffsetOnAxis.TcPOU
 F_RoundLREAL.TcPOU
 NCError_TO_STRING.TcPOU
-ST_TelescopeConfig.TcDUT
 ST_AxisStatus.TcDUT

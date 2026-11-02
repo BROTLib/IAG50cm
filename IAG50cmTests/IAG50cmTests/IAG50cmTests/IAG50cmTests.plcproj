@@ -75,9 +75,6 @@
     <Compile Include="POUs\ST_AxisStatus.TcDUT">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\ST_TelescopeConfig.TcDUT">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_AxisMockCore.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -196,7 +193,7 @@
       <Namespace>AstroBROT</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.15.1 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.17.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Math">
