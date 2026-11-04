@@ -1,33 +1,15 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_TelescopeControl" Id="{10c2c294-efcf-424f-afd3-75ac57a5e8bc}" SpecialFunc="None">
-    <Declaration><![CDATA[FUNCTION_BLOCK FB_TelescopeControl IMPLEMENTS I_RaDecTelescope, I_Telescope
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_TelescopeControl EXTENDS BROTLib.FB_RaDecTelescopeControl, I_Telescope
 VAR_INPUT
 (*
 TCS interface section
 see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 *)
-	bPower				: BOOL;		// true: Power on
-	bGoHome				: BOOL;		// true: go to home position, unset track/goto if active
-	bPark				: BOOL;		// boolean, true: go into park position, ready to stow telescope, unset track/goto
-	bTrack				: BOOL;		// boolean, TRUE: MOVE telescope TO last ra/de AND start tracking. Set 'goto' TO FALSE, IF TRUE. FALSE: Stop tracking as soon as possible
-	bGoto				: BOOL;		// boolean, TRUE: MOVE telescope TO tau/de AND stop there. Set track TO FALSE, IF TRUE. FALSE: no effect.)	
-	bSlew				: BOOL;		// move the telescope to a given az-alt position
-	bStop				: BOOL;		// boolean, TRUE: Stop motion OF telescope immediately, set goto AND track TO FALSE. FALSE: Allow motion OF telescope again via track/goto).	
-	bReset				: BOOL;		// initiates reset on all axis
 	bSafetyAckRequest	: BOOL;		// set by a telescope reset, taken (and cleared) by MAIN which gives the safety acknowledge (#11)
 	bStartupAxisReset	: BOOL;		// set by MAIN once when the safety start-up is done: one axis reset pass like after the reset acknowledge (#103)
-	bAutoTrack			: BOOL := TRUE;	// automatic tracking after goto
 	nTimeDivisor		: UDINT := 1;	// test seam (plan decision 4): divides the long timeouts (600 s, 2 min, 12 h); production leaves it at 1
-	fRightAscension		: LREAL :=  0.0;	//  right ascension, degrees, double	
-	fDeclination		: LREAL :=  0.0;	//  declination, degrees, double
-	fDeclinationApparent: LREAL :=	0.0;	// apparent declination , degrees, double
-	fElevation			: LREAL :=  0.0;	// desired elevation of the telescope pointing
-	fAzimuth			: LREAL :=  0.0;	// desired azimut of the telescope pointing
-	fHourAngleOffset	: LREAL := 0.0;		// absolute offset for right ascension
-	fDeclinationOffset 	: LREAL := 0.0;		// absolute offset for declination
-	fTimeOffset			: LREAL := 0.0;		// absolute offset for time
-	fHorizon			: LREAL := 1.0;		// ELEVATION below which value the telescope will not go
 	fPoleZone			: LREAL := 3.0;		// 90° - fPoleZone = No go zone near the Pole
 	fPointingSafeAltitude	: LREAL := 5.0;	// ELEVATION below which the pointing model's fixed-point inversion is not numerically reliable (chaotic, see FB_PointingModelInversion / testing/check_pointing_inversion.py); gates goto/slew targets and tracking in addition to fHorizon
 	
@@ -35,12 +17,9 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	
 	// TRUE while the E-stop is triggered (MAIN: safetyHandling.estop): disables both axes, which only the next
 	// power-on enables again, and publishes STATUS.GLOBAL = 1
-	bEstopTriggered		: BOOL	:= FALSE;
 	// MAIN: safetyHandling.ackPending (previous scan). An E-stop was seen and no clean safety acknowledge has run
 	// since: the reset fires on it even without an error, and a power-on is refused (#59)
 	bSafetyAckPending	: BOOL	:= FALSE;
-	bMainReady			: BOOL	:= TRUE;
-	bCoverAutoOpen		: BOOL	:= TRUE;
     fStartupFocusTolerance : LREAL := 0.005; // match FB_FocusControl.fTolerance; align if that axis setting changes
 	fbFocus				: I_Focus;
 	fbCovers			: I_MirrorCovers;
@@ -49,24 +28,11 @@ see https://gitlab.aip.de/bmk10k/telescope_firmware/snippets/5
 	fbHourAngle			: REFERENCE TO FB_HourAngleControl;
 	fbDeclination		: REFERENCE TO FB_DeclinationControl;
 
-	telescopeConfig		: ST_TelescopeConfig;
 END_VAR
 VAR
     fbStartup : BROTLib.FB_StartupControl;
-	fbComm 				: I_Comm;
 	fbCabinet			: FB_CabinetControl;
-	
-	TCS_command			: E_TCSCommand;	// actual command from the TCS
-	fJd					: LREAL;	// current Julian Date calculated from system time
-	fLst				: LREAL;	// local siderial time calculated from Julian date in hours
-	fElevationCalc		: LREAL;	// elevation calulated when ra and dec are set by TCS 
-	fAzimuthCalc		: LREAL;	// azimuth calulated when ra and dec are set by TCS
-	fHourAngleApparent	: LREAL;	// hourangle when ra and dec are set by TCS
-	
-	fRightAscensionCalc	: LREAL;	// right ascension calulated when azimuth and elevation are set by TCS
-	fDeclinationCalc	: LREAL;	// declination calulated when azimuth and elevation are set by TCS
-	fHourAngleCalc		: LREAL;	// hour angle azimuth and elevation are set by TCS
-	
+
 	fHourAnglePointingOffset	: LREAL; // pointing offset to sky
 	fDeclinationPointingOffset	: LREAL; // pointing offset to sky
 	fHourAngleInversionOffset	: LREAL;
@@ -76,7 +42,6 @@ VAR
 	bPointingInversionValid		: BOOL;		// FALSE near the horizon where the inversion doesn't converge; fHourAngleInversionOffset/fDeclinationInversionOffset then keep their last valid value
 	fHourAngleVelocity			: LREAL;	// rotational velocity of the HourAngle
 	fDeclinationVelocity		: LREAL;	// rotational velocity of the Declination
-	fbTime				: FB_AstroClock;	// precise astronomical	time
 	fbEq2Hor			: FB_EQ2HOR;
 	fbHor2Eq			: FB_HOR2EQ;
 	fbHaDec2RaDec		: FB_HADEC2RADEC;
@@ -91,7 +56,6 @@ VAR
 	rtrigHorizonError	: R_TRIG;		// if the set Coordinate is below the Horizon threshold fHorizon
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
-	rtrigReset		: R_TRIG;
 	rtrigPoweredClear	: R_TRIG;		// #100: error or E-stop edge: the telescope is no longer powered
 	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
 	tonAxisResetAfterAck	: TON;
@@ -123,7 +87,6 @@ VAR
 	fbHomeDrop			: FB_HomeDropReason;	// #108/#120: why a pending home was dropped
 	tonHomePending		: FB_TimeoutTimer;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
-	bPowerFailure		: BOOL;		// triggers power-failure event
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
 	bPowerParked		: BOOL;		// a park aborted a running power-on (one scan, #109)
 	bInHorizonLimit		: BOOL;		// #84: the mount is below the horizon limit (the safety block homes it out)
@@ -145,9 +108,6 @@ VAR
 	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
 	sStopNoDone			: STRING(10);	// #120: the axes named in the stop timeout text
 	bStopTimeoutLog		: BOOL;		// #120: the stop transaction timed out or was released by the timeout (one scan); text in TCSstopTimeoutEvent.OnMessage
-	tpPowerOnWarning		: TP;		// triggers power warning
-	tonPowerTimeout		: FB_TimeoutTimer;		// power on timeout
-	tonCommandTimeout		: FB_TimeoutTimer;		// command timeout
 	// MONETcommon#17: 600 s timeouts of the goto/home/slew state machines. They were TONs in the methods' plain VAR, which is
 	// re-created on every call, so they never fired. Fed every scan in the body, reset when the command flag drops.
 	tonGotoTimeout			: FB_TimeoutTimer;
@@ -155,19 +115,7 @@ VAR
 	tonSlewTimeout			: FB_TimeoutTimer;
 	tonParkTimeout			: FB_TimeoutTimer;		// park had no state-machine timeout: covers that never close hung it forever
 	tonParkFocus			: FB_TimeoutTimer;		// park stage 80 waits for the focus move to end (#56), at most 60 s
-	tonTrackingDelay		: TON;		// tracking delay
 	
-	TCSpowerEvent,
-	TCSgohomeEvent,
-	TCSparkEvent,
-	TCSgotoEvent,
-	TCStrackEvent,
-	TCSstopEvent,
-	TCStargetHorizonEvent,
-	TCSaltitudeEvent,
-	TCSnearPoleEvent,
-	TCSreadyEvent,
-	TCSCTOEvent,
 	TCSsoftErrorEvent,
 	TCSparkErrorEvent,
 	TCSparkInPlaceEvent,
@@ -176,44 +124,19 @@ VAR
 	TCSpowerBlockedEvent,
 	TCSpowerParkEvent,
 	TCSparkHomeEvent,
-	TCScommandRefusedEvent	: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
+	TCScommandRefusedEvent		: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
 	TCSstopTimeoutEvent		: FB_Eventlog;	// #120: a stop transaction passed 30 s without a Done of an axis, and its release
-	tonMQTTTimer 			: TON := (PT:=T#5S);
-	
-	
+
 	nStatusWord, nLastStatus:	UDINT;
 	bTestError : BOOL; // Test Error, deactivates under reset command
 END_VAR
 VAR_OUTPUT
-	bReady				: BOOL;		// TRUE, IF telescope can be operated 
-	fReadyState 		: LREAL := 0.0; // -1 error, 0 parked, 0.3 parking, 0.7 initializing, 0.8 calibrating/positioning, 1 startup complete
-	bIsParked			: BOOL := TRUE;		// telescope is parked
-	bIsPowered			: BOOL;		// telescope is powered on
-	bError				: BOOL;		// indicates an error on one of the components
-	nErrorID			: UDINT;	//error id of axis
-	nMotionState		: INT	:= 0;
 	bSliding			: BOOL;		//TRUE, IF telescope is in fast-MOVE phase (includes pole-swap)	
-	bTracking			: BOOL;		//TRUE, IF telescope is on tracking position AND currently tracking.	
-	bStopped			: BOOL;		//TRUE, IF telescope is AT rest.	
 	fbSweepStop			: FB_SweepStop;	// #113: switches the uncalibrated axes off after a stop in the calibration sweep
 	bSettled			: BOOL;		// #98: at rest AND no stop transaction running (every stopped axis reported Done, no motion lock): gate of every home/restart that follows a stop
-	fHourAngleCurrent	: LREAL;	// current position of the hour angle (without pointing and offset correction)
-	fDeclinationCurrent	: LREAL;	// current position of the declination (without pointing and offset correction)
-	fRightAscensionCurrentICRS	: LREAL;	// true position of the right ascension (without pointing and offset correction) nut, aberr and precess corrected
-	fDeclinationCurrentICRS		: LREAL;	// true position of the declination (without pointing and offset correction) nut, aberr and precess corrected
-	fRightAscensionCurrentICRScorr	: LREAL;	// true position of the right ascension (with pointing and offset correction) nut, aberr and precess corrected
-	fDeclinationCurrentICRScorr		: LREAL;	// true position of the declination (with pointing and offset correction) nut, aberr and precess corrected
-	fElevationCurrent	: LREAL;	// current position in elevation (calculated) (without pointing and offset correction)
-	fAzimuthCurrent		: LREAL;	// current position in azimuth (calculated) (without pointing and offset correction)
-	fElevationCurrentSky	: LREAL;	// current position in elevation (calculated)
-	fAzimuthCurrentSky		: LREAL;	// current position in azimuth (calculated)
-	fSlewTime			: LREAL;	//	(time in sec. to reach the goto/track position) 
-	bHomed				: BOOL;		// True: telescope is calibrated
-	bBusy				: BOOL;		// telescope does not accept further commands
 	bLocalMode			: BOOL;		// TRUE if switch is flipped to prevent Robotic Mode
 END_VAR
 VAR CONSTANT
-	d2r		: LREAL := PI/180.0;
 	fSiderialVelocity: LREAL := 360.0 / 86164.099;
 END_VAR]]></Declaration>
     <Implementation>
