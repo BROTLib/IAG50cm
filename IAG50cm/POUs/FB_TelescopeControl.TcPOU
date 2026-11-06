@@ -77,7 +77,7 @@ VAR
 	sHomeEnd			: STRING(40) := 'completed';	// the same for the home (#75)
 	bHomeCancelled		: BOOL;		// a pending home that never started was dropped (one scan): logs the reason (#75)
 	sHomeDropWhy		: STRING(160);	// why the pending home was dropped, for the WARN text (#108)
-	fbStopTx			: FB_StopTransaction;	// #108/#120: one stop per axis and stop transaction
+	fbStopTx			: BROTLib.FB_StopTransaction;	// #108/#120: one stop per axis and stop transaction
 	rtHaMove			: R_TRIG;		// #92: MoveAxis of the axis went TRUE: the move command is out (MoveTo)
 	rtDecMove			: R_TRIG;
 	bHaMovePending		: BOOL;			// #92: a move was commanded and the NC does not report it yet: the axis is not at rest
@@ -862,22 +862,17 @@ IF bReset OR bError OR bEstopTriggered THEN
 	fbStopTx.Cancel();
 	fbSweepStop.Cancel();
 END_IF
-fbStopTx.nTimeDivisor := nTimeDivisor;
-fbStopTx.Monitor(	bStopped := bStopped,
-					bHaEnabled := fbHourAngle.bEnable, bDecEnabled := fbDeclination.bEnable,
-					bHaStopDone := aAxis[1].bStopDone, bDecStopDone := aAxis[2].bStopDone,
-					bHaLocked := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
-					bDecLocked := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0,
-					bHaHoming := fbHourAngle.fbLatchHome.Busy, bDecHoming := fbDeclination.fbLatchHome.Busy);
+_SetStopTxInputs();
+fbStopTx.Monitor();
 bSettled := bStopped AND NOT fbStopTx.bActive;
 
 // #120: a stop transaction that is not settled 30 s after it began (an axis never reported Done) no longer waits for the
 // Done: it settles as soon as the telescope is at rest. The stop is not sent again. Clear StopAxis of the axes without a
 // Done so that the next stop gives a rising edge (FB_AxisControl.StopAxis) and the home hold does not see a stale stop.
 IF fbStopTx.bTimedOut THEN
-	IF fbStopTx.bHaNoDone AND fbStopTx.bDecNoDone THEN
+	IF fbStopTx.abNoDone[1] AND fbStopTx.abNoDone[2] THEN
 		sStopNoDone := 'HA and Dec';
-	ELSIF fbStopTx.bHaNoDone THEN
+	ELSIF fbStopTx.abNoDone[1] THEN
 		sStopNoDone := 'HA';
 	ELSE
 		sStopNoDone := 'Dec';
@@ -890,15 +885,15 @@ IF fbStopTx.bTimedOut THEN
 		TCSstopTimeoutEvent.OnMessage := CONCAT(CONCAT('STOP: no stop Done from ', sStopNoDone), ' within 30 s; axis locked (stop active) or homing, released when it ends.');
 	END_IF
 	bStopTimeoutLog := TRUE;
-ELSIF fbStopTx.bReleasedByTimeout THEN
+ELSIF fbStopTx.bForced THEN
 	TCSstopTimeoutEvent.OnMessage := 'STOP released: at rest without a stop Done from an axis (30 s timeout).';
 	bStopTimeoutLog := TRUE;
 END_IF
-IF fbStopTx.bReleasedByTimeout THEN
-	IF fbStopTx.bHaNoDone THEN
+IF fbStopTx.bForced THEN
+	IF fbStopTx.abNoDone[1] THEN
 		fbHourAngle.StopAxis := FALSE;
 	END_IF
-	IF fbStopTx.bDecNoDone THEN
+	IF fbStopTx.abNoDone[2] THEN
 		fbDeclination.StopAxis := FALSE;
 	END_IF
 END_IF
@@ -2212,6 +2207,32 @@ nLastStage := nStage;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="_SetStopTxInputs" Id="{7c1b2e44-5d0a-4f63-9a1e-3b8d2f6c9e01}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// BROTLib#25 step 4.4a: the inputs of the generic stop transaction (axis 1 = hour angle, 2 = declination), set before the
+// body and before Monitor() so that both see this scan's values.
+METHOD PRIVATE _SetStopTxInputs
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbStopTx.abEnabled[1] := fbHourAngle.bEnable;
+fbStopTx.abEnabled[2] := fbDeclination.bEnable;
+fbStopTx.abStandStill[1] := aAxis[1].bStandStill;
+fbStopTx.abStandStill[2] := aAxis[2].bStandStill;
+fbStopTx.abStopAxis[1] := fbHourAngle.StopAxis;
+fbStopTx.abStopAxis[2] := fbDeclination.StopAxis;
+fbStopTx.abStopDone[1] := aAxis[1].bStopDone;
+fbStopTx.abStopDone[2] := aAxis[2].bStopDone;
+fbStopTx.abLocked[1] := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0;	// MotionCommandsLocked
+fbStopTx.abLocked[2] := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0;
+fbStopTx.abHoming[1] := fbHourAngle.fbLatchHome.Busy;
+fbStopTx.abHoming[2] := fbDeclination.fbLatchHome.Busy;
+fbStopTx.abSweeping[1] := fbHourAngle.bSweepActive;	// #198
+fbStopTx.abSweeping[2] := fbDeclination.bSweepActive;
+fbStopTx.bStopped := bStopped;
+fbStopTx.tTimeout := T#30S;	// #120: the stop command timeout
+fbStopTx.nTimeDivisor := nTimeDivisor;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="_StopTelescope" Id="{cc9583d1-2578-4480-8aee-f6d55f373bf1}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _StopTelescope : BOOL
 VAR_INPUT
@@ -2230,17 +2251,21 @@ ELSE
 	// An axis that finishes a scan later than the other (HA outside its target window after 120 s of tracking) then
 	// never lined up with the other one, bStopped stayed FALSE and a gohome waiting for it was dropped. FB_AxisControl
 	// clears StopAxis on StopDone.
-	fbStopTx(	bHaStandStill := aAxis[1].bStandStill, bDecStandStill := aAxis[2].bStandStill,
-				bHaSweeping := fbHourAngle.bSweepActive, bDecSweeping := fbDeclination.bSweepActive);	// #198
-	IF fbStopTx.bStopHa THEN
+	_SetStopTxInputs();
+	fbStopTx();
+	IF fbStopTx.abWriteLow[1] THEN
+		fbHourAngle.StopAxis := FALSE;	// a level left TRUE by an earlier stop: low for one scan, the stop follows
+	ELSIF fbStopTx.abWriteHigh[1] THEN
 		fbHourAngle.StopAxis := TRUE;
 	END_IF
-	
-	IF fbStopTx.bStopDec THEN
-		fbDeclination.StopAxis := TRUE;
-	END_IF	
 
-	IF fbStopTx.bFinished THEN
+	IF fbStopTx.abWriteLow[2] THEN
+		fbDeclination.StopAxis := FALSE;
+	ELSIF fbStopTx.abWriteHigh[2] THEN
+		fbDeclination.StopAxis := TRUE;
+	END_IF
+
+	IF fbStopTx.bSettled THEN
 		fbHourAngle.StopAxis := FALSE;
 		fbDeclination.StopAxis := FALSE;
 		_StopTelescope := FALSE;
