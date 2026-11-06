@@ -27,9 +27,6 @@
     <Compile Include="PlcTask.TcTTO">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_StopTransaction_Tests.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_HomeDropReason_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -150,9 +147,6 @@
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_StopTransaction.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_HomeDropReason.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -193,7 +187,7 @@
       <Namespace>AstroBROT</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.17.0 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.19.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Math">
