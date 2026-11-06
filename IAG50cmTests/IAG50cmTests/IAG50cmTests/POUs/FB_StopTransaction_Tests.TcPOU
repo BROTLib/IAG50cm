@@ -34,6 +34,9 @@ Timeout_Does_Not_Release_While_Locked();
 Timeout_Does_Not_Release_While_Homing();
 Cancel_Stops_The_Timeout_And_Begin_Restarts_It();
 Settled_Transaction_Does_Not_Time_Out();
+Sweeping_Axis_At_Standstill_Gets_One_Stop();
+Standing_Axis_Without_Sweep_Gets_No_Stop();
+Sweep_Stop_Waits_For_Done_And_Homing();
 ]]></ST>
     </Implementation>
     <Method Name="Stop_That_Never_Finishes_Is_Sent_Once_Per_Axis" Id="{a44efb43-09ce-47be-9280-43477da45e79}">
@@ -1088,6 +1091,86 @@ IF nCycles > 300 THEN
 	bFinished := TRUE;
 	TEST_FINISHED();
 END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Sweeping_Axis_At_Standstill_Gets_One_Stop" Id="{1bdee47c-925a-40e4-851c-27b48ba9baa5}">
+      <Declaration><![CDATA[METHOD PRIVATE Sweeping_Axis_At_Standstill_Gets_One_Stop
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+	nDec	: INT;
+	nHa		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Sweeping_Axis_At_Standstill_Gets_One_Stop');
+// #198: a pause of the calibration sweep reports StandStill, but the sweep is active: the axis gets its one stop anyway
+fbTx.Begin();
+FOR i := 1 TO 50 DO
+	fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bHaSweeping := FALSE, bDecSweeping := TRUE);
+	IF fbTx.bStopHa THEN nHa := nHa + 1; END_IF
+	IF fbTx.bStopDec THEN nDec := nDec + 1; END_IF
+END_FOR
+AssertEquals_INT(Expected := 1, Actual := nDec, Message := 'sweeping Dec stopped once');
+AssertEquals_INT(Expected := 0, Actual := nHa, Message := 'standing HA without sweep not stopped');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Standing_Axis_Without_Sweep_Gets_No_Stop" Id="{2e586fee-a641-44e7-8912-9c91dfa837b7}">
+      <Declaration><![CDATA[METHOD PRIVATE Standing_Axis_Without_Sweep_Gets_No_Stop
+VAR
+	fbTx	: FB_StopTransaction;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Standing_Axis_Without_Sweep_Gets_No_Stop');
+fbTx.Begin();
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bHaSweeping := FALSE, bDecSweeping := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bStopHa, Message := 'HA');
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bStopDec, Message := 'Dec');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Sweep_Stop_Waits_For_Done_And_Homing" Id="{e283ecb1-9e82-4ddb-a5ab-227e9f0ed2a5}">
+      <Declaration><![CDATA[METHOD PRIVATE Sweep_Stop_Waits_For_Done_And_Homing
+VAR
+	fbTx	: FB_StopTransaction;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Sweep_Stop_Waits_For_Done_And_Homing');
+fbTx.Begin();
+fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bDecSweeping := TRUE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bStopDec, Message := 'stop sent');
+// no Done yet: not settled however long the axis stands
+FOR i := 1 TO 10 DO
+	fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bDecSweeping := TRUE);
+	fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := FALSE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bFinished, Message := 'waits for Done');
+// Done, but the latch home is still homing: still not settled
+FOR i := 1 TO 10 DO
+	fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bDecSweeping := TRUE);
+	fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := TRUE);
+END_FOR
+AssertEquals_BOOL(Expected := FALSE, Actual := fbTx.bFinished, Message := 'waits for the homing');
+// homing over: settles after the clear scans
+FOR i := 1 TO 10 DO
+	fbTx(bHaStandStill := TRUE, bDecStandStill := TRUE, bDecSweeping := FALSE);
+	fbTx.Monitor(bStopped := TRUE, bHaEnabled := TRUE, bDecEnabled := TRUE,
+		bHaStopDone := FALSE, bDecStopDone := TRUE, bHaLocked := FALSE, bDecLocked := FALSE,
+		bHaHoming := FALSE, bDecHoming := FALSE);
+END_FOR
+AssertEquals_BOOL(Expected := TRUE, Actual := fbTx.bFinished, Message := 'settled');
+TEST_FINISHED();
 ]]></ST>
       </Implementation>
     </Method>

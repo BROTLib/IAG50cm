@@ -474,6 +474,8 @@ IF bPower AND bPark AND NOT bStop AND TCS_command = E_TCSCommand.poweron THEN
 		// needs the completed power-on) and parks in place.
 		bStopping := TRUE;
 		fbSweepStop.ArmAll();
+		fbHourAngle.bStopSweep := TRUE;		// #198
+		fbDeclination.bStopSweep := TRUE;
 	END_IF
 	bInterupted := FALSE;
 	bPower := FALSE;
@@ -490,6 +492,8 @@ IF bStop AND (bUserStop OR NOT bPower) THEN
 		bPower := FALSE;
 		IF _PowerOn() >= 40 THEN	// bStop is set: resets its stage; returns the stage it was in
 			fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
+			fbHourAngle.bStopSweep := TRUE;		// #198: no new sweep step after this stop, also before the sweep has started
+			fbDeclination.bStopSweep := TRUE;
 		END_IF
 	ELSIF bPark AND (bUserStop OR TCS_command = E_TCSCommand.park OR NOT (bInHorizonLimit OR bInPoleLimit)) THEN
 		bPark := FALSE;
@@ -845,8 +849,10 @@ IF tonDecMovePending.Q THEN
 	bDecMovePending := FALSE;
 END_IF
 
-bStopped :=  (NOT fbHourAngle.bEnable OR aAxis[1].bStandStill) AND
-			(NOT fbDeclination.bEnable OR aAxis[2].bStandStill) AND
+// #198: a pause of the calibration sweep reports StandStill, but FB_LatchHome is still in its sequence (or about to start
+// it): the axis is not at rest. A stop in a pause saw bStopped, ran for one scan and sent no axis stop.
+bStopped :=  (NOT fbHourAngle.bEnable OR (aAxis[1].bStandStill AND NOT fbHourAngle.bSweepActive)) AND
+			(NOT fbDeclination.bEnable OR (aAxis[2].bStandStill AND NOT fbDeclination.bSweepActive)) AND
 			NOT bHaMovePending AND NOT bDecMovePending;
 
 // #98: bStopped is TRUE for one scan at the start of every stop, before MC_Stop has taken hold (StandStill is still
@@ -2224,7 +2230,8 @@ ELSE
 	// An axis that finishes a scan later than the other (HA outside its target window after 120 s of tracking) then
 	// never lined up with the other one, bStopped stayed FALSE and a gohome waiting for it was dropped. FB_AxisControl
 	// clears StopAxis on StopDone.
-	fbStopTx(	bHaStandStill := aAxis[1].bStandStill, bDecStandStill := aAxis[2].bStandStill);
+	fbStopTx(	bHaStandStill := aAxis[1].bStandStill, bDecStandStill := aAxis[2].bStandStill,
+				bHaSweeping := fbHourAngle.bSweepActive, bDecSweeping := fbDeclination.bSweepActive);	// #198
 	IF fbStopTx.bStopHa THEN
 		fbHourAngle.StopAxis := TRUE;
 	END_IF

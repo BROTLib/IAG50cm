@@ -15,6 +15,8 @@ VAR_INPUT
 	nTimeDivisor	: UDINT := 1;	// test seam: divides the 30 s timeout (FB_TelescopeControl.nTimeDivisor); production leaves it at 1
 	bHaStandStill	: BOOL;		// HA axis at standstill (a running MC_Stop reports FALSE)
 	bDecStandStill	: BOOL;
+	bHaSweeping		: BOOL;		// #198: the calibration sweep of the axis is active (a pause between two homing steps reports StandStill): it gets its stop anyway
+	bDecSweeping	: BOOL;
 END_VAR
 VAR_OUTPUT
 	bStopHa			: BOOL;		// TRUE in the one scan in which the HA axis is to be sent its stop
@@ -45,12 +47,12 @@ END_VAR
       <ST><![CDATA[bStopHa := FALSE;
 bStopDec := FALSE;
 
-IF NOT bHaStopRequested AND NOT bHaStandStill THEN
+IF NOT bHaStopRequested AND (NOT bHaStandStill OR bHaSweeping) THEN
 	bStopHa := TRUE;
 	bHaStopRequested := TRUE;
 END_IF
 
-IF NOT bDecStopRequested AND NOT bDecStandStill THEN
+IF NOT bDecStopRequested AND (NOT bDecStandStill OR bDecSweeping) THEN
 	bStopDec := TRUE;
 	bDecStopRequested := TRUE;
 END_IF
