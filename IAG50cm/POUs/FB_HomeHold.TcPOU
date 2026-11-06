@@ -13,18 +13,19 @@ VAR_INPUT
 	bStopAxis	: BOOL;		// a stop of the axis is requested (cleared on StopDone)
 	bReset		: BOOL;
 	bRelease	: BOOL;		// #159: a new power-on was accepted
+	bStopSweep	: BOOL;		// #198: a stop arrived in the sweep (one scan): hold even if the sweep has not started yet
 END_VAR
 VAR_OUTPUT
 	bHold		: BOOL;		// do not request homing
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[IF bStopAxis AND bHoming AND NOT bCalibrated THEN
+      <ST><![CDATA[IF ((bStopAxis AND bHoming) OR bStopSweep) AND NOT bCalibrated THEN
 	bHold := TRUE;
 END_IF
 // #159: an automatic stop (horizon, pole, calibration lost) leaves the axes enabled with the hold set, and reset=1 gives no
 // bReset without an error. A new power-on releases it, but never through a stop that is still running.
-IF NOT bEnable OR bReset OR (bRelease AND NOT bStopAxis) THEN
+IF NOT bEnable OR bReset OR (bRelease AND NOT bStopAxis AND NOT bStopSweep) THEN
 	bHold := FALSE;
 END_IF
 ]]></ST>

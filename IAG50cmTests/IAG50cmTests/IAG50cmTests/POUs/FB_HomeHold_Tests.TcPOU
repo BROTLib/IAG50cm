@@ -17,6 +17,11 @@ Reset_Releases_The_Hold();
 New_PowerOn_Releases_The_Hold();
 Release_Ignored_While_Stop_Active();
 Release_Without_Hold_Changes_Nothing();
+StopSweep_Holds_An_Uncalibrated_Axis_Before_The_Sweep_Starts();
+StopSweep_Ignored_On_A_Calibrated_Axis();
+StopSweep_Wins_Over_Release_In_The_Same_Scan();
+StopSweep_Hold_Ends_With_Disable();
+StopSweep_Hold_Ends_With_Release_In_A_Later_Scan();
 ]]></ST>
     </Implementation>
     <Method Name="No_Hold_Without_Stop" Id="{e618cb85-d147-45e8-af5c-d7c17a1c1091}">
@@ -177,4 +182,79 @@ TEST_FINISHED();
       </Implementation>
     </Method>
   </POU>
+    <Method Name="StopSweep_Holds_An_Uncalibrated_Axis_Before_The_Sweep_Starts" Id="{c8e4d888-cf30-46f7-9257-b533bf879c95}">
+      <Declaration><![CDATA[METHOD PRIVATE StopSweep_Holds_An_Uncalibrated_Axis_Before_The_Sweep_Starts
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('StopSweep_Holds_An_Uncalibrated_Axis_Before_The_Sweep_Starts');
+// #198: the stop arrives before bHomeAxis is set (tonReady, or the scans after a reset)
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE, bStopSweep := TRUE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbHold.bHold, Message := 'held');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE, bStopSweep := FALSE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbHold.bHold, Message := 'still held');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StopSweep_Ignored_On_A_Calibrated_Axis" Id="{d5cc4f73-8d57-49c4-95bc-ea4167a5039d}">
+      <Declaration><![CDATA[METHOD PRIVATE StopSweep_Ignored_On_A_Calibrated_Axis
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('StopSweep_Ignored_On_A_Calibrated_Axis');
+fbHold(bEnable := TRUE, bCalibrated := TRUE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE, bStopSweep := TRUE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'calibrated axis not held');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StopSweep_Wins_Over_Release_In_The_Same_Scan" Id="{11e7a50a-4407-4d05-b7bd-7c53a2f391e4}">
+      <Declaration><![CDATA[METHOD PRIVATE StopSweep_Wins_Over_Release_In_The_Same_Scan
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('StopSweep_Wins_Over_Release_In_The_Same_Scan');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE, bRelease := TRUE, bStopSweep := TRUE);
+AssertEquals_BOOL(Expected := TRUE, Actual := fbHold.bHold, Message := 'held');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StopSweep_Hold_Ends_With_Disable" Id="{7a273dbf-c555-4785-93f3-7e97d24eab83}">
+      <Declaration><![CDATA[METHOD PRIVATE StopSweep_Hold_Ends_With_Disable
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('StopSweep_Hold_Ends_With_Disable');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE, bStopSweep := TRUE);
+fbHold(bEnable := FALSE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE, bStopSweep := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'released by the disable');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="StopSweep_Hold_Ends_With_Release_In_A_Later_Scan" Id="{5de5d511-f0ce-4959-be2c-fa3d49135d43}">
+      <Declaration><![CDATA[METHOD PRIVATE StopSweep_Hold_Ends_With_Release_In_A_Later_Scan
+VAR
+	fbHold	: FB_HomeHold;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('StopSweep_Hold_Ends_With_Release_In_A_Later_Scan');
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE, bStopSweep := TRUE);
+fbHold(bEnable := TRUE, bCalibrated := FALSE, bHoming := FALSE, bStopAxis := FALSE, bReset := FALSE, bRelease := TRUE, bStopSweep := FALSE);
+AssertEquals_BOOL(Expected := FALSE, Actual := fbHold.bHold, Message := 'released by a new power-on');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
 </TcPlcObject>
