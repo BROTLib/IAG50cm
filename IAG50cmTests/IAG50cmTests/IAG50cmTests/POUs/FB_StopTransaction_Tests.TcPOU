@@ -1094,7 +1094,6 @@ END_IF
 ]]></ST>
       </Implementation>
     </Method>
-  </POU>
     <Method Name="Sweeping_Axis_At_Standstill_Gets_One_Stop" Id="{1bdee47c-925a-40e4-851c-27b48ba9baa5}">
       <Declaration><![CDATA[METHOD PRIVATE Sweeping_Axis_At_Standstill_Gets_One_Stop
 VAR
@@ -1175,4 +1174,5 @@ TEST_FINISHED();
 ]]></ST>
       </Implementation>
     </Method>
+  </POU>
 </TcPlcObject>

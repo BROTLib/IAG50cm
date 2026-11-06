@@ -181,7 +181,6 @@ TEST_FINISHED();
 ]]></ST>
       </Implementation>
     </Method>
-  </POU>
     <Method Name="StopSweep_Holds_An_Uncalibrated_Axis_Before_The_Sweep_Starts" Id="{c8e4d888-cf30-46f7-9257-b533bf879c95}">
       <Declaration><![CDATA[METHOD PRIVATE StopSweep_Holds_An_Uncalibrated_Axis_Before_The_Sweep_Starts
 VAR
@@ -257,4 +256,5 @@ TEST_FINISHED();
 ]]></ST>
       </Implementation>
     </Method>
+  </POU>
 </TcPlcObject>
