@@ -3,7 +3,7 @@
   <POU Name="IagCommandInputs_Tests" Id="{ce2b8202-2582-4506-8c21-3f082b0ac712}" SpecialFunc="None">
     <Declaration><![CDATA[// The command inputs bStop/bPark/bPower/bReset of FB_TelescopeControl (IAG50cm) are edge-triggered like the methods and are never
 // written by the block; the block works on the request latches bStopActive/bParkActive/bPowerActive/bResetActive.
-// Plan: BROTLib specs/plans/2026-11-09-iag50cm-command-model-unification.md, step 1a. One rig per test, one Scan() per PLC cycle.
+// Plan: BROTLib specs/plans/2026-11-09-iag50cm-command-model-unification.md, steps 1a/1b. One rig per test, one Scan() per PLC cycle.
 FUNCTION_BLOCK IagCommandInputs_Tests EXTENDS TcUnit.FB_TestSuite
 VAR
 END_VAR
@@ -13,6 +13,9 @@ END_VAR
 Park_Input_Edge_Parks_Like_Park();
 Stop_Method_And_Input_Edge_In_One_Scan_Count_Once();
 Power_Input_Is_Not_Written_By_The_Block();
+Held_Slew_Input_Starts_The_Slew_Once();
+Slew_Input_Falling_Does_Not_Abort_The_Slew();
+Slew_Method_And_Input_Edge_In_One_Scan_Count_Once();
 ]]></ST>
     </Implementation>
     <Method Name="Held_Stop_Input_Stops_Once" Id="{e863a4e4-6e59-4764-bafa-ca5df7d13b80}">
@@ -309,6 +312,242 @@ CASE nStep OF
 		F_Note(bFailed := NOT (NOT rig.fbTel.bPowerActive), sText := CONCAT(sTest, 'the power-on request ended'));
 		AssertTrue(Condition := rig.fbTel.bPower, Message := 'the block did not clear the input');
 		F_Note(bFailed := NOT (rig.fbTel.bPower), sText := CONCAT(sTest, 'the block did not clear the input'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Held_Slew_Input_Starts_The_Slew_Once" Id="{131a17aa-45da-4c24-9ff5-93bdb4077968}">
+      <Declaration><![CDATA[// A held slew input is one slew: it runs once and is neither repeated nor cleared by the block (command model step 1b).
+METHOD PRIVATE Held_Slew_Input_Starts_The_Slew_Once
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	nEdges		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Held_Slew_Input_Starts_The_Slew_Once');
+sTest := 'Held_Slew_Input_Starts_The_Slew_Once: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.SetSlewTargetInput(180.0, 45.0);
+		rig.SetSlewInput(TRUE);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// an axis is moving
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		nCycles := 0;
+		nStep := 30;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not start an axis move'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// the slew from the held input runs to its end
+	IF NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		nStep := 40;
+		nCycles := 0;
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+40:	// 60 scans with the input still TRUE: the slew is not started again, the input is not cleared
+	IF nCycles >= 60 THEN
+		AssertTrue(Condition := NOT rig.fbTel.bSlewActive, Message := 'the slew was not restarted');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'the slew was not restarted'));
+		AssertTrue(Condition := rig.fbTel.TCS_command <> E_TCSCommand.slew, Message := 'no slew command is running');
+		F_Note(bFailed := NOT (rig.fbTel.TCS_command <> E_TCSCommand.slew), sText := CONCAT(sTest, 'no slew command is running'));
+		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'the block did not clear the input');
+		F_Note(bFailed := NOT (rig.fbTel.bSlew), sText := CONCAT(sTest, 'the block did not clear the input'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Slew_Input_Falling_Does_Not_Abort_The_Slew" Id="{b71c0bc3-66bd-4cd1-bea4-eebc87eab3d2}">
+      <Declaration><![CDATA[// The slew input falling does not abort the slew; it ends only by its own completion or a stop.
+METHOD PRIVATE Slew_Input_Falling_Does_Not_Abort_The_Slew
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	nEdges		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_Input_Falling_Does_Not_Abort_The_Slew');
+sTest := 'Slew_Input_Falling_Does_Not_Abort_The_Slew: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.SetSlewTargetInput(180.0, 45.0);
+		rig.SetSlewInput(TRUE);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// an axis is moving
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		nCycles := 0;
+		nStep := 25;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not start an axis move'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+25:	// the writer drops the input while the axis moves
+	IF nCycles >= 5 THEN
+		rig.SetSlewInput(FALSE);
+		nStep := 30;
+		nCycles := 0;
+	END_IF
+30:
+	IF nCycles >= 5 THEN
+		AssertTrue(Condition := rig.fbTel.bSlewActive, Message := 'the slew goes on after the input fell');
+		F_Note(bFailed := NOT (rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'the slew goes on after the input fell'));
+		nStep := 40;
+		nCycles := 0;
+	END_IF
+40:
+	IF NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Slew_Method_And_Input_Edge_In_One_Scan_Count_Once" Id="{4ef17647-4434-4785-ab0d-f642668748f4}">
+      <Declaration><![CDATA[// Slew() and a slew input edge in one scan are one slew (the method sets the edge memory).
+METHOD PRIVATE Slew_Method_And_Input_Edge_In_One_Scan_Count_Once
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	nEdges		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_Method_And_Input_Edge_In_One_Scan_Count_Once');
+sTest := 'Slew_Method_And_Input_Edge_In_One_Scan_Count_Once: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		rig.SetSlewInput(TRUE);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// an axis is moving
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		nCycles := 0;
+		nStep := 30;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not start an axis move'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+	IF NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		nStep := 40;
+		nCycles := 0;
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+40:	IF nCycles >= 60 THEN
+		AssertTrue(Condition := NOT rig.fbTel.bSlewActive, Message := 'no second slew');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'no second slew'));
+		AssertTrue(Condition := rig.fbHa.nStopEdges + rig.fbDec.nStopEdges = 0, Message := 'no restart stop');
+		F_Note(bFailed := NOT (rig.fbHa.nStopEdges + rig.fbDec.nStopEdges = 0), sText := CONCAT(sTest, 'no restart stop'));
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF

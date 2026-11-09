@@ -210,6 +210,32 @@ END_VAR
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetSlewInput" Id="{56f9b5ac-d946-4b7f-bf1f-220a8f105ee7}">
+      <Declaration><![CDATA[// the command input bSlew of the telescope under test, as an ADS writer sets it (not the method)
+METHOD SetSlewInput
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bSlew := bValue;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetSlewTargetInput" Id="{5fe36a9f-ab27-440f-842f-bdba6e7ceba4}">
+      <Declaration><![CDATA[// the slew target fields an ADS writer sets before it raises bSlew
+METHOD SetSlewTargetInput
+VAR_INPUT
+	fAzimuth	: LREAL;
+	fAltitude	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.fAzimuth := fAzimuth;
+fbTel.fElevation := fAltitude;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SetEstop" Id="{2e9b6f03-51a7-4c8d-b3f4-8a7d90e1c622}">
       <Declaration><![CDATA[// the E-stop input of the telescope under test (#14)
 METHOD SetEstop
