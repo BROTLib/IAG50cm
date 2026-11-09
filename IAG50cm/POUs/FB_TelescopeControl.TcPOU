@@ -61,6 +61,8 @@ VAR
 	tonAxisResetAfterAck	: TON;
 	// plan step 3.2: the axis feedback of this scan (1 hour angle, 2 declination), filled by _ReadAxes
 	aAxis				: ARRAY[1..2] OF ST_AxisStatus;
+	bHwErrorLast		: BOOL;		// BROTLib#25 step 4.4d: bHwError of the previous scan (edge for F_ErrorParkRequest)
+	bErrorParkStarted	: BOOL;		// the park that a new axis/focus error starts (MONETcommon#86)
 	bResetRequest		: BOOL;		// Reset() was called (one scan); kept apart from bReset, which the trigger below drives (#36)
 	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
 	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
@@ -219,6 +221,21 @@ IF bError THEN
 ELSE
 	fbCabinet.Error := FALSE;
 	nErrorID := 0;
+END_IF
+
+// BROTLib#25 step 4.4d (decided by Tim 2026-11-09: MONETcommon wins): a new hardware error (hour angle, declination or focus; not a
+// software or cabinet error) while not parked and without E-stop starts the park by itself, like MONETcommon#86. The park branch
+// below does what is safe without the mount (the axes are disabled by the error): covers close, dome parks, focus off; the mount
+// is not moved and bIsParked is not set until the covers are closed and the dome is parked. A running power-on is aborted by
+// the park (#109). Edge only: a still present error does not start it again.
+bErrorParkStarted := BROTLib.F_ErrorParkRequest(
+	bHwError := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error),
+	bHwErrorLast := bHwErrorLast,
+	bIsParked := bIsParked,
+	bEstop := bEstopTriggered);
+bHwErrorLast := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error);
+IF bErrorParkStarted THEN
+	Park();
 END_IF
 
 
