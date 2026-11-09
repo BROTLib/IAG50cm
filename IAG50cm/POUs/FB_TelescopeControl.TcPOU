@@ -448,7 +448,7 @@ END_IF
 //----------------------------------------------------------------------------------------------
 // if the given coordinates to goto/slew are under the horizon
 // (also rejects targets below fPointingSafeAltitude, where the pointing model's inversion is chaotic -- see FB_PointingModelInversion)
-IF (bGoTo AND (fElevationCalc < MAX(fHorizon + 1.0, fPointingSafeAltitude))) OR (bSlewActive AND (fElevation < MAX(fHorizon, fPointingSafeAltitude))) THEN
+IF (bGotoActive AND (fElevationCalc < MAX(fHorizon + 1.0, fPointingSafeAltitude))) OR (bSlewActive AND (fElevation < MAX(fHorizon, fPointingSafeAltitude))) THEN
 	// trigger event
 	rtrigHorizonError(CLK:=TRUE);
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
@@ -469,7 +469,7 @@ ELSE
 END_IF
 
 // if the given coordinates to goto/slew are in the PoleZone
-IF (bGoTo AND (fDeclinationApparent > (90.0 - fPoleZone))) OR (bSlewActive AND (fDeclinationCalc  > (90.0 - fPoleZone))) THEN
+IF (bGotoActive AND (fDeclinationApparent > (90.0 - fPoleZone))) OR (bSlewActive AND (fDeclinationCalc  > (90.0 - fPoleZone))) THEN
 	// trigger event
 	rtrigPoleError(CLK:=TRUE);
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
