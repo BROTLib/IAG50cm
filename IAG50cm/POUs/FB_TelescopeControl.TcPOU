@@ -56,6 +56,7 @@ VAR
 	rtrigHorizonError	: R_TRIG;		// if the set Coordinate is below the Horizon threshold fHorizon
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
+	rtrigResetAny		: R_TRIG;		// every reset edge (method, input, cabinet key), also without an error: the request part of the reset
 	rtrigPoweredClear	: R_TRIG;		// #100: error or E-stop edge: the telescope is no longer powered
 	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
 	tonAxisResetAfterAck	: TON;
@@ -73,7 +74,6 @@ VAR
 	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
 	bRestartSlew		: BOOL;		// Slew() while a slew is running: the new target replaces the old one (#41)
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
-	bUserStop			: BOOL;		// Stop() was called (one scan): aborts a running power-on, automatic stops do not (#27)
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
 	sParkEnd			: STRING(160) := 'completed';	// the park log line when bParkActive falls: completed, or why it ended (#57)
 	bParkLogged			: BOOL;		// bParkActive as the park event saw it last scan: PARK commencing is logged, an end line follows (#57)
@@ -91,6 +91,10 @@ VAR
 	fbHomeDrop			: FB_HomeDropReason;	// #108/#120: why a pending home was dropped
 	tonHomePending		: FB_TimeoutTimer;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
+	bInitRefused		: BOOL;		// Init() was refused because of a stop or a park (one scan): logs 'power-on ignored: <reason>'
+	sInitRefusedReason	: STRING(80);
+	nInitRefusedCount	: UDINT;	// diagnostics (ADS)
+	TCSinitRefusedEvent	: FB_Eventlog;
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
 	bPowerParked		: BOOL;		// a park aborted a running power-on (one scan, #109)
 	bInHorizonLimit		: BOOL;		// #84: the mount is below the horizon limit (the safety block homes it out)
@@ -109,6 +113,7 @@ VAR
 	tonParkPending		: FB_TimeoutTimer;		// #197: a park that is requested but never starts is forced into an in-place park after 2 min
 	bParkForceInPlace	: BOOL;		// #197: the pending-park watchdog fired
 	tonParkInPlace		: FB_TimeoutTimer;		// #187: an axes-off park gives up after 120 s if the covers or the dome do not finish
+	bParkAfterStop		: BOOL;		// Park() arrived during a stop, or an automatic stop took a pending park: it runs when the stop has settled (MONETcommon#83/#213, IAG#84)
 	bHomeByCommand		: BOOL;		// the running or pending home was requested by a Home() call or a bGoHome edge; the power-on's own home and the limit homes are not: a move replaces them (the old precedence), only a commanded home rejects moves (gohome_active)
 	bCommandRejected	: BOOL;		// set by _NoteRejected, logged and cleared by the body (as MONETcommon, #83)
 	eLastRejectedCommand	: E_TCSCommand;
@@ -210,7 +215,7 @@ fLst := CT2LST(telescopeConfig.longitude, fJd);
 
 // without a trustworthy time nothing may be pointed or tracked: refuse through the normal stop path
 IF NOT fbTime.bValid AND (bGotoActive OR bSlewActive OR bTrackActive) THEN
-	bStopActive := TRUE;
+	_AutoStop();
 END_IF
 
 // State of the Cabinet
@@ -406,13 +411,13 @@ bAxesCalibrated := fbHourAngle.Calibrated AND fbDeclination.Calibrated;
 // losing the reference while enabled and not homing: stop instead of silently releasing the horizon protection
 rtrigCalibLost(CLK := bAxesCalibrated);
 IF rtrigCalibLost.Q AND bReady AND NOT bError AND NOT aAxis[1].bHoming AND NOT aAxis[2].bHoming THEN
-	bStopActive := TRUE;
+	_AutoStop();
 END_IF
 // #166: a running power-on does not move a calibrated axis, but enabling it is not settled for a few scans and the mount
 // is not ready before stage 100, so a mount inside a limit was stopped and the power-on aborted (any bStop aborts it).
 // Skip the automatic stop only while the axes that matter stand still; stage 100 hands over to bGoHome. Any motion, a
 // user stop or an error still stops.
-bPowerOnHold := bPowerActive AND NOT bUserStop AND NOT bError;
+bPowerOnHold := bPowerActive AND NOT bError;
 bHaMoving := aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming;
 bDecMoving := aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming;
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
@@ -430,7 +435,7 @@ bInHorizonLimit := bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPo
 bInPoleLimit := (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrackActive AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)));
 IF bInHorizonLimit THEN
 	IF NOT bSettled AND NOT bGoHomeActive AND NOT (bPowerOnHold AND NOT bHaMoving AND NOT bDecMoving) THEN
-		bStopActive := TRUE;
+		_AutoStop();
 	ELSIF bReady AND NOT bError AND NOT bParkHomeDone THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHomeActive := TRUE;
 		bLimitHome := TRUE;		// #84: also when bGoHome was set already (Home(), power-on stage 100)
@@ -439,7 +444,7 @@ END_IF
 // If the Telescope goes into the forbidden polezone (e.g. while tracking, stop and gohome)
 IF bInPoleLimit THEN
 	IF NOT bSettled AND NOT bGoHomeActive AND NOT (bPowerOnHold AND NOT bDecMoving) THEN
-		bStopActive := TRUE;
+		_AutoStop();
 	ELSIF bReady AND NOT bError AND NOT bParkHomeDone THEN	// #82: only when the home can run; the power-on homes (stage 100)
 		bGoHomeActive := TRUE;
 		bLimitHome := TRUE;		// #84
@@ -448,7 +453,7 @@ END_IF
 //----------------------------------------------------------------------------------------------
 // if the given coordinates to goto/slew are under the horizon
 // (also rejects targets below fPointingSafeAltitude, where the pointing model's inversion is chaotic -- see FB_PointingModelInversion)
-IF (bGoTo AND (fElevationCalc < MAX(fHorizon + 1.0, fPointingSafeAltitude))) OR (bSlewActive AND (fElevation < MAX(fHorizon, fPointingSafeAltitude))) THEN
+IF (bGotoActive AND (fElevationCalc < MAX(fHorizon + 1.0, fPointingSafeAltitude))) OR (bSlewActive AND (fElevation < MAX(fHorizon, fPointingSafeAltitude))) THEN
 	// trigger event
 	rtrigHorizonError(CLK:=TRUE);
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
@@ -462,14 +467,14 @@ IF (bGoTo AND (fElevationCalc < MAX(fHorizon + 1.0, fPointingSafeAltitude))) OR 
 	fElevationCalc := 20.0;
 	fElevation := 20.0;
 	// stop telescope
-	bStopActive := TRUE;
+	_AutoStop();
 ELSE
 	// reset event trigger
 	rtrigHorizonError(CLK:=FALSE);
 END_IF
 
 // if the given coordinates to goto/slew are in the PoleZone
-IF (bGoTo AND (fDeclinationApparent > (90.0 - fPoleZone))) OR (bSlewActive AND (fDeclinationCalc  > (90.0 - fPoleZone))) THEN
+IF (bGotoActive AND (fDeclinationApparent > (90.0 - fPoleZone))) OR (bSlewActive AND (fDeclinationCalc  > (90.0 - fPoleZone))) THEN
 	// trigger event
 	rtrigPoleError(CLK:=TRUE);
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
@@ -483,7 +488,7 @@ IF (bGoTo AND (fDeclinationApparent > (90.0 - fPoleZone))) OR (bSlewActive AND (
 	fElevationCalc := 20.0;
 	fElevation := 20.0;
 	// stop telescope
-	bStopActive := TRUE;
+	_AutoStop();
 
 ELSE
 	// reset event trigger
@@ -539,7 +544,7 @@ END_IF
 // #109: a park outranks a running power-on (like an explicit stop, #27, and like MONET): the startup is aborted
 // (READY_STATE -2 for the aborted init) and the park runs below in this scan. Only for a power-on that was already running
 // (TCS_command of the last scan): an Init() during a park still cancels the park, see the bPower branch below.
-IF bPowerActive AND bParkActive AND NOT bStopActive AND TCS_command = E_TCSCommand.poweron THEN
+IF bPowerActive AND bParkActive AND NOT bStopActive THEN
 	bPowerParked := TRUE;
 	bInterupted := TRUE;
 	IF _PowerOn() >= 40 THEN	// bInterupted: marks the startup aborted, clears bPowerActive, resets its stage; returns the stage it was in
@@ -555,7 +560,7 @@ IF bPowerActive AND bParkActive AND NOT bStopActive AND TCS_command = E_TCSComma
 END_IF
 // #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
 // time) are meant not to abort a running power-on, but _PowerOn aborts on any bStop, so they are held back in the checks above (#166).
-IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
+IF bStopActive THEN
     fbStartup.MarkAbortedIfStarting(Power := bPowerActive);
 	bTrackActive := FALSE;
 	bMoveAbortPending := FALSE;
@@ -568,7 +573,7 @@ IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
 			fbHourAngle.bStopSweep := TRUE;		// #198: no new sweep step after this stop, also before the sweep has started
 			fbDeclination.bStopSweep := TRUE;
 		END_IF
-	ELSIF bParkActive AND (bUserStop OR TCS_command = E_TCSCommand.park OR NOT (bInHorizonLimit OR bInPoleLimit)) THEN
+	ELSIF bParkActive THEN	// a park that was only pending when an automatic stop came is queued in bParkAfterStop by _AutoStop
 		bParkActive := FALSE;
 		sParkEnd := 'cancelled by stop';
 		fbSweepStop.Cancel();		// #197: the park is gone, the axes stay as they are
@@ -601,18 +606,6 @@ IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
 	TCS_command := E_TCSCommand.stop;
 
 ELSIF bPowerActive THEN
-	// Init() during a park cancels the park: its stage is reset and the move flags dropped. Left alone, bPark
-	// survived the power-on, the park then preempted the go-home, resumed at its old stage and hung at 90 waiting
-	// for covers that the power-on had just reopened.
-	IF bParkActive THEN
-		bParkActive := FALSE;
-		sParkEnd := 'cancelled by power-on';
-		bInterupted := TRUE;
-		_ParkTelescope();
-		bInterupted := FALSE;
-		fbHourAngle.MoveAxis := FALSE;
-		fbDeclination.MoveAxis := FALSE;
-	END_IF
 	TCS_command := E_TCSCommand.poweron;
 
 ELSIF bMoveAbortPending THEN
@@ -840,7 +833,6 @@ END_IF
 // the restart requests are consumed above or void
 bRestartGoto := FALSE;
 bRestartSlew := FALSE;
-bUserStop := FALSE;
 
 // #40: every command gets its own timeout; the timer used to run on from one command into the next
 IF TCS_command <> eLastTimeoutCommand THEN
@@ -1068,6 +1060,11 @@ IF bSettled THEN
 		bMoveAbortPending := FALSE;	// only after STOP was dispatched in this scan
 	END_IF
 END_IF
+// a park queued during the stop runs from the next scan, once the stop is released
+IF bParkAfterStop AND NOT bStopActive THEN
+	bParkActive := TRUE;
+	bParkAfterStop := FALSE;
+END_IF
 
 // unset the RESET command when no Error is present
 IF NOT bError THEN
@@ -1237,6 +1234,12 @@ TCSpowerParkEvent(	Trigger := bPowerParked,
 				OnMessage := 'Power-on aborted by park',
 				Comm := fbComm);
 bPowerParked := FALSE;
+TCSinitRefusedEvent(	Trigger := bInitRefused,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := 'power-on ignored: %s',
+				OnMessage := sInitRefusedReason,
+				Comm := fbComm);
+bInitRefused := FALSE;
 // every rejection is logged (ADS log and MQTT log topic); an identical one repeated within 2 s once, all are counted. The event is
 // re-armed with FALSE first so that rejections in consecutive scans each give a rising edge (as MONETcommon).
 tonRejectRepeat(IN := TRUE, PT := T#2S);
@@ -1285,7 +1288,7 @@ _CommandState.bError		:= bError;
 _CommandState.bClockValid	:= fbTime.bValid;
 _CommandState.bStop			:= bStopActive;
 _CommandState.bPowering		:= bPowerActive OR fbStartup.Initializing;
-_CommandState.bParkPending	:= bParkActive;
+_CommandState.bParkPending	:= bParkActive OR bParkAfterStop;
 _CommandState.bIsParked		:= bIsParked;
 _CommandState.bReady		:= bReady;
 _CommandState.bGoHomeActive	:= bHomeByCommand AND ((bGoHomeActive AND eExcludeOwn <> E_TCSCommand.gohome) OR TCS_command = E_TCSCommand.gohome);
@@ -1334,6 +1337,19 @@ eLastRejectReason := eReason;
 bCommandRejected := TRUE;]]></ST>
       </Implementation>
     </Method>
+    <Method Name="_AutoStop" Id="{6f0d3a5e-2b91-4c78-8e14-7a9c5d3b1e02}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Every automatic stop (horizon, pole zone, no valid time, lost calibration, bad target): a stop, and a park that is only pending
+// (not dispatched yet) is queued behind it instead of being cleared by the stop: it runs when the stop has settled (IAG#84).
+METHOD PRIVATE _AutoStop
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bStopActive := TRUE;
+IF bParkActive AND TCS_command <> E_TCSCommand.park THEN
+	bParkAfterStop := TRUE;
+	bParkActive := FALSE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="_HandleReset" Id="{d3bbfeba-2cbb-4111-9ae3-4525c9154e5c}" FolderPath="internal methods\">
       <Declaration><![CDATA[// plan step 3.4: the reset trigger and the reset handling of the body (bResetActive, drop of pending goto/slew/track, dome reset, stage reset), moved
 // unchanged; called where the block stood. The axis reset of #11 stays in the body, it runs after the error ID.
@@ -1346,8 +1362,49 @@ END_VAR
 // #36: the request from Reset() must not be overwritten by the key state, so it has its own flag
 // #59: also while the safety acknowledge after an E-stop is pending, so a reset sent during the E-stop (which
 // clears the axis errors but skips the acknowledge) or after an E-stop without an axis error is not lost
+rtrigResetAny(CLK := fbCabinet.Reset OR bResetRequest);
 rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND (bError OR bSafetyAckPending), Q=>bResetActive);
 bResetRequest := FALSE;
+
+// The request part of the reset runs on every reset edge, also without an error (MONETcommon#84/#85): pending moves are dropped,
+// a move that is still running is stopped (abort stop), a power-on that is running is aborted. The hardware part below (safety
+// acknowledge, axis reset passes, dome reset, coordinates) stays gated on an error or a pending acknowledge (#36, #59).
+IF rtrigResetAny.Q THEN
+	bGotoActive := FALSE;
+	bSlewActive := FALSE;
+	bTrackActive := FALSE;
+	bInterupted := TRUE;
+	_GotoTelescope();
+	_SlewTelescope();
+	IF NOT bLimitHome THEN	// the home of a park in a limit belongs to the park (#84)
+		bGoHomeActive := FALSE;
+		sHomeEnd := 'cancelled by reset';
+		_HomeTelescope();
+	END_IF
+	bInterupted := FALSE;
+	// a stop that is stuck in Stopping is recovered by a reset without writing over ADS: only axes that stand still are reset (a reset
+	// under motion was followed by 0x4260, MONETcommon#84), a moving enabled axis keeps the stop going (MONETcommon#96 D3)
+	IF (bStopActive OR bMoveAbortPending)
+		AND NOT (fbHourAngle.bEnable AND (aAxis[1].bInMotion OR aAxis[1].bInRamp))
+		AND NOT (fbDeclination.bEnable AND (aAxis[2].bInMotion OR aAxis[2].bInRamp)) THEN
+		IF aAxis[1].bStopping THEN
+			fbHourAngle.Reset();
+		END_IF
+		IF aAxis[2].bStopping THEN
+			fbDeclination.Reset();
+		END_IF
+		fbStopTx.Cancel();	// the stop then releases at standstill
+	END_IF
+	// not during an error (the drives are off) and not during a park (its motion is wanted)
+	bMoveAbortPending := bMoveAbortPending OR BROTLib.F_ResetMoveAbort(
+		bError := bError,
+		bParkRunning := TCS_command = E_TCSCommand.park,
+		bAnyAxisMoving := (fbHourAngle.bEnable AND (aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming))
+			OR (fbDeclination.bEnable AND (aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming)));
+	IF bPowerActive OR fbStartup.Initializing THEN
+		bStopActive := TRUE;	// aborts the power-on and marks the startup aborted (stop branch)
+	END_IF
+END_IF
 
 IF bResetActive THEN
     fbStartup.MarkAborted();
@@ -2640,9 +2697,26 @@ END_VAR
       <Declaration><![CDATA[METHOD Init : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[// AcceptInit refuses while a startup runs or completed (also across a transient interlock, -2).
-bPowerChecked := TRUE;
-IF fbStartup.AcceptInit() THEN
+        <ST><![CDATA[bPowerChecked := TRUE;
+// park wins in both orders and a stop is not overridden by a power-on (MONETcommon#87); this comes before AcceptInit, a pending
+// park clears Initialized, so AcceptInit would accept. The in-place park (bSafeParked, up to 120 s) is refused as well.
+IF bStopActive OR bParkActive OR bParkAfterStop OR bSafeParked THEN
+    nInitRefusedCount := nInitRefusedCount + 1;
+    bInitRefused := TRUE;
+    IF bStopActive THEN
+        sInitRefusedReason := 'stop in progress';
+    ELSIF bSafeParked THEN
+        sInitRefusedReason := 'in-place park in progress, ends within 120 s';
+    ELSE
+        sInitRefusedReason := 'park in progress, send stop to cancel it';
+    END_IF
+// AcceptInit refuses while a startup runs or completed (also across a transient interlock, -2).
+ELSIF fbStartup.AcceptInit() THEN
+    // nothing stale after the power-on starts: a pending move or home from before would run into it (park is kept, it is the safe direction)
+    bGoHomeActive := FALSE;
+    bGotoActive := FALSE;
+    bSlewActive := FALSE;
+    bTrackActive := FALSE;
     bPowerActive := TRUE;
     fReadyState := 0.7;
     // #159: an automatic stop leaves the sweep hold set with the axes enabled; a new power-on releases it
@@ -2657,7 +2731,12 @@ Init := TRUE;]]></ST>
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bParkChecked := TRUE;
-bParkActive := TRUE;
+// during a stop the park is queued and runs when the stop has settled (a stop would clear it otherwise)
+IF bStopActive THEN
+	bParkAfterStop := TRUE;
+ELSE
+	bParkActive := TRUE;
+END_IF
 ]]></ST>
       </Implementation>
     </Method>
@@ -2785,6 +2864,8 @@ bSlewActive		:= TRUE;]]></ST>
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bStopChecked := TRUE;
+// a stop ends a park that is queued behind a running stop (MONETcommon#213)
+bParkAfterStop := FALSE;
 // a repeated stop while a stop is running sends a new stop only to axes that are moving again and are not stopping already
 // (BROTLib.FB_StopTransaction.Restart); the focus is stopped again as well (MONETcommon#96/#122)
 IF bStopActive THEN
@@ -2794,7 +2875,6 @@ IF bStopActive THEN
 		fbFocus.Stop();
 	END_IF
 END_IF
-bUserStop := TRUE;
 bStopActive := TRUE;
 // MONETcommon#122: an explicit stop also stops a running focus move and holds the position reached; the automatic
 // stops of the mount (horizon, pole zone) leave the focus alone

@@ -236,6 +236,38 @@ fbTel.fElevation := fAltitude;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="ForceGoHomeActive" Id="{abb77387-5b6c-4636-bc8b-2a95b777a604}">
+      <Declaration><![CDATA[// sets the request latch bGoHomeActive of the telescope under test (an output, written through a pointer): a request left over from before
+METHOD ForceGoHomeActive
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pBool := ADR(fbTel.bGoHomeActive);
+pBool^ := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ForceSlewActive" Id="{3ffb04e7-864e-4540-994d-94252b727107}">
+      <Declaration><![CDATA[// sets the request latch bSlewActive of the telescope under test (an output, written through a pointer): a request left over from before
+METHOD ForceSlewActive
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pBool := ADR(fbTel.bSlewActive);
+pBool^ := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetSafeAltitude" Id="{5080fecd-12c1-4a4d-85b0-db08c61b38f5}">
+      <Declaration><![CDATA[// the pointing-model safe altitude of the telescope under test (an input of the telescope; a goto target below it is refused)
+METHOD SetSafeAltitude
+VAR_INPUT
+	fValue	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.fPointingSafeAltitude := fValue;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SetEstop" Id="{2e9b6f03-51a7-4c8d-b3f4-8a7d90e1c622}">
       <Declaration><![CDATA[// the E-stop input of the telescope under test (#14)
 METHOD SetEstop
