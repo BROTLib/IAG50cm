@@ -69,7 +69,7 @@ VAR
 	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
 	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
-	bStopping			: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41)
+	bMoveAbortPending	: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41); the abort stop of MONETcommon
 	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
 	bRestartSlew		: BOOL;		// Slew() while a slew is running: the new target replaces the old one (#41)
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
@@ -266,6 +266,7 @@ IF rtrigPoweredClear.Q THEN
 END_IF
 
 IF bError THEN
+	bMoveAbortPending := FALSE;	// the drives are disabled below, nothing to wait for (MONETcommon#84)
 	bGoHomeActive := 	FALSE;
 	bTrackActive := 	FALSE;
 	bGotoActive := 	FALSE;
@@ -520,7 +521,7 @@ END_IF
 // #197: a park that is requested but not started (not dispatched, not in the axes-off path, no stop or home running)
 // waited without a timeout: tonParkTimeout counts only a running park (#75). After 2 min: say why and park in place.
 tonParkPending(IN := bParkActive AND TCS_command <> E_TCSCommand.park AND TCS_command <> E_TCSCommand.gohome
-	AND NOT bStopping AND NOT bError AND NOT bEstopTriggered AND NOT bParkForceInPlace, PT := T#2M, nDivisor := nTimeDivisor);
+	AND NOT bMoveAbortPending AND NOT bError AND NOT bEstopTriggered AND NOT bParkForceInPlace, PT := T#2M, nDivisor := nTimeDivisor);
 IF tonParkPending.Q THEN
 	bParkForceInPlace := TRUE;
 	fbHomeDrop(bReady := bReady, bStopPending := TCS_command = E_TCSCommand.stop OR NOT bSettled);
@@ -544,7 +545,7 @@ IF bPowerActive AND bParkActive AND NOT bStopActive AND TCS_command = E_TCSComma
 	IF _PowerOn() >= 40 THEN	// bInterupted: marks the startup aborted, clears bPowerActive, resets its stage; returns the stage it was in
 		// #197: the axes are on and may be sweeping: stop them. The park then switches them off (nothing else can: bReady
 		// needs the completed power-on) and parks in place.
-		bStopping := TRUE;
+		bMoveAbortPending := TRUE;
 		fbSweepStop.ArmAll();
 		fbHourAngle.bStopSweep := TRUE;		// #198
 		fbDeclination.bStopSweep := TRUE;
@@ -557,7 +558,7 @@ END_IF
 IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
     fbStartup.MarkAbortedIfStarting(Power := bPowerActive);
 	bTrackActive := FALSE;
-	bStopping := FALSE;
+	bMoveAbortPending := FALSE;
 
 	// If the stop is during a movement, reset the stage of the movement first
 	IF bPowerActive THEN
@@ -579,19 +580,23 @@ IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
 			_HomeTelescope();
 		END_IF
 	// #84: a park that is only pending survives the automatic stop of a limit: the stop settles, the limit home runs, then the park
-	ELSIF bGotoActive THEN
+	ELSIF bSafeParked AND NOT (bGotoActive OR bSlewActive OR bGoHomeActive) THEN
+		// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
+		bStopIgnored := TRUE;
+	END_IF
+	// a stop clears every pending move and interrupts its stage machine, not only the first of a chain (MONETcommon#84)
+	IF bGotoActive THEN
 		bGotoActive := FALSE;
 		_GotoTelescope();
-	ELSIF bSlewActive THEN
+	END_IF
+	IF bSlewActive THEN
 		bSlewActive := FALSE;
 		_SlewTelescope();
-	ELSIF bGoHomeActive THEN
+	END_IF
+	IF bGoHomeActive THEN
 		bGoHomeActive := FALSE;
 		sHomeEnd := 'cancelled by stop';
 		_HomeTelescope();
-	ELSIF bSafeParked THEN
-		// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
-		bStopIgnored := TRUE;
 	END_IF
 	TCS_command := E_TCSCommand.stop;
 
@@ -610,14 +615,11 @@ ELSIF bPowerActive THEN
 	END_IF
 	TCS_command := E_TCSCommand.poweron;
 
-ELSIF bStopping THEN
+ELSIF bMoveAbortPending THEN
 	// #43: a movement was preempted. Its flag and stage are already reset; TCS_command must not stay on the old
 	// command (its method would keep the axes going), so run the stop until the axes stand still. The pending
 	// command is picked up below in the next scan.
-	TCS_command := E_TCSCommand.stop;
-	IF bSettled THEN
-		bStopping := FALSE;
-	END_IF
+	TCS_command := E_TCSCommand.stop;	// released with the stop (bSettled) at the end of the body
 
 ELSIF bParkActive THEN
 	bTrackActive := FALSE;
@@ -718,8 +720,8 @@ ELSIF bParkActive THEN
 			_GotoTelescope();
 			_SlewTelescope();
 			bInterupted := FALSE;
-			IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew THEN
-				bStopping := TRUE;
+			IF TCS_command <> E_TCSCommand.gohome THEN
+				bMoveAbortPending := TRUE;
 			END_IF
 		ELSE
 			IF NOT bParkAfterHome THEN
@@ -743,10 +745,10 @@ ELSIF bParkActive THEN
 		_GotoTelescope();
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage; it could latch otherwise
-		// #43: stop the axes now, park starts when they stand still. Only if one of the preempted commands is
-		// the one moving; a Track()/Slew() arriving while the park itself runs must not stop the park.
-		IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew OR TCS_command = E_TCSCommand.gohome THEN
-			bStopping := TRUE;
+		// #43: stop the axes now, park starts when they stand still. Every preemption runs the (short) abort stop, also of a
+		// command that was not dispatched yet; not while the park itself runs: a Track()/Slew() arriving then must not stop it.
+		IF TCS_command <> E_TCSCommand.park THEN
+			bMoveAbortPending := TRUE;
 		END_IF
 
 	ELSE
@@ -768,15 +770,15 @@ ELSIF bGoHomeActive THEN
 		_GotoTelescope();
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, see the park branch
-		IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew THEN
-			bStopping := TRUE;	// #43, only if the preempted command is the one moving
+		IF TCS_command <> E_TCSCommand.gohome THEN
+			bMoveAbortPending := TRUE;	// #43; not while the home itself runs
 		END_IF
 
 	ELSIF TCS_command <> E_TCSCommand.gohome AND NOT bSettled AND (TCS_command = E_TCSCommand.track OR fbHourAngle.Tracking OR fbDeclination.Tracking) THEN
 		// #72: a home during tracking waited for bStopped, which is never TRUE while the axes track, so it never
 		// ran (bGoHome stayed set) until a stop. End the tracking through the stop (#43); the home starts when the
 		// axes stand still.
-		bStopping := TRUE;
+		bMoveAbortPending := TRUE;
 
 	ELSE
 		IF bReady AND NOT bBusy AND bSettled THEN
@@ -794,8 +796,8 @@ ELSIF bGotoActive THEN
 		bInterupted := TRUE;
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, see the park branch
-		IF TCS_command = E_TCSCommand.slew THEN
-			bStopping := TRUE;	// #43, only if the preempted command is the one moving
+		IF TCS_command <> E_TCSCommand.goto THEN
+			bMoveAbortPending := TRUE;	// #43; not while the goto itself runs
 		END_IF
 	ELSIF bRestartGoto AND TCS_command = E_TCSCommand.goto THEN
 		// #41: Track() while going to a target: stop, then go to the new one (bGoto stays set)
@@ -803,7 +805,7 @@ ELSIF bGotoActive THEN
 		_GotoTelescope();
 		bInterupted := FALSE;
 		tonGotoTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);	// the timeout counts from the new request
-		bStopping := TRUE;
+		bMoveAbortPending := TRUE;
 	ELSE
 		IF bReady AND NOT bBusy THEN
 			bInterupted := FALSE;
@@ -820,7 +822,7 @@ ELSIF bSlewActive THEN
 		_SlewTelescope();
 		bInterupted := FALSE;
 		tonSlewTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);	// the timeout counts from the new request
-		bStopping := TRUE;
+		bMoveAbortPending := TRUE;
 	ELSIF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.slew;
 	END_IF
@@ -1058,9 +1060,13 @@ ELSIF bTracking THEN
 END_IF
 	
 //----------------------------------------------------------------------------------------------
-// unset the STOP command if telescope is already stopped
-IF bStopped THEN
+// release the stop and the abort stop once the stop transaction has settled (every stopped axis reported Done and stood
+// still for 3 scans, no motion lock): a stop that has axes to stop is held until then (MONETcommon#96/#118)
+IF bSettled THEN
 	bStopActive := FALSE;
+	IF TCS_command = E_TCSCommand.stop THEN
+		bMoveAbortPending := FALSE;	// only after STOP was dispatched in this scan
+	END_IF
 END_IF
 
 // unset the RESET command when no Error is present
@@ -1266,7 +1272,7 @@ TCSCTOEvent(	Trigger := tonCommandTimeout.Q,
       </Implementation>
     </Method>
     <Method Name="_CommandState" Id="{dcfc70aa-b99e-45a8-9b01-d3cbca8d7345}" FolderPath="internal methods\">
-      <Declaration><![CDATA[// The state BROTLib.F_CommandAcceptance decides on. eExcludeOwn leaves the own request out of bMoveActive. bStopping stands in for
+      <Declaration><![CDATA[// The state BROTLib.F_CommandAcceptance decides on. eExcludeOwn leaves the own request out of bMoveActive. bMoveAbortPending stands in for
 // bMoveAbortPending until the abort stop (command model step 3A).
 METHOD PRIVATE _CommandState : BROTLib.ST_CommandState
 VAR_INPUT
@@ -1288,7 +1294,7 @@ _CommandState.bMoveActive	:= (bGotoActive AND eExcludeOwn <> E_TCSCommand.goto) 
 	(bTrackActive AND eExcludeOwn <> E_TCSCommand.track) OR
 	(bGoHomeActive AND eExcludeOwn <> E_TCSCommand.gohome) OR
 	TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew OR TCS_command = E_TCSCommand.track OR
-	bTracking OR bStopping;]]></ST>
+	bTracking OR bMoveAbortPending;]]></ST>
       </Implementation>
     </Method>
     <Method Name="_AcceptMove" Id="{51edef40-3393-4d6a-a494-75062c704f44}" FolderPath="internal methods\">
@@ -2384,6 +2390,10 @@ fbStopTx.abLocked[1] := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000)
 fbStopTx.abLocked[2] := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0;
 fbStopTx.abHoming[1] := fbHourAngle.fbLatchHome.Busy;
 fbStopTx.abHoming[2] := fbDeclination.fbLatchHome.Busy;
+fbStopTx.abMoving[1] := aAxis[1].bInMotion OR aAxis[1].bInRamp;	// for Restart
+fbStopTx.abMoving[2] := aAxis[2].bInMotion OR aAxis[2].bInRamp;
+fbStopTx.abStopping[1] := aAxis[1].bStopping;
+fbStopTx.abStopping[2] := aAxis[2].bStopping;
 fbStopTx.abSweeping[1] := fbHourAngle.bSweepActive;	// #198
 fbStopTx.abSweeping[2] := fbDeclination.bSweepActive;
 fbStopTx.bStopped := bStopped;
@@ -2775,6 +2785,15 @@ bSlewActive		:= TRUE;]]></ST>
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bStopChecked := TRUE;
+// a repeated stop while a stop is running sends a new stop only to axes that are moving again and are not stopping already
+// (BROTLib.FB_StopTransaction.Restart); the focus is stopped again as well (MONETcommon#96/#122)
+IF bStopActive THEN
+	_SetStopTxInputs();
+	fbStopTx.Restart();
+	IF fbFocus <> 0 THEN
+		fbFocus.Stop();
+	END_IF
+END_IF
 bUserStop := TRUE;
 bStopActive := TRUE;
 // MONETcommon#122: an explicit stop also stops a running focus move and holds the position reached; the automatic
