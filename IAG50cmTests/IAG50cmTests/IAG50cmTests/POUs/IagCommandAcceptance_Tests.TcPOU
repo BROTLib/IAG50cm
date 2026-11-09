@@ -1,0 +1,587 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagCommandAcceptance_Tests" Id="{7d5ad0e5-d130-4d6d-876a-858e1e162aaf}" SpecialFunc="None">
+    <Declaration><![CDATA[// Command acceptance at arrival (BROTLib.F_CommandAcceptance, as MONETcommon#83) in FB_TelescopeControl (IAG50cm): a move command
+// that the table rejects is logged and counted and writes nothing. Plan: BROTLib specs/plans/2026-11-09-iag50cm-command-model-unification.md,
+// step 2. One rig per test, one Scan() per PLC cycle.
+FUNCTION_BLOCK IagCommandAcceptance_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Slew_While_Parked_Is_Rejected();
+Rejected_Slew_Writes_No_Target();
+Track_During_PowerOn_Is_Rejected();
+Home_While_Not_Ready_Is_Rejected();
+Slew_During_Park_Is_Rejected();
+Goto_During_GoHome_Is_Rejected();
+Slew_During_Stop_Is_Rejected();
+Rejections_Are_Counted_Each_Time();
+Park_Is_Never_Rejected();
+]]></ST>
+    </Implementation>
+    <Method Name="Slew_While_Parked_Is_Rejected" Id="{69b79256-b82f-4486-a0bf-557307ae01ac}">
+      <Declaration><![CDATA[// A slew while the telescope is parked is rejected (D2), nothing is latched.
+METHOD PRIVATE Slew_While_Parked_Is_Rejected
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_While_Parked_Is_Rejected');
+sTest := 'Slew_While_Parked_Is_Rejected: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Park();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// wait until the park has finished
+	IF rig.fbTel.bIsParked THEN
+		fAz := rig.fbTel.fAzimuth;
+		fEl := rig.fbTel.fElevation;
+		rig.fbTel.Slew(fAzimuth := 100.0, fAltitude := 30.0);
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 1, Message := 'the command was rejected and counted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 1), sText := CONCAT(sTest, 'the command was rejected and counted'));
+		AssertTrue(Condition := rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.parked, Message := 'rejected for the right reason');
+		F_Note(bFailed := NOT (rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.parked), sText := CONCAT(sTest, 'rejected for the right reason'));
+		AssertTrue(Condition := NOT rig.fbTel.bSlewActive, Message := 'no slew was latched');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'no slew was latched'));
+		nStep := 99;
+		TEST_FINISHED();
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Rejected_Slew_Writes_No_Target" Id="{f2078e8e-673e-4984-8110-36bec418414c}">
+      <Declaration><![CDATA[// A rejected slew writes nothing, not even the target fields.
+METHOD PRIVATE Rejected_Slew_Writes_No_Target
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Rejected_Slew_Writes_No_Target');
+sTest := 'Rejected_Slew_Writes_No_Target: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Park();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// wait until the park has finished
+	IF rig.fbTel.bIsParked THEN
+		fAz := rig.fbTel.fAzimuth;
+		fEl := rig.fbTel.fElevation;
+		rig.fbTel.Slew(fAzimuth := 100.0, fAltitude := 30.0);
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 1, Message := 'the command was rejected and counted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 1), sText := CONCAT(sTest, 'the command was rejected and counted'));
+		AssertTrue(Condition := rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.parked, Message := 'rejected for the right reason');
+		F_Note(bFailed := NOT (rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.parked), sText := CONCAT(sTest, 'rejected for the right reason'));
+		AssertTrue(Condition := rig.fbTel.fAzimuth = fAz AND rig.fbTel.fElevation = fEl, Message := 'the slew target is untouched');
+		F_Note(bFailed := NOT (rig.fbTel.fAzimuth = fAz AND rig.fbTel.fElevation = fEl), sText := CONCAT(sTest, 'the slew target is untouched'));
+		nStep := 99;
+		TEST_FINISHED();
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Track_During_PowerOn_Is_Rejected" Id="{7dab9629-8f1f-4f8a-a786-15ad18f28c52}">
+      <Declaration><![CDATA[// A track while the power-on runs is rejected (D2).
+METHOD PRIVATE Track_During_PowerOn_Is_Rejected
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Track_During_PowerOn_Is_Rejected');
+sTest := 'Track_During_PowerOn_Is_Rejected: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the power-on is running
+	rig.fbTel.Track(fRightAscension := 100.0, fDeclination := 30.0);
+	nStep := 20;
+20:
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 1, Message := 'the command was rejected and counted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 1), sText := CONCAT(sTest, 'the command was rejected and counted'));
+		AssertTrue(Condition := rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.powering_on, Message := 'rejected for the right reason');
+		F_Note(bFailed := NOT (rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.powering_on), sText := CONCAT(sTest, 'rejected for the right reason'));
+		AssertTrue(Condition := NOT rig.fbTel.bGotoActive, Message := 'no goto was latched');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bGotoActive), sText := CONCAT(sTest, 'no goto was latched'));
+		nStep := 99;
+		TEST_FINISHED();
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Home_While_Not_Ready_Is_Rejected" Id="{0796953e-2acc-4947-81ab-ea2d5117de29}">
+      <Declaration><![CDATA[// A home while the telescope is not ready is rejected, not left pending for 2 minutes (D4).
+METHOD PRIVATE Home_While_Not_Ready_Is_Rejected
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Home_While_Not_Ready_Is_Rejected');
+sTest := 'Home_While_Not_Ready_Is_Rejected: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock
+	IF rig.ClockValid THEN
+		rig.fbTel.Home();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 1, Message := 'the home was rejected and counted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 1), sText := CONCAT(sTest, 'the home was rejected and counted'));
+		AssertTrue(Condition := rig.fbTel.eLastRejectReason <> BROTLib.E_CommandRejectReason.none, Message := 'with a reason');
+		F_Note(bFailed := NOT (rig.fbTel.eLastRejectReason <> BROTLib.E_CommandRejectReason.none), sText := CONCAT(sTest, 'with a reason'));
+		AssertTrue(Condition := NOT rig.fbTel.bGoHomeActive, Message := 'no home was latched (it used to wait 2 min)');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bGoHomeActive), sText := CONCAT(sTest, 'no home was latched (it used to wait 2 min)'));
+		nStep := 99;
+		TEST_FINISHED();
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Slew_During_Park_Is_Rejected" Id="{1917d8b8-1cae-4c38-b83e-8789b85a2aa6}">
+      <Declaration><![CDATA[// A slew while a park is pending or running is rejected (D2).
+METHOD PRIVATE Slew_During_Park_Is_Rejected
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_During_Park_Is_Rejected');
+sTest := 'Slew_During_Park_Is_Rejected: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Park();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the park is running
+	IF rig.fbTel.bParkActive THEN
+		rig.fbTel.Slew(fAzimuth := 100.0, fAltitude := 30.0);
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 10 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park did not start');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park did not start'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 1, Message := 'the command was rejected and counted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 1), sText := CONCAT(sTest, 'the command was rejected and counted'));
+		AssertTrue(Condition := rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.parking, Message := 'rejected for the right reason');
+		F_Note(bFailed := NOT (rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.parking), sText := CONCAT(sTest, 'rejected for the right reason'));
+		nStep := 99;
+		TEST_FINISHED();
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Goto_During_GoHome_Is_Rejected" Id="{98f1a431-d0af-43ee-9dbf-a9e052c22036}">
+      <Declaration><![CDATA[// A goto/track while the home runs is rejected (D2).
+METHOD PRIVATE Goto_During_GoHome_Is_Rejected
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Goto_During_GoHome_Is_Rejected');
+sTest := 'Goto_During_GoHome_Is_Rejected: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Home();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the home is accepted and running
+	IF rig.fbTel.bGoHomeActive THEN
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 0, Message := 'the home from the ready telescope was accepted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 0), sText := CONCAT(sTest, 'the home from the ready telescope was accepted'));
+		rig.fbTel.Track(fRightAscension := 100.0, fDeclination := 30.0);
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 10 THEN
+		AssertTrue(Condition := FALSE, Message := 'the home did not start');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the home did not start'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 1, Message := 'the command was rejected and counted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 1), sText := CONCAT(sTest, 'the command was rejected and counted'));
+		AssertTrue(Condition := rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.gohome_active, Message := 'rejected for the right reason');
+		F_Note(bFailed := NOT (rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.gohome_active), sText := CONCAT(sTest, 'rejected for the right reason'));
+		nStep := 99;
+		TEST_FINISHED();
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Slew_During_Stop_Is_Rejected" Id="{127c8bc2-240b-46af-bebf-515bd340c554}">
+      <Declaration><![CDATA[// A slew while a stop is running is rejected (D5).
+METHOD PRIVATE Slew_During_Stop_Is_Rejected
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_During_Stop_Is_Rejected');
+sTest := 'Slew_During_Stop_Is_Rejected: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// an axis is moving: stop
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		rig.fbTel.Stop();
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not start an axis move'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// the stop is running
+	IF rig.fbTel.bStopActive THEN
+		rig.fbTel.Slew(fAzimuth := 100.0, fAltitude := 30.0);
+		nStep := 40;
+		nCycles := 0;
+	ELSIF nCycles > 10 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not start');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not start'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+40:
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 1, Message := 'the command was rejected and counted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 1), sText := CONCAT(sTest, 'the command was rejected and counted'));
+		AssertTrue(Condition := rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.stopping, Message := 'rejected for the right reason');
+		F_Note(bFailed := NOT (rig.fbTel.eLastRejectReason = BROTLib.E_CommandRejectReason.stopping), sText := CONCAT(sTest, 'rejected for the right reason'));
+		nStep := 99;
+		TEST_FINISHED();
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Rejections_Are_Counted_Each_Time" Id="{c7a5fde2-7e81-4c09-9843-6598a8e286fd}">
+      <Declaration><![CDATA[// Every rejection is counted, also an identical one in consecutive scans (the log shows an identical one within 2 s once).
+METHOD PRIVATE Rejections_Are_Counted_Each_Time
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Rejections_Are_Counted_Each_Time');
+sTest := 'Rejections_Are_Counted_Each_Time: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Park();
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:
+	IF rig.fbTel.bIsParked THEN
+		rig.fbTel.Slew(fAzimuth := 100.0, fAltitude := 30.0);
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// a second rejection in the next scan
+	rig.fbTel.Slew(fAzimuth := 100.0, fAltitude := 30.0);
+	nStep := 40;
+40:
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 2, Message := 'both rejections are counted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 2), sText := CONCAT(sTest, 'both rejections are counted'));
+		nStep := 99;
+		TEST_FINISHED();
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Park_Is_Never_Rejected" Id="{a199b2df-8b0a-4326-94ba-eff84d4d1d1e}">
+      <Declaration><![CDATA[// A park is never rejected by the acceptance table.
+METHOD PRIVATE Park_Is_Never_Rejected
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	fAz			: LREAL;
+	fEl			: LREAL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Park_Is_Never_Rejected');
+sTest := 'Park_Is_Never_Rejected: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the power-on is running: a park is not rejected, it wins over the power-on
+	rig.fbTel.Park();
+	nStep := 20;
+	nCycles := 0;
+20:
+	IF nCycles >= 5 THEN
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 0, Message := 'a park is never rejected');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 0), sText := CONCAT(sTest, 'a park is never rejected'));
+		AssertTrue(Condition := rig.fbTel.bParkActive OR rig.fbTel.bIsParked, Message := 'the park runs');
+		F_Note(bFailed := NOT (rig.fbTel.bParkActive OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the park runs'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
