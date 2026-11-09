@@ -720,7 +720,7 @@ ELSIF bParkActive THEN
 			_GotoTelescope();
 			_SlewTelescope();
 			bInterupted := FALSE;
-			IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew THEN
+			IF TCS_command <> E_TCSCommand.gohome THEN
 				bMoveAbortPending := TRUE;
 			END_IF
 		ELSE
@@ -745,9 +745,9 @@ ELSIF bParkActive THEN
 		_GotoTelescope();
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage; it could latch otherwise
-		// #43: stop the axes now, park starts when they stand still. Only if one of the preempted commands is
-		// the one moving; a Track()/Slew() arriving while the park itself runs must not stop the park.
-		IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew OR TCS_command = E_TCSCommand.gohome THEN
+		// #43: stop the axes now, park starts when they stand still. Every preemption runs the (short) abort stop, also of a
+		// command that was not dispatched yet; not while the park itself runs: a Track()/Slew() arriving then must not stop it.
+		IF TCS_command <> E_TCSCommand.park THEN
 			bMoveAbortPending := TRUE;
 		END_IF
 
@@ -770,8 +770,8 @@ ELSIF bGoHomeActive THEN
 		_GotoTelescope();
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, see the park branch
-		IF TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew THEN
-			bMoveAbortPending := TRUE;	// #43, only if the preempted command is the one moving
+		IF TCS_command <> E_TCSCommand.gohome THEN
+			bMoveAbortPending := TRUE;	// #43; not while the home itself runs
 		END_IF
 
 	ELSIF TCS_command <> E_TCSCommand.gohome AND NOT bSettled AND (TCS_command = E_TCSCommand.track OR fbHourAngle.Tracking OR fbDeclination.Tracking) THEN
@@ -796,8 +796,8 @@ ELSIF bGotoActive THEN
 		bInterupted := TRUE;
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, see the park branch
-		IF TCS_command = E_TCSCommand.slew THEN
-			bMoveAbortPending := TRUE;	// #43, only if the preempted command is the one moving
+		IF TCS_command <> E_TCSCommand.goto THEN
+			bMoveAbortPending := TRUE;	// #43; not while the goto itself runs
 		END_IF
 	ELSIF bRestartGoto AND TCS_command = E_TCSCommand.goto THEN
 		// #41: Track() while going to a target: stop, then go to the new one (bGoto stays set)
