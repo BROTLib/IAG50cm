@@ -114,6 +114,9 @@
     <Compile Include="POUs\IagParkPowerReset_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\IagSupersede_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\IagStuckStop_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>

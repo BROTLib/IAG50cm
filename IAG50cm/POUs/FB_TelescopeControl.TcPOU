@@ -71,8 +71,8 @@ VAR
 	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	bMoveAbortPending	: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41); the abort stop of MONETcommon
-	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
-	bRestartSlew		: BOOL;		// Slew() while a slew is running: the new target replaces the old one (#41)
+	bSupersedeRequest	: BOOL;		// a move was accepted as replace of the running one (_AcceptMove): the latest move wins (MONETcommon#83)
+	eSupersedeKeep		: E_TCSCommand;	// the move that stays when the others are dropped
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
 	sParkEnd			: STRING(160) := 'completed';	// the park log line when bParkActive falls: completed, or why it ended (#57)
@@ -271,6 +271,7 @@ IF rtrigPoweredClear.Q THEN
 END_IF
 
 IF bError THEN
+	bSupersedeRequest := FALSE;
 	bMoveAbortPending := FALSE;	// the drives are disabled below, nothing to wait for (MONETcommon#84)
 	bGoHomeActive := 	FALSE;
 	bTrackActive := 	FALSE;
@@ -539,6 +540,39 @@ IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	// set again every scan (dropping Track/Goto/Slew/Home, re-commanding the dome). The timer counts again from now.
 	tonPowerTimeout(IN := FALSE);
 END_IF
+//----------------------------------------------------------------------------------------------
+// The latest move wins (MONETcommon#83, D6/D7; replaces the restart flags of #41 and the home-during-tracking branch of #72): _AcceptMove
+// accepted a move as replace of the running one and wrote its target. Drop the other move latches, reset their stage machines and stop
+// the axes (abort stop, #43); the kept move starts once the axes are at standstill.
+IF bSupersedeRequest THEN
+	IF eSupersedeKeep <> E_TCSCommand.gohome THEN
+		bGoHomeActive := FALSE;
+	END_IF
+	IF eSupersedeKeep <> E_TCSCommand.goto THEN
+		bGotoActive := FALSE;
+	END_IF
+	IF eSupersedeKeep <> E_TCSCommand.slew THEN
+		bSlewActive := FALSE;
+	END_IF
+	IF eSupersedeKeep <> E_TCSCommand.track THEN
+		bTrackActive := FALSE;
+	END_IF
+	bInterupted := TRUE;
+	_HomeTelescope();
+	_GotoTelescope();
+	_SlewTelescope();
+	bInterupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage
+	// the replacement gets its own 600 s, the timer must not go on counting from the first request
+	CASE eSupersedeKeep OF
+		E_TCSCommand.gohome:	tonHomeTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
+		E_TCSCommand.goto:		tonGotoTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
+		E_TCSCommand.slew:		tonSlewTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
+	END_CASE
+	IF NOT bError THEN
+		bMoveAbortPending := TRUE;
+	END_IF
+	bSupersedeRequest := FALSE;
+END_IF
 //----------------------------------------------------------------------------------------------		
 // set TCS_command according to state variables ordered by precedence
 // #109: a park outranks a running power-on (like an explicit stop, #27, and like MONET): the startup is aborted
@@ -767,12 +801,6 @@ ELSIF bGoHomeActive THEN
 			bMoveAbortPending := TRUE;	// #43; not while the home itself runs
 		END_IF
 
-	ELSIF TCS_command <> E_TCSCommand.gohome AND NOT bSettled AND (TCS_command = E_TCSCommand.track OR fbHourAngle.Tracking OR fbDeclination.Tracking) THEN
-		// #72: a home during tracking waited for bStopped, which is never TRUE while the axes track, so it never
-		// ran (bGoHome stayed set) until a stop. End the tracking through the stop (#43); the home starts when the
-		// axes stand still.
-		bMoveAbortPending := TRUE;
-
 	ELSE
 		IF bReady AND NOT bBusy AND bSettled THEN
 			bInterupted := FALSE;
@@ -792,13 +820,6 @@ ELSIF bGotoActive THEN
 		IF TCS_command <> E_TCSCommand.goto THEN
 			bMoveAbortPending := TRUE;	// #43; not while the goto itself runs
 		END_IF
-	ELSIF bRestartGoto AND TCS_command = E_TCSCommand.goto THEN
-		// #41: Track() while going to a target: stop, then go to the new one (bGoto stays set)
-		bInterupted := TRUE;
-		_GotoTelescope();
-		bInterupted := FALSE;
-		tonGotoTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);	// the timeout counts from the new request
-		bMoveAbortPending := TRUE;
 	ELSE
 		IF bReady AND NOT bBusy THEN
 			bInterupted := FALSE;
@@ -809,14 +830,7 @@ ELSIF bGotoActive THEN
 
 ELSIF bSlewActive THEN
 	bTrackActive := FALSE;
-	IF bRestartSlew AND TCS_command = E_TCSCommand.slew THEN
-		// #41: Slew() during a slew: stop, then slew to the new target (bSlew stays set)
-		bInterupted := TRUE;
-		_SlewTelescope();
-		bInterupted := FALSE;
-		tonSlewTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);	// the timeout counts from the new request
-		bMoveAbortPending := TRUE;
-	ELSIF bReady AND NOT bBusy THEN
+	IF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.slew;
 	END_IF
 ELSIF bTrackActive THEN
@@ -830,9 +844,6 @@ ELSE
 	fbHourAngle.bTracking := FALSE;
 	fbDeclination.bTracking := FALSE;
 END_IF
-// the restart requests are consumed above or void
-bRestartGoto := FALSE;
-bRestartSlew := FALSE;
 
 // #40: every command gets its own timeout; the timer used to run on from one command into the next
 IF TCS_command <> eLastTimeoutCommand THEN
@@ -1302,7 +1313,7 @@ _CommandState.bMoveActive	:= (bGotoActive AND eExcludeOwn <> E_TCSCommand.goto) 
     </Method>
     <Method Name="_AcceptMove" Id="{51edef40-3393-4d6a-a494-75062c704f44}" FolderPath="internal methods\">
       <Declaration><![CDATA[// TRUE if the move may run (accepted, or it replaces the running one), FALSE if it was rejected (logged by the body, nothing written).
-// Until the supersede of step 3C, a replace is carried out by the old preemption (bRestartGoto/bRestartSlew, precedence).
+// A replace asks for the supersede block of the body: the others are dropped, the axes stopped, the kept move starts at standstill.
 METHOD PRIVATE _AcceptMove : BOOL
 VAR_INPUT
 	eCommand	: E_TCSCommand;
@@ -1319,6 +1330,10 @@ IF eDecision = BROTLib.E_CommandDecision.reject THEN
 	_NoteRejected(eCommand := eCommand, eReason := eReason);
 	_AcceptMove := FALSE;
 ELSE
+	IF eDecision = BROTLib.E_CommandDecision.replace THEN
+		bSupersedeRequest := TRUE;
+		eSupersedeKeep := eCommand;
+	END_IF
 	_AcceptMove := TRUE;
 END_IF]]></ST>
       </Implementation>
@@ -1370,6 +1385,7 @@ bResetRequest := FALSE;
 // a move that is still running is stopped (abort stop), a power-on that is running is aborted. The hardware part below (safety
 // acknowledge, axis reset passes, dome reset, coordinates) stays gated on an error or a pending acknowledge (#36, #59).
 IF rtrigResetAny.Q THEN
+	bSupersedeRequest := FALSE;
 	bGotoActive := FALSE;
 	bSlewActive := FALSE;
 	bTrackActive := FALSE;
@@ -2855,7 +2871,6 @@ IF NOT _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
 END_IF
 THIS^.fElevation 	:= fAltitude;
 THIS^.fAzimuth 	:= fAzimuth;
-bRestartSlew	:= bSlewActive;	// #41: a slew is already running, replace its target
 bSlewActive		:= TRUE;]]></ST>
       </Implementation>
     </Method>
@@ -2899,7 +2914,6 @@ IF NOT _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
 END_IF
 THIS^.fRightAscension	:= fRightAscension;
 THIS^.fDeclination	:= fDeclination;
-bRestartGoto	:= bGotoActive;	// #41: a goto is already running, replace its target
 bGotoActive			:= TRUE;]]></ST>
       </Implementation>
     </Method>
