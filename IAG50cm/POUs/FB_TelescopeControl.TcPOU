@@ -69,7 +69,6 @@ VAR
 	bPowerChecked, bParkChecked, bStopChecked, bResetChecked : BOOL;	// the input as the edge block saw it last scan; a method sets its flag so an input edge in the same scan counts once
 	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
 	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
-	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	bMoveAbortPending	: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41); the abort stop of MONETcommon
 	fbArbiter			: BROTLib.FB_CommandArbiter;	// which command runs now (command model step 3C.2)
 	bParkHeld			: BOOL;		// the pending park waits: not given to the arbiter (park pre-step)
@@ -77,7 +76,7 @@ VAR
 	bWasPower, bWasPark, bWasGoHome, bWasMove : BOOL;	// the requests of the scan before the arbiter's clears (log texts, stop-ignored)
 	bSupersedeRequest	: BOOL;		// a move was accepted as replace of the running one (_AcceptMove): the latest move wins (MONETcommon#83)
 	eSupersedeKeep		: E_TCSCommand;	// the move that stays when the others are dropped
-	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
+	eTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
 	sParkEnd			: STRING(160) := 'completed';	// the park log line when bParkActive falls: completed, or why it ended (#57)
 	bParkLogged			: BOOL;		// bParkActive as the park event saw it last scan: PARK commencing is logged, an end line follows (#57)
@@ -100,7 +99,7 @@ VAR
 	nInitRefusedCount	: UDINT;	// diagnostics (ADS)
 	TCSinitRefusedEvent	: FB_Eventlog;
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
-	bPowerParked		: BOOL;		// a park aborted a running power-on (one scan, #109)
+	bPowerAbortedByPark		: BOOL;		// a park aborted a running power-on (one scan, #109)
 	bInHorizonLimit		: BOOL;		// #84: the mount is below the horizon limit (the safety block homes it out)
 	bInPoleLimit		: BOOL;		// #84: the mount (or the tracking target) is in the pole zone
 	bLimitHome			: BOOL;		// #84: the pending or running home was requested by a limit block; latched while bGoHome
@@ -184,28 +183,6 @@ END_IF
 IF bPower AND NOT bPowerChecked THEN
 	Init();
 END_IF
-// A rising move input is a command like the method call: decided at arrival (_AcceptMove); accepted, it sets the latch, rejected, it
-// is logged and nothing is set. The target fields are what the writer set before the edge. Nested IFs on purpose: ST does not
-// short-circuit AND and _AcceptMove must only run on the edge.
-IF bGoHome AND NOT bGoHomeChecked THEN
-	Home();
-END_IF
-IF bGoto AND NOT bGotoChecked THEN
-	IF _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
-		bGotoActive := TRUE;
-	END_IF
-END_IF
-IF bSlew AND NOT bSlewChecked THEN
-	IF _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
-		bSlewActive := TRUE;
-	END_IF
-END_IF
-IF bTrack AND NOT bTrackChecked THEN
-	IF _AcceptMove(E_TCSCommand.track, E_TCSCommand.no_command) THEN
-		bTrackActive := TRUE;
-	END_IF
-END_IF
-
 _ReadAxes();
 // Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
 // A repeated request to an already online telescope is dropped, it must not restart calibration.
@@ -274,6 +251,30 @@ IF rtrigPoweredClear.Q THEN
 	bIsPowered := FALSE;
 END_IF
 
+// (Template body step S1.d, D1: after the error computation like MONETcommon, so the gate sees bError, the clock and the power-on of this scan:
+// a move edge in the scan of a new error is rejected with a log, not accepted and dropped silently.)
+// A rising move input is a command like the method call: decided at arrival (_AcceptMove); accepted, it sets the latch, rejected, it
+// is logged and nothing is set. The target fields are what the writer set before the edge. Nested IFs on purpose: ST does not
+// short-circuit AND and _AcceptMove must only run on the edge.
+IF bGoHome AND NOT bGoHomeChecked THEN
+	Home();
+END_IF
+IF bGoto AND NOT bGotoChecked THEN
+	IF _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
+		bGotoActive := TRUE;
+	END_IF
+END_IF
+IF bSlew AND NOT bSlewChecked THEN
+	IF _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
+		bSlewActive := TRUE;
+	END_IF
+END_IF
+IF bTrack AND NOT bTrackChecked THEN
+	IF _AcceptMove(E_TCSCommand.track, E_TCSCommand.no_command) THEN
+		bTrackActive := TRUE;
+	END_IF
+END_IF
+
 IF bError THEN
 	bSupersedeRequest := FALSE;
 	bMoveAbortPending := FALSE;	// the drives are disabled below, nothing to wait for (MONETcommon#84)
@@ -289,20 +290,6 @@ ELSE
 	nErrorID := 0;
 END_IF
 
-// BROTLib#25 step 4.4d (decided by Tim 2026-11-09: MONETcommon wins): a new hardware error (hour angle, declination or focus; not a
-// software or cabinet error) while not parked and without E-stop starts the park by itself, like MONETcommon#86. The park branch
-// below does what is safe without the mount (the axes are disabled by the error): covers close, dome parks, focus off; the mount
-// is not moved and bIsParked is not set until the covers are closed and the dome is parked. A running power-on is aborted by
-// the park (#109). Edge only: a still present error does not start it again.
-bErrorParkStarted := BROTLib.F_ErrorParkRequest(
-	bHwError := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error),
-	bHwErrorLast := bHwErrorLast,
-	bIsParked := bIsParked,
-	bEstop := bEstopTriggered);
-bHwErrorLast := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error);
-IF bErrorParkStarted THEN
-	Park();
-END_IF
 
 
 // calculate fHourAngleApparent, fDeclinationApparent 
@@ -561,11 +548,11 @@ IF bSupersedeRequest THEN
 	IF eSupersedeKeep <> E_TCSCommand.track THEN
 		bTrackActive := FALSE;
 	END_IF
-	bInterupted := TRUE;
+	bInterrupted := TRUE;
 	_HomeTelescope();
 	_GotoTelescope();
 	_SlewTelescope();
-	bInterupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage
+	bInterrupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage
 	// the replacement gets its own 600 s, the timer must not go on counting from the first request
 	CASE eSupersedeKeep OF
 		E_TCSCommand.gohome:	tonHomeTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
@@ -577,6 +564,22 @@ IF bSupersedeRequest THEN
 	END_IF
 	bSupersedeRequest := FALSE;
 END_IF
+// (Template body step S1.e, D2: after the supersede block and before the park pre-step, as MONETcommon#86, so the stop branch cannot clear the request in the scan it is made.)
+// BROTLib#25 step 4.4d (decided by Tim 2026-11-09: MONETcommon wins): a new hardware error (hour angle, declination or focus; not a
+// software or cabinet error) while not parked and without E-stop starts the park by itself, like MONETcommon#86. The park branch
+// below does what is safe without the mount (the axes are disabled by the error): covers close, dome parks, focus off; the mount
+// is not moved and bIsParked is not set until the covers are closed and the dome is parked. A running power-on is aborted by
+// the park (#109). Edge only: a still present error does not start it again.
+bErrorParkStarted := BROTLib.F_ErrorParkRequest(
+	bHwError := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error),
+	bHwErrorLast := bHwErrorLast,
+	bIsParked := bIsParked,
+	bEstop := bEstopTriggered);
+bHwErrorLast := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error);
+IF bErrorParkStarted THEN
+	Park();
+END_IF
+
 //----------------------------------------------------------------------------------------------
 // set TCS_command according to state variables ordered by precedence (command model step 3C.2: BROTLib.FB_CommandArbiter decides,
 // the block applies what it asks for, as MONETcommon). Order: stop (also a running power-on) > park aborts a running power-on >
@@ -655,10 +658,10 @@ END_IF
 IF fbArbiter.bClearGoHome THEN
 	bGoHomeActive := FALSE;
 END_IF
-// #26: the interrupted state machines reset their stage in one call with bInterupted TRUE; bInterupted is a one-shot
+// #26: the interrupted state machines reset their stage in one call with bInterrupted TRUE; bInterrupted is a one-shot
 IF fbArbiter.bInterruptPower OR fbArbiter.bInterruptPark OR fbArbiter.bInterruptGoto OR fbArbiter.bInterruptSlew
 		OR fbArbiter.bInterruptGoHome THEN
-	bInterupted := TRUE;
+	bInterrupted := TRUE;
 	IF fbArbiter.bInterruptPower THEN
 		IF _PowerOn() >= 40 THEN	// abort path: bPowerActive FALSE, startup marked aborted, stage 0; returns the stage it was in
 			IF fbArbiter.bPowerAbortedByPark THEN
@@ -695,13 +698,13 @@ IF fbArbiter.bInterruptPower OR fbArbiter.bInterruptPark OR fbArbiter.bInterrupt
 		END_IF
 		_HomeTelescope();
 	END_IF
-	bInterupted := FALSE;
+	bInterrupted := FALSE;
 END_IF
 IF fbArbiter.bSetMoveAbortPending THEN
 	bMoveAbortPending := TRUE;	// #43/#84
 END_IF
 IF fbArbiter.bPowerAbortedByPark THEN
-	bPowerParked := TRUE;	// logged: 'Power-on aborted by park' (#109)
+	bPowerAbortedByPark := TRUE;	// logged: 'Power-on aborted by park' (#109)
 END_IF
 // #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
 IF bStopActive AND bSafeParked AND NOT bWasPark AND NOT bWasPower AND NOT bWasMove AND NOT bWasGoHome THEN
@@ -719,9 +722,9 @@ ELSIF bRequestIdle THEN
 END_IF
 
 // #40: every command gets its own timeout; the timer used to run on from one command into the next
-IF TCS_command <> eLastTimeoutCommand THEN
+IF TCS_command <> eTimeoutCommand THEN
 	tonCommandTimeout(IN := FALSE);
-	eLastTimeoutCommand := TCS_command;
+	eTimeoutCommand := TCS_command;
 	// #108: a stop transaction starts here and lasts as long as TCS_command stays stop (also through the wait of a
 	// gohome that preempted a track): each axis gets one stop in it
 	IF TCS_command = E_TCSCommand.stop THEN
@@ -1112,12 +1115,12 @@ TCSparkHomeEvent(	Trigger := bParkHomeFirst,
 				OnMessage := 'Park in the horizon/pole-zone limit: homing out of it first, then parking',
 				Comm := fbComm);
 bParkHomeFirst := FALSE;
-TCSpowerParkEvent(	Trigger := bPowerParked,
+TCSpowerParkEvent(	Trigger := bPowerAbortedByPark,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'Power-on aborted by park',
 				Comm := fbComm);
-bPowerParked := FALSE;
+bPowerAbortedByPark := FALSE;
 TCSinitRefusedEvent(	Trigger := bInitRefused,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := 'power-on ignored: %s',
@@ -1258,12 +1261,12 @@ METHOD PRIVATE _ParkInPlace
 		sHomeEnd := 'cancelled by park';
 		bGotoActive := FALSE;
 		bSlewActive := FALSE;
-		bInterupted := TRUE;
+		bInterrupted := TRUE;
 		_ParkTelescope();
 		_HomeTelescope();
 		_GotoTelescope();
 		_SlewTelescope();
-		bInterupted := FALSE;
+		bInterrupted := FALSE;
 		fbCovers.Close();
 		fbDome.Position := 180.0;
 		fbDome.Park();
@@ -1351,7 +1354,7 @@ IF rtrigResetAny.Q THEN
 	bGotoActive := FALSE;
 	bSlewActive := FALSE;
 	bTrackActive := FALSE;
-	bInterupted := TRUE;
+	bInterrupted := TRUE;
 	_GotoTelescope();
 	_SlewTelescope();
 	IF NOT bLimitHome THEN	// the home of a park in a limit belongs to the park (#84)
@@ -1359,7 +1362,7 @@ IF rtrigResetAny.Q THEN
 		sHomeEnd := 'cancelled by reset';
 		_HomeTelescope();
 	END_IF
-	bInterupted := FALSE;
+	bInterrupted := FALSE;
 	// a stop that is stuck in Stopping is recovered by a reset without writing over ADS: only axes that stand still are reset (a reset
 	// under motion was followed by 0x4260, MONETcommon#84), a moving enabled axis keeps the stop going (MONETcommon#96 D3)
 	IF (bStopActive OR bMoveAbortPending)
@@ -1412,12 +1415,12 @@ IF bResetActive THEN
 	bGotoActive := FALSE;
 	bSlewActive := FALSE;
 	bTrackActive := FALSE;
-	bInterupted := TRUE;
+	bInterrupted := TRUE;
 	_HomeTelescope();
 	_GotoTelescope();
 	_SlewTelescope();
 	_ParkTelescope();
-	bInterupted := FALSE;
+	bInterrupted := FALSE;
 END_IF
 
 ]]></ST>
@@ -1470,7 +1473,7 @@ IF tonGotoTimeout.Q THEN	// MONETcommon#17: fed every scan in the body, a method
 	nStage := 0;
 	RETURN;
 END_IF
-IF bResetActive OR bError OR bStopActive OR bInterupted THEN
+IF bResetActive OR bError OR bStopActive OR bInterrupted THEN
 	nStage := 0;
 	RETURN;
 END_IF
@@ -1604,7 +1607,7 @@ IF tonHomeTimeout.Q THEN
 	RETURN;		// #75: like goto/slew/park; bError is recomputed next scan, do not run the stages on
 END_IF
 
-IF bResetActive OR bError OR bStopActive OR bInterupted THEN
+IF bResetActive OR bError OR bStopActive OR bInterrupted THEN
     fbStartup.MarkAbortedIfInitializing();
 	nStage := 0;
 	RETURN;
@@ -1730,7 +1733,7 @@ IF tonParkTimeout.Q THEN	// fed every scan in the body, like the goto/home/slew 
 	nStage := 0;
 	RETURN;
 END_IF
-IF bResetActive OR bError OR bStopActive OR bInterupted THEN
+IF bResetActive OR bError OR bStopActive OR bInterrupted THEN
 	nStage := 0;
 	RETURN;
 END_IF
@@ -1960,9 +1963,9 @@ _PowerOn := nStage;
 // #69: a power-on only runs while it is requested. Stage 100 clears bPower, but TCS_command stays poweron until
 // the go-home takes over, so _PowerOn kept being called and restarted its stages; the go-home then left nStage at
 // 10 or 20 and the next power=1 resumed there, skipping the wait for the safety acknowledge in stage 0.
-IF NOT bPowerActive OR bResetActive OR bError OR bStopActive OR bInterupted THEN
+IF NOT bPowerActive OR bResetActive OR bError OR bStopActive OR bInterrupted THEN
     // After a successful handoff bPower is false but the home phase still owns startup.
-    IF bResetActive OR bError OR bStopActive OR bInterupted OR bPowerFailure THEN
+    IF bResetActive OR bError OR bStopActive OR bInterrupted OR bPowerFailure THEN
         fbStartup.MarkAborted();
         bPowerActive := FALSE;
     END_IF
@@ -2293,7 +2296,7 @@ IF tonSlewTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
 	nStage := 0;
 	RETURN;
 END_IF
-IF bResetActive OR bError OR bStopActive OR bInterupted THEN
+IF bResetActive OR bError OR bStopActive OR bInterrupted THEN
 	nStage := 0;
 	RETURN;
 END_IF
@@ -2871,6 +2874,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[// #100: see Slew(); a track request while the telescope is not ready is refused, not latched
 bGotoChecked := TRUE;
+bTrackChecked := TRUE;	// D4 (template body step S1.f): Track() and a bTrack edge in one scan are one command, as in MONETcommon
 IF NOT _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
 	RETURN;
 END_IF
