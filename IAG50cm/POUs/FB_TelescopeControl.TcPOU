@@ -76,7 +76,7 @@ VAR
 	bWasPower, bWasPark, bWasGoHome, bWasMove : BOOL;	// the requests of the scan before the arbiter's clears (log texts, stop-ignored)
 	bSupersedeRequest	: BOOL;		// a move was accepted as replace of the running one (_AcceptMove): the latest move wins (MONETcommon#83)
 	eSupersedeKeep		: E_TCSCommand;	// the move that stays when the others are dropped
-	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
+	eTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
 	sParkEnd			: STRING(160) := 'completed';	// the park log line when bParkActive falls: completed, or why it ended (#57)
 	bParkLogged			: BOOL;		// bParkActive as the park event saw it last scan: PARK commencing is logged, an end line follows (#57)
@@ -99,7 +99,7 @@ VAR
 	nInitRefusedCount	: UDINT;	// diagnostics (ADS)
 	TCSinitRefusedEvent	: FB_Eventlog;
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
-	bPowerParked		: BOOL;		// a park aborted a running power-on (one scan, #109)
+	bPowerAbortedByPark		: BOOL;		// a park aborted a running power-on (one scan, #109)
 	bInHorizonLimit		: BOOL;		// #84: the mount is below the horizon limit (the safety block homes it out)
 	bInPoleLimit		: BOOL;		// #84: the mount (or the tracking target) is in the pole zone
 	bLimitHome			: BOOL;		// #84: the pending or running home was requested by a limit block; latched while bGoHome
@@ -700,7 +700,7 @@ IF fbArbiter.bSetMoveAbortPending THEN
 	bMoveAbortPending := TRUE;	// #43/#84
 END_IF
 IF fbArbiter.bPowerAbortedByPark THEN
-	bPowerParked := TRUE;	// logged: 'Power-on aborted by park' (#109)
+	bPowerAbortedByPark := TRUE;	// logged: 'Power-on aborted by park' (#109)
 END_IF
 // #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
 IF bStopActive AND bSafeParked AND NOT bWasPark AND NOT bWasPower AND NOT bWasMove AND NOT bWasGoHome THEN
@@ -718,9 +718,9 @@ ELSIF bRequestIdle THEN
 END_IF
 
 // #40: every command gets its own timeout; the timer used to run on from one command into the next
-IF TCS_command <> eLastTimeoutCommand THEN
+IF TCS_command <> eTimeoutCommand THEN
 	tonCommandTimeout(IN := FALSE);
-	eLastTimeoutCommand := TCS_command;
+	eTimeoutCommand := TCS_command;
 	// #108: a stop transaction starts here and lasts as long as TCS_command stays stop (also through the wait of a
 	// gohome that preempted a track): each axis gets one stop in it
 	IF TCS_command = E_TCSCommand.stop THEN
@@ -1111,12 +1111,12 @@ TCSparkHomeEvent(	Trigger := bParkHomeFirst,
 				OnMessage := 'Park in the horizon/pole-zone limit: homing out of it first, then parking',
 				Comm := fbComm);
 bParkHomeFirst := FALSE;
-TCSpowerParkEvent(	Trigger := bPowerParked,
+TCSpowerParkEvent(	Trigger := bPowerAbortedByPark,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
 				OnMessage := 'Power-on aborted by park',
 				Comm := fbComm);
-bPowerParked := FALSE;
+bPowerAbortedByPark := FALSE;
 TCSinitRefusedEvent(	Trigger := bInitRefused,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := 'power-on ignored: %s',
