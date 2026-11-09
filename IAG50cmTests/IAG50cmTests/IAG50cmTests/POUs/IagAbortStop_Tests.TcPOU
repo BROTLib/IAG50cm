@@ -51,7 +51,7 @@ CASE nStep OF
 	IF rig.Online THEN
 		// the target is not checked against the sky of the day this runs on: no horizon, no safe altitude
 		rig.SetHorizon(-90.0);
-		rig.fbTel.fPointingSafeAltitude := -90.0;
+		rig.SetSafeAltitude(-90.0);
 		rig.fbTel.Track(fRightAscension := 100.0, fDeclination := 30.0);
 		nStep := 20;
 		nCycles := 0;
@@ -351,7 +351,7 @@ CASE nStep OF
 10:	// wait until the startup has finished (READY_STATE 1.0)
 	IF rig.Online THEN
 		rig.SetHorizon(-90.0);
-		rig.fbTel.fPointingSafeAltitude := -90.0;
+		rig.SetSafeAltitude(-90.0);
 		rig.fbTel.Track(fRightAscension := 100.0, fDeclination := 30.0);
 		rig.fbTel.Park();
 		nStep := 20;
