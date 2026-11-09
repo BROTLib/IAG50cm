@@ -71,6 +71,10 @@ VAR
 	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
 	bInterupted			: BOOL;		// If a command is interuped by one with more presedence, the interupted needs to reset its stage
 	bMoveAbortPending	: BOOL;		// a movement was preempted: the axes are stopped before the new command starts (#43, #42, #41); the abort stop of MONETcommon
+	fbArbiter			: BROTLib.FB_CommandArbiter;	// which command runs now (command model step 3C.2)
+	bParkHeld			: BOOL;		// the pending park waits: not given to the arbiter (park pre-step)
+	bRequestIdle		: BOOL;		// no request at all: the axis commands are dropped
+	bWasPower, bWasPark, bWasGoHome, bWasMove : BOOL;	// the requests of the scan before the arbiter's clears (log texts, stop-ignored)
 	bSupersedeRequest	: BOOL;		// a move was accepted as replace of the running one (_AcceptMove): the latest move wins (MONETcommon#83)
 	eSupersedeKeep		: E_TCSCommand;	// the move that stays when the others are dropped
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
@@ -573,271 +577,140 @@ IF bSupersedeRequest THEN
 	END_IF
 	bSupersedeRequest := FALSE;
 END_IF
-//----------------------------------------------------------------------------------------------		
-// set TCS_command according to state variables ordered by precedence
-// #109: a park outranks a running power-on (like an explicit stop, #27, and like MONET): the startup is aborted
-// (READY_STATE -2 for the aborted init) and the park runs below in this scan. Only for a power-on that was already running
-// (TCS_command of the last scan): an Init() during a park still cancels the park, see the bPower branch below.
-IF bPowerActive AND bParkActive AND NOT bStopActive THEN
-	bPowerParked := TRUE;
-	bInterupted := TRUE;
-	IF _PowerOn() >= 40 THEN	// bInterupted: marks the startup aborted, clears bPowerActive, resets its stage; returns the stage it was in
-		// #197: the axes are on and may be sweeping: stop them. The park then switches them off (nothing else can: bReady
-		// needs the completed power-on) and parks in place.
-		bMoveAbortPending := TRUE;
+//----------------------------------------------------------------------------------------------
+// set TCS_command according to state variables ordered by precedence (command model step 3C.2: BROTLib.FB_CommandArbiter decides,
+// the block applies what it asks for, as MONETcommon). Order: stop (also a running power-on) > park aborts a running power-on >
+// power-on > a running abort stop > park > gohome > goto > slew > track > idle.
+// The park pre-step keeps what the arbiter does not know about IAG50cm: the park with an error, an E-stop or the axes off is the
+// in-place park, a park while the mount is not powered or forced waits for the axes to be switched off (#197), a park in a limit waits
+// for the limit home (#84), and a park is only dispatched when the telescope is ready and not busy (the arbiter alone would park at
+// standstill without ready, which on IAG50cm could drive uncalibrated axes, #161). A held park is not given to the arbiter.
+bParkHeld := FALSE;
+IF bParkActive AND NOT bStopActive AND NOT bPowerActive AND NOT fbStartup.Initializing AND NOT (bMoveAbortPending AND NOT bError) THEN
+	bTrackActive := FALSE;
+	IF bError OR bEstopTriggered OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
+		_ParkInPlace();
+		bParkHeld := TRUE;
+	ELSIF (NOT bIsPowered OR bParkForceInPlace) AND TCS_command <> E_TCSCommand.park THEN
+		// #197: no completed power-on (aborted by this park, or stopped in stage 40 or later) but an axis is on: the park can
+		// never be dispatched. Switch the axes off once they are at rest, then the axes-off park parks in place.
+		// TCS_command must not stay on poweron: _PowerOn and its 12 h timeout would stay selected.
 		fbSweepStop.ArmAll();
-		fbHourAngle.bStopSweep := TRUE;		// #198
-		fbDeclination.bStopSweep := TRUE;
+		TCS_command := E_TCSCommand.no_command;
+		bParkHeld := TRUE;
+	ELSIF bGoHomeActive AND bLimitHome THEN
+		// #84: a park in a limit: the home out of the limit runs first (the arbiter dispatches it), the park follows (bParkHomeDone)
+		IF NOT bParkAfterHome THEN
+			bParkAfterHome := TRUE;
+			bParkHomeFirst := TRUE;
+		END_IF
+		bParkHeld := TRUE;
+	ELSIF NOT (bReady AND NOT bBusy) THEN
+		bParkHeld := TRUE;
 	END_IF
-	bInterupted := FALSE;
+END_IF
+
+fbArbiter.bStop := bStopActive;
+fbArbiter.bPower := bPowerActive;
+fbArbiter.bInitializing := fbStartup.Initializing;
+fbArbiter.bPark := bParkActive AND NOT bParkHeld;
+fbArbiter.bGoHome := bGoHomeActive;
+fbArbiter.bGoto := bGotoActive;
+fbArbiter.bSlew := bSlewActive;
+fbArbiter.bTrack := bTrackActive;
+fbArbiter.bError := bError;
+fbArbiter.bEmergencyPark := FALSE;
+fbArbiter.bReady := bReady;
+fbArbiter.bBusy := bBusy;
+fbArbiter.bStopped := bSettled;	// IAG50cm: at rest and no stop transaction running
+fbArbiter.bMoveAbortPending := bMoveAbortPending;
+fbArbiter.bParkWinsOverPowerOn := TRUE;
+bRequestIdle := NOT (bStopActive OR bPowerActive OR bParkActive OR bGoHomeActive OR bGotoActive OR bSlewActive OR bTrackActive
+	OR (bMoveAbortPending AND NOT bError));
+bWasPower := bPowerActive;
+bWasPark := bParkActive;
+bWasGoHome := bGoHomeActive;
+bWasMove := bGotoActive OR bSlewActive;
+fbArbiter();
+
+// a stop always aborts a startup, also when bPower is already FALSE; the park that aborts a power-on does too
+IF fbArbiter.bAbortStartup THEN
+	fbStartup.MarkAbortedIfStarting(Power := bPowerActive);
+END_IF
+IF fbArbiter.bClearPower THEN
 	bPowerActive := FALSE;
 END_IF
-// #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
-// time) are meant not to abort a running power-on, but _PowerOn aborts on any bStop, so they are held back in the checks above (#166).
-IF bStopActive THEN
-    fbStartup.MarkAbortedIfStarting(Power := bPowerActive);
+IF fbArbiter.bClearTrack THEN
 	bTrackActive := FALSE;
-	bMoveAbortPending := FALSE;
-
-	// If the stop is during a movement, reset the stage of the movement first
-	IF bPowerActive THEN
-		bPowerActive := FALSE;
-		IF _PowerOn() >= 40 THEN	// bStopActive is set: resets its stage; returns the stage it was in
-			fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
+END_IF
+IF fbArbiter.bClearPark THEN
+	bParkActive := FALSE;
+END_IF
+IF fbArbiter.bClearGoto THEN
+	bGotoActive := FALSE;
+END_IF
+IF fbArbiter.bClearSlew THEN
+	bSlewActive := FALSE;
+END_IF
+IF fbArbiter.bClearGoHome THEN
+	bGoHomeActive := FALSE;
+END_IF
+// #26: the interrupted state machines reset their stage in one call with bInterupted TRUE; bInterupted is a one-shot
+IF fbArbiter.bInterruptPower OR fbArbiter.bInterruptPark OR fbArbiter.bInterruptGoto OR fbArbiter.bInterruptSlew
+		OR fbArbiter.bInterruptGoHome THEN
+	bInterupted := TRUE;
+	IF fbArbiter.bInterruptPower THEN
+		IF _PowerOn() >= 40 THEN	// abort path: bPowerActive FALSE, startup marked aborted, stage 0; returns the stage it was in
+			IF fbArbiter.bPowerAbortedByPark THEN
+				// #197: the axes are on and may be sweeping: stop them. The park then switches them off (nothing else can: bReady
+				// needs the completed power-on) and parks in place.
+				fbSweepStop.ArmAll();
+			ELSE
+				fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
+			END_IF
 			fbHourAngle.bStopSweep := TRUE;		// #198: no new sweep step after this stop, also before the sweep has started
 			fbDeclination.bStopSweep := TRUE;
 		END_IF
-	ELSIF bParkActive THEN	// a park that was only pending when an automatic stop came is queued in bParkAfterStop by _AutoStop
-		bParkActive := FALSE;
-		sParkEnd := 'cancelled by stop';
-		fbSweepStop.Cancel();		// #197: the park is gone, the axes stay as they are
+	END_IF
+	IF fbArbiter.bInterruptPark THEN
+		IF bWasPark THEN
+			sParkEnd := 'cancelled by stop';
+			fbSweepStop.Cancel();		// #197: the park is gone, the axes stay as they are
+		END_IF
 		_ParkTelescope();
-		IF bGoHomeActive THEN
-			// #84: the park was waiting for the limit home; the home goes with it (and its stage is reset, it would resume mid-way)
-			bGoHomeActive := FALSE;
-			sHomeEnd := 'cancelled by stop';
-			_HomeTelescope();
-		END_IF
-	// #84: a park that is only pending survives the automatic stop of a limit: the stop settles, the limit home runs, then the park
-	ELSIF bSafeParked AND NOT (bGotoActive OR bSlewActive OR bGoHomeActive) THEN
-		// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
-		bStopIgnored := TRUE;
 	END_IF
-	// a stop clears every pending move and interrupts its stage machine, not only the first of a chain (MONETcommon#84)
-	IF bGotoActive THEN
-		bGotoActive := FALSE;
+	IF fbArbiter.bInterruptGoto THEN
 		_GotoTelescope();
 	END_IF
-	IF bSlewActive THEN
-		bSlewActive := FALSE;
+	IF fbArbiter.bInterruptSlew THEN
 		_SlewTelescope();
 	END_IF
-	IF bGoHomeActive THEN
-		bGoHomeActive := FALSE;
-		sHomeEnd := 'cancelled by stop';
+	IF fbArbiter.bInterruptGoHome THEN
+		IF bWasGoHome THEN
+			IF bStopActive THEN
+				sHomeEnd := 'cancelled by stop';	// #84: also the home that a park waited for
+			ELSE
+				sHomeEnd := 'cancelled by park';
+			END_IF
+		END_IF
 		_HomeTelescope();
 	END_IF
-	TCS_command := E_TCSCommand.stop;
+	bInterupted := FALSE;
+END_IF
+IF fbArbiter.bSetMoveAbortPending THEN
+	bMoveAbortPending := TRUE;	// #43/#84
+END_IF
+IF fbArbiter.bPowerAbortedByPark THEN
+	bPowerParked := TRUE;	// logged: 'Power-on aborted by park' (#109)
+END_IF
+// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
+IF bStopActive AND bSafeParked AND NOT bWasPark AND NOT bWasPower AND NOT bWasMove AND NOT bWasGoHome THEN
+	bStopIgnored := TRUE;
+END_IF
 
-ELSIF bPowerActive THEN
-	TCS_command := E_TCSCommand.poweron;
-
-ELSIF bMoveAbortPending THEN
-	// #43: a movement was preempted. Its flag and stage are already reset; TCS_command must not stay on the old
-	// command (its method would keep the axes going), so run the stop until the axes stand still. The pending
-	// command is picked up below in the next scan.
-	TCS_command := E_TCSCommand.stop;	// released with the stop (bSettled) at the end of the body
-
-ELSIF bParkActive THEN
-	bTrackActive := FALSE;
-	IF bError OR bEstopTriggered OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
-		// Park during an error: the axes are disabled by the error and the park state machine aborts on bError, so
-		// bPark used to stay set and the park fired after the next Init() (or hung half way after a reset). Do what
-		// is safe without the mount: close the covers, park the dome, disable the focus, and drop the command. The
-		// mount is not moved and bIsParked is not set.
-		// The same with the axes off (#54): the park command is dispatched only with bReady, which needs the axes
-		// enabled, so a park after a stopped power-on, or on a parked telescope, waited until a power-on or the
-		// 600 s timeout with the covers open. Not while a park is running (TCS_command park): stage 60 of the park
-		// disables the axes itself and the park must go on to stage 100.
-		// An E-stop (#57) aborts a running park at any stage: after stage 60 the axes are off and no NC error is raised,
-		// so bError stayed FALSE and the park waited at stage 90 for covers that cannot move, until the 600 s timeout.
-		bGoHomeActive := FALSE;
-		sHomeEnd := 'cancelled by park';
-		bGotoActive := FALSE;
-		bSlewActive := FALSE;
-		bInterupted := TRUE;
-		_ParkTelescope();
-		_HomeTelescope();
-		_GotoTelescope();
-		_SlewTelescope();
-		bInterupted := FALSE;
-		fbCovers.Close();
-		fbDome.Position := 180.0;
-		fbDome.Park();
-		IF fbFocus <> 0 THEN
-			fbFocus.Enable := FALSE;
-		END_IF
-		bParkActive := FALSE;
-		// #57: say what was commanded, not what was done. With the E-stop pressed the cover and dome requests are
-		// dropped; a dome in its latched error ignores the park.
-		IF bEstopTriggered THEN
-			sParkWhy := 'E-stop pressed, the covers and the dome cannot move. Release it, reset, then park again.';
-		ELSE
-			IF fbCovers.Closed THEN
-				sParkWhy := 'covers closed, ';
-			ELSE
-				sParkWhy := 'covers closing, ';
-			END_IF
-			IF fbDome.Error THEN
-				sParkWhy := CONCAT(sParkWhy, 'the dome is in error and not parked, ');
-			ELSE
-				sParkWhy := CONCAT(sParkWhy, 'dome parking, ');
-			END_IF
-			IF bParkLogged THEN
-				sParkWhy := CONCAT(sParkWhy, 'the mount stopped short of the park position');
-			ELSE
-				sParkWhy := CONCAT(sParkWhy, 'the mount was not moved');
-			END_IF
-			IF bError THEN
-				sParkWhy := CONCAT(sParkWhy, '. Reset, then park again.');
-			ELSE
-				sParkWhy := CONCAT(sParkWhy, '.');
-			END_IF
-		END_IF
-		IF bParkLogged THEN
-			// A running park ends with ONE line, the PARK line, at WARN (E8 logged "PARK completed" and "Park refused").
-			IF bEstopTriggered THEN
-				sParkEnd := CONCAT('aborted: ', sParkWhy);
-				TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_WARN;
-			ELSIF bError THEN
-				sParkEnd := CONCAT('aborted by an error: ', sParkWhy);
-				TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_WARN;
-			ELSE
-				// #197/#200: the park goes on as an in-place park (covers, dome); its end is this park's one end line
-				bParkInPlaceOpen := TRUE;
-			END_IF
-		ELSE
-			// A request during an error or with the axes off was never logged: the separate WARN.
-			IF bEstopTriggered THEN
-				TCSparkErrorEvent.OnMessage := CONCAT('Park refused: ', sParkWhy);
-			ELSIF bError THEN
-				TCSparkErrorEvent.OnMessage := CONCAT('Park during an error: ', sParkWhy);
-			ELSE
-				TCSparkErrorEvent.OnMessage := CONCAT('Park with the axes off: ', sParkWhy);
-			END_IF
-			bParkInError := TRUE;
-		END_IF
-		// #110/#187: with no error and no E-stop this leaves a known, covered state. READY_STATE reports 0.3 while the covers
-		// close, and bIsParked is set once the covers are closed and the dome is parked (see below); the mount is where it was.
-		bSafeParked := NOT bError AND NOT bEstopTriggered;
-		TCS_command := E_TCSCommand.no_command;
-	// #197: no completed power-on (aborted by this park, or stopped in stage 40 or later) but an axis is on: the park can
-	// never be dispatched (bReady needs bIsPowered and the focus enable of stages 70 and 100). Switch the axes off once they
-	// are at rest (FB_SweepStop waits for the stop and the homing to end), then the axes-off park above parks in place.
-	// TCS_command must not stay on poweron: _PowerOn and its 12 h timeout would stay selected.
-	ELSIF (NOT bIsPowered OR bParkForceInPlace) AND TCS_command <> E_TCSCommand.park THEN
-		fbSweepStop.ArmAll();
-		TCS_command := E_TCSCommand.no_command;
-	// #84: a park in a limit: the home out of the limit runs first, the park follows (see bParkHomeDone)
-	ELSIF bGoHomeActive AND bLimitHome THEN
-		IF bGotoActive OR bSlewActive THEN
-			bGotoActive := FALSE;
-			bSlewActive := FALSE;
-			bInterupted := TRUE;
-			_GotoTelescope();
-			_SlewTelescope();
-			bInterupted := FALSE;
-			IF TCS_command <> E_TCSCommand.gohome THEN
-				bMoveAbortPending := TRUE;
-			END_IF
-		ELSE
-			IF NOT bParkAfterHome THEN
-				bParkAfterHome := TRUE;
-				bParkHomeFirst := TRUE;
-				fbStartup.MarkAbortedIfInitializing();	// #109: a park during the startup makes the init fail
-			END_IF
-			IF TCS_command <> E_TCSCommand.gohome AND bReady AND NOT bBusy AND bSettled THEN
-				bInterupted := FALSE;
-				TCS_command := E_TCSCommand.gohome;
-			END_IF
-		END_IF
-	// If lower presedence commands are ongoing, let them know they are interupted
-	ELSIF bGotoActive OR bSlewActive OR bGoHomeActive THEN
-		bGoHomeActive := FALSE;
-		sHomeEnd := 'cancelled by park';
-		bGotoActive := FALSE;
-		bSlewActive := FALSE;
-		bInterupted := TRUE;
-		_HomeTelescope();
-		_GotoTelescope();
-		_SlewTelescope();
-		bInterupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage; it could latch otherwise
-		// #43: stop the axes now, park starts when they stand still. Every preemption runs the (short) abort stop, also of a
-		// command that was not dispatched yet; not while the park itself runs: a Track()/Slew() arriving then must not stop it.
-		IF TCS_command <> E_TCSCommand.park THEN
-			bMoveAbortPending := TRUE;
-		END_IF
-
-	ELSE
-		IF bReady AND NOT bBusy THEN
-			bInterupted := FALSE;
-			TCS_command := E_TCSCommand.park;
-		END_IF
-	END_IF
-	
-	
-	
-ELSIF bGoHomeActive THEN
-	bTrackActive := FALSE;
-	// If lower presedence commands are ongoing, let them know they are interupted
-	IF bGotoActive OR bSlewActive THEN
-		bGotoActive := FALSE;
-		bSlewActive := FALSE;
-		bInterupted := TRUE;
-		_GotoTelescope();
-		_SlewTelescope();
-		bInterupted := FALSE;	// #26: one-shot, see the park branch
-		IF TCS_command <> E_TCSCommand.gohome THEN
-			bMoveAbortPending := TRUE;	// #43; not while the home itself runs
-		END_IF
-
-	ELSE
-		IF bReady AND NOT bBusy AND bSettled THEN
-			bInterupted := FALSE;
-			TCS_command := E_TCSCommand.gohome;
-		END_IF
-	END_IF
-	
-	
-ELSIF bGotoActive THEN
-	bTrackActive := FALSE;
-	// If lower presedence commands are ongoing, let them know they are interupted
-	IF bSlewActive THEN
-		bSlewActive := FALSE;
-		bInterupted := TRUE;
-		_SlewTelescope();
-		bInterupted := FALSE;	// #26: one-shot, see the park branch
-		IF TCS_command <> E_TCSCommand.goto THEN
-			bMoveAbortPending := TRUE;	// #43; not while the goto itself runs
-		END_IF
-	ELSE
-		IF bReady AND NOT bBusy THEN
-			bInterupted := FALSE;
-			TCS_command := E_TCSCommand.goto;
-		END_IF
-	END_IF
-
-
-ELSIF bSlewActive THEN
-	bTrackActive := FALSE;
-	IF bReady AND NOT bBusy THEN
-		TCS_command := E_TCSCommand.slew;
-	END_IF
-ELSIF bTrackActive THEN
-	IF bReady AND NOT bBusy THEN
-		TCS_command := E_TCSCommand.track;
-	END_IF
-ELSE
+IF fbArbiter.eCommand <> E_TCSCommand.no_command THEN
+	TCS_command := fbArbiter.eCommand;
+ELSIF bRequestIdle THEN
 	TCS_command := E_TCSCommand.no_command;
 	fbHourAngle.MoveAxis := FALSE;
 	fbDeclination.MoveAxis := FALSE;
@@ -1363,6 +1236,95 @@ IF bParkActive AND TCS_command <> E_TCSCommand.park THEN
 	bParkAfterStop := TRUE;
 	bParkActive := FALSE;
 END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ParkInPlace" Id="{8325b836-3a90-4df9-8d4a-8b6c11a8e16d}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// The park with an error, an E-stop or the axes off: what is safe without the mount (covers, dome, focus), moved unchanged out of the
+// arbitration chain (command model step 3C.2). Clears bParkActive, sets bSafeParked for an axes-off park, TCS_command no_command.
+METHOD PRIVATE _ParkInPlace
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[		// Park during an error: the axes are disabled by the error and the park state machine aborts on bError, so
+		// bPark used to stay set and the park fired after the next Init() (or hung half way after a reset). Do what
+		// is safe without the mount: close the covers, park the dome, disable the focus, and drop the command. The
+		// mount is not moved and bIsParked is not set.
+		// The same with the axes off (#54): the park command is dispatched only with bReady, which needs the axes
+		// enabled, so a park after a stopped power-on, or on a parked telescope, waited until a power-on or the
+		// 600 s timeout with the covers open. Not while a park is running (TCS_command park): stage 60 of the park
+		// disables the axes itself and the park must go on to stage 100.
+		// An E-stop (#57) aborts a running park at any stage: after stage 60 the axes are off and no NC error is raised,
+		// so bError stayed FALSE and the park waited at stage 90 for covers that cannot move, until the 600 s timeout.
+		bGoHomeActive := FALSE;
+		sHomeEnd := 'cancelled by park';
+		bGotoActive := FALSE;
+		bSlewActive := FALSE;
+		bInterupted := TRUE;
+		_ParkTelescope();
+		_HomeTelescope();
+		_GotoTelescope();
+		_SlewTelescope();
+		bInterupted := FALSE;
+		fbCovers.Close();
+		fbDome.Position := 180.0;
+		fbDome.Park();
+		IF fbFocus <> 0 THEN
+			fbFocus.Enable := FALSE;
+		END_IF
+		bParkActive := FALSE;
+		// #57: say what was commanded, not what was done. With the E-stop pressed the cover and dome requests are
+		// dropped; a dome in its latched error ignores the park.
+		IF bEstopTriggered THEN
+			sParkWhy := 'E-stop pressed, the covers and the dome cannot move. Release it, reset, then park again.';
+		ELSE
+			IF fbCovers.Closed THEN
+				sParkWhy := 'covers closed, ';
+			ELSE
+				sParkWhy := 'covers closing, ';
+			END_IF
+			IF fbDome.Error THEN
+				sParkWhy := CONCAT(sParkWhy, 'the dome is in error and not parked, ');
+			ELSE
+				sParkWhy := CONCAT(sParkWhy, 'dome parking, ');
+			END_IF
+			IF bParkLogged THEN
+				sParkWhy := CONCAT(sParkWhy, 'the mount stopped short of the park position');
+			ELSE
+				sParkWhy := CONCAT(sParkWhy, 'the mount was not moved');
+			END_IF
+			IF bError THEN
+				sParkWhy := CONCAT(sParkWhy, '. Reset, then park again.');
+			ELSE
+				sParkWhy := CONCAT(sParkWhy, '.');
+			END_IF
+		END_IF
+		IF bParkLogged THEN
+			// A running park ends with ONE line, the PARK line, at WARN (E8 logged "PARK completed" and "Park refused").
+			IF bEstopTriggered THEN
+				sParkEnd := CONCAT('aborted: ', sParkWhy);
+				TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_WARN;
+			ELSIF bError THEN
+				sParkEnd := CONCAT('aborted by an error: ', sParkWhy);
+				TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_WARN;
+			ELSE
+				// #197/#200: the park goes on as an in-place park (covers, dome); its end is this park's one end line
+				bParkInPlaceOpen := TRUE;
+			END_IF
+		ELSE
+			// A request during an error or with the axes off was never logged: the separate WARN.
+			IF bEstopTriggered THEN
+				TCSparkErrorEvent.OnMessage := CONCAT('Park refused: ', sParkWhy);
+			ELSIF bError THEN
+				TCSparkErrorEvent.OnMessage := CONCAT('Park during an error: ', sParkWhy);
+			ELSE
+				TCSparkErrorEvent.OnMessage := CONCAT('Park with the axes off: ', sParkWhy);
+			END_IF
+			bParkInError := TRUE;
+		END_IF
+		// #110/#187: with no error and no E-stop this leaves a known, covered state. READY_STATE reports 0.3 while the covers
+		// close, and bIsParked is set once the covers are closed and the dome is parked (see below); the mount is where it was.
+		bSafeParked := NOT bError AND NOT bEstopTriggered;
+		TCS_command := E_TCSCommand.no_command;
+]]></ST>
       </Implementation>
     </Method>
     <Method Name="_HandleReset" Id="{d3bbfeba-2cbb-4111-9ae3-4525c9154e5c}" FolderPath="internal methods\">
