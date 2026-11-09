@@ -166,7 +166,7 @@ CASE nStep OF
 	IF rig.fbTel.bMoveAbortPending THEN
 		bSeen := TRUE;
 	END_IF
-	IF nCycles > 5 AND rig.fbTel.bTracking THEN
+	IF nCycles > 5 AND rig.fbTel.TCS_command = E_TCSCommand.track THEN
 		AssertTrue(Condition := bSeen, Message := 'the new target ran the abort stop');
 		F_Note(bFailed := NOT (bSeen), sText := CONCAT(sTest, 'the new target ran the abort stop'));
 		AssertTrue(Condition := ABS(rig.fbTel.fRightAscension - 110.0) < 0.001, Message := 'the new target is the one');
@@ -230,8 +230,8 @@ CASE nStep OF
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
-20:	// wait until the mount tracks
-	IF rig.fbTel.bTracking THEN
+20:	// wait until the mount tracks (the mock axes do not report isTracking: the track command is the sign)
+	IF rig.fbTel.TCS_command = E_TCSCommand.track THEN
 		rig.fbTel.Home();
 		nStep := 30;
 		nCycles := 0;
@@ -248,8 +248,8 @@ CASE nStep OF
 	IF nCycles > 5 AND NOT rig.fbTel.bGoHomeActive AND rig.fbTel.bStopped THEN
 		AssertTrue(Condition := bSeen, Message := 'the tracking was ended through the abort stop');
 		F_Note(bFailed := NOT (bSeen), sText := CONCAT(sTest, 'the tracking was ended through the abort stop'));
-		AssertTrue(Condition := NOT rig.fbTel.bTracking, Message := 'the telescope no longer tracks');
-		F_Note(bFailed := NOT (NOT rig.fbTel.bTracking), sText := CONCAT(sTest, 'the telescope no longer tracks'));
+		AssertTrue(Condition := rig.fbTel.TCS_command <> E_TCSCommand.track, Message := 'the telescope no longer tracks');
+		F_Note(bFailed := NOT (rig.fbTel.TCS_command <> E_TCSCommand.track), sText := CONCAT(sTest, 'the telescope no longer tracks'));
 		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 0, Message := 'the home was accepted');
 		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 0), sText := CONCAT(sTest, 'the home was accepted'));
 		nStep := 99;
