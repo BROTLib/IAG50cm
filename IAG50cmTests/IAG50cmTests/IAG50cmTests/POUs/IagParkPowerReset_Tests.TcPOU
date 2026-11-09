@@ -423,7 +423,7 @@ nCycles := nCycles + 1;
 CASE nStep OF
 0:
 	IF rig.ClockValid THEN
-		rig.fbTel.bGoHomeActive := TRUE;	// a home left over from before
+		rig.ForceGoHomeActive();	// a home left over from before
 		rig.fbTel.Init();
 		nStep := 10;
 		nCycles := 0;
@@ -467,7 +467,7 @@ nCycles := nCycles + 1;
 CASE nStep OF
 0:
 	IF rig.ClockValid THEN
-		rig.fbTel.bSlewActive := TRUE;	// a request that cannot run (the telescope is not on)
+		rig.ForceSlewActive();	// a request that cannot run (the telescope is not on)
 		rig.fbTel.Reset();
 		nStep := 10;
 		nCycles := 0;
