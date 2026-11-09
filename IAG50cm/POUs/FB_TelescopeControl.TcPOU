@@ -1382,6 +1382,19 @@ IF rtrigResetAny.Q THEN
 		_HomeTelescope();
 	END_IF
 	bInterupted := FALSE;
+	// a stop that is stuck in Stopping is recovered by a reset without writing over ADS: only axes that stand still are reset (a reset
+	// under motion was followed by 0x4260, MONETcommon#84), a moving enabled axis keeps the stop going (MONETcommon#96 D3)
+	IF (bStopActive OR bMoveAbortPending)
+		AND NOT (fbHourAngle.bEnable AND (aAxis[1].bInMotion OR aAxis[1].bInRamp))
+		AND NOT (fbDeclination.bEnable AND (aAxis[2].bInMotion OR aAxis[2].bInRamp)) THEN
+		IF aAxis[1].bStopping THEN
+			fbHourAngle.Reset();
+		END_IF
+		IF aAxis[2].bStopping THEN
+			fbDeclination.Reset();
+		END_IF
+		fbStopTx.Cancel();	// the stop then releases at standstill
+	END_IF
 	// not during an error (the drives are off) and not during a park (its motion is wanted)
 	bMoveAbortPending := bMoveAbortPending OR BROTLib.F_ResetMoveAbort(
 		bError := bError,
