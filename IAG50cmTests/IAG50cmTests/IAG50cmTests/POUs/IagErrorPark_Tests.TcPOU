@@ -13,6 +13,7 @@ END_VAR
       <ST><![CDATA[Axis_Error_Starts_The_Park_Without_Moving_The_Mount();
 Park_During_An_Error_Closes_The_Covers_And_Parks_The_Dome();
 Park_With_The_Axes_Off_Does_Not_Move_The_Mount();
+Error_Park_With_A_Stop_In_The_Same_Scan_Runs_After_Settle();
 ]]></ST>
     </Implementation>
     <Method Name="Axis_Error_Starts_The_Park_Without_Moving_The_Mount" Id="{0423491c-a8e9-40cd-9002-9680002d64f8}">
@@ -205,6 +206,68 @@ CASE nStep OF
 		F_Note(bFailed := NOT (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked is still TRUE, as from the start: the park changes nothing'));
 		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'the mount was not moved');
 		F_Note(bFailed := (rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis), sText := CONCAT(sTest, 'the mount was not moved'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Error_Park_With_A_Stop_In_The_Same_Scan_Runs_After_Settle" Id="{9998987f-7d3c-4445-8993-705f1f316c62}">
+      <Declaration><![CDATA[// Characterization for the move of the error-park request (template body step S1.e): a stop in the scan of a new axis error queues the park behind it (bParkAfterStop); the park runs when the stop has settled. Written first, green before and after the move.
+METHOD PRIVATE Error_Park_With_A_Stop_In_The_Same_Scan_Runs_After_Settle
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Error_Park_With_A_Stop_In_The_Same_Scan_Runs_After_Settle');
+sTest := 'Error_Park_With_A_Stop_In_The_Same_Scan_Runs_After_Settle: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Stop();
+		rig.InjectHaError(16#4550);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the error park is queued behind the stop and runs when the stop has settled
+	IF nCycles >= 600 THEN
+		AssertTrue(Condition := rig.fbTel.bError, Message := 'the error is reported');
+		F_Note(bFailed := NOT (rig.fbTel.bError), sText := CONCAT(sTest, 'the error is reported'));
+		AssertTrue(Condition := rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1, Message := 'the park ran after the stop: covers closed');
+		F_Note(bFailed := NOT (rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the park ran after the stop: covers closed'));
+		AssertTrue(Condition := rig.fbDome.nParkCalls >= 1, Message := 'the dome is parked');
+		F_Note(bFailed := NOT (rig.fbDome.nParkCalls >= 1), sText := CONCAT(sTest, 'the dome is parked'));
+		AssertTrue(Condition := NOT rig.fbTel.bParkActive, Message := 'the park command is consumed');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bParkActive), sText := CONCAT(sTest, 'the park command is consumed'));
+		AssertTrue(Condition := NOT rig.fbTel.bStopActive, Message := 'the stop is released');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bStopActive), sText := CONCAT(sTest, 'the stop is released'));
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF

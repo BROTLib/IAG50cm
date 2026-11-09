@@ -236,6 +236,18 @@ fbTel.fElevation := fAltitude;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetTrackInput" Id="{5afafdc8-4a81-4113-9b6a-42ca03f9727f}">
+      <Declaration><![CDATA[// the command input bTrack of the telescope under test, as an ADS writer sets it (not the method)
+METHOD SetTrackInput
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bTrack := bValue;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="ForceGoHomeActive" Id="{abb77387-5b6c-4636-bc8b-2a95b777a604}">
       <Declaration><![CDATA[// sets the request latch bGoHomeActive of the telescope under test (an output, written through a pointer): a request left over from before
 METHOD ForceGoHomeActive
