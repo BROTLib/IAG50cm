@@ -2874,6 +2874,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[// #100: see Slew(); a track request while the telescope is not ready is refused, not latched
 bGotoChecked := TRUE;
+bTrackChecked := TRUE;	// D4 (template body step S1.f): Track() and a bTrack edge in one scan are one command, as in MONETcommon
 IF NOT _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
 	RETURN;
 END_IF
