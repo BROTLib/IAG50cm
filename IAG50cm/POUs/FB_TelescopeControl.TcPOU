@@ -2390,6 +2390,10 @@ fbStopTx.abLocked[1] := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000)
 fbStopTx.abLocked[2] := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0;
 fbStopTx.abHoming[1] := fbHourAngle.fbLatchHome.Busy;
 fbStopTx.abHoming[2] := fbDeclination.fbLatchHome.Busy;
+fbStopTx.abMoving[1] := aAxis[1].bInMotion OR aAxis[1].bInRamp;	// for Restart
+fbStopTx.abMoving[2] := aAxis[2].bInMotion OR aAxis[2].bInRamp;
+fbStopTx.abStopping[1] := aAxis[1].bStopping;
+fbStopTx.abStopping[2] := aAxis[2].bStopping;
 fbStopTx.abSweeping[1] := fbHourAngle.bSweepActive;	// #198
 fbStopTx.abSweeping[2] := fbDeclination.bSweepActive;
 fbStopTx.bStopped := bStopped;
@@ -2781,6 +2785,15 @@ bSlewActive		:= TRUE;]]></ST>
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bStopChecked := TRUE;
+// a repeated stop while a stop is running sends a new stop only to axes that are moving again and are not stopping already
+// (BROTLib.FB_StopTransaction.Restart); the focus is stopped again as well (MONETcommon#96/#122)
+IF bStopActive THEN
+	_SetStopTxInputs();
+	fbStopTx.Restart();
+	IF fbFocus <> 0 THEN
+		fbFocus.Stop();
+	END_IF
+END_IF
 bUserStop := TRUE;
 bStopActive := TRUE;
 // MONETcommon#122: an explicit stop also stops a running focus move and holds the position reached; the automatic
