@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagCommandInputs_Tests" Id="{ce2b8202-2582-4506-8c21-3f082b0ac712}" SpecialFunc="None">
+    <Declaration><![CDATA[// The command inputs bStop/bPark/bPower/bReset of FB_TelescopeControl (IAG50cm) are edge-triggered like the methods and are never
+// written by the block; the block works on the request latches bStopActive/bParkActive/bPowerActive/bResetActive.
+// Plan: BROTLib specs/plans/2026-11-09-iag50cm-command-model-unification.md, step 1a. One rig per test, one Scan() per PLC cycle.
+FUNCTION_BLOCK IagCommandInputs_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Held_Stop_Input_Stops_Once();
+Park_Input_Edge_Parks_Like_Park();
+Stop_Method_And_Input_Edge_In_One_Scan_Count_Once();
+Power_Input_Is_Not_Written_By_The_Block();
+]]></ST>
+    </Implementation>
+    <Method Name="Held_Stop_Input_Stops_Once" Id="{e863a4e4-6e59-4764-bafa-ca5df7d13b80}">
+      <Declaration><![CDATA[// A held stop input is one command: one stop transaction, never repeated, never cleared by the block (IAG50cm command model step 1a).
+METHOD PRIVATE Held_Stop_Input_Stops_Once
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	nEdges		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Held_Stop_Input_Stops_Once');
+sTest := 'Held_Stop_Input_Stops_Once: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// an axis is moving
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		nCycles := 0;
+		nStep := 30;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not start an axis move'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// a few scans of motion, then hold the stop INPUT (an ADS write, not the method)
+	IF nCycles >= 5 THEN
+		rig.SetStopInput(TRUE);
+		nStep := 40;
+		nCycles := 0;
+	END_IF
+40:	// the stop has settled: note the stop edges, keep holding the input
+	IF NOT rig.fbTel.bStopActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		nEdges := rig.fbHa.nStopEdges + rig.fbDec.nStopEdges;
+		AssertTrue(Condition := nEdges = 1, Message := 'the held input sent one stop to the moving axis');
+		F_Note(bFailed := NOT (nEdges = 1), sText := CONCAT(sTest, 'the held input sent one stop to the moving axis'));
+		nStep := 50;
+		nCycles := 0;
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not settle'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+50:	// 60 more scans with the input still TRUE: no second stop, the latch stays down, the input is not cleared
+	IF nCycles >= 60 THEN
+		AssertTrue(Condition := rig.fbHa.nStopEdges + rig.fbDec.nStopEdges = nEdges, Message := 'a held input is not a second stop');
+		F_Note(bFailed := NOT (rig.fbHa.nStopEdges + rig.fbDec.nStopEdges = nEdges), sText := CONCAT(sTest, 'a held input is not a second stop'));
+		AssertTrue(Condition := NOT rig.fbTel.bStopActive, Message := 'the stop latch stayed down');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bStopActive), sText := CONCAT(sTest, 'the stop latch stayed down'));
+		AssertTrue(Condition := rig.fbTel.bStop, Message := 'the block did not clear the input');
+		F_Note(bFailed := NOT (rig.fbTel.bStop), sText := CONCAT(sTest, 'the block did not clear the input'));
+		AssertTrue(Condition := rig.fbFocus.nStop = 1, Message := 'one stop for the focus');
+		F_Note(bFailed := NOT (rig.fbFocus.nStop = 1), sText := CONCAT(sTest, 'one stop for the focus'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Park_Input_Edge_Parks_Like_Park" Id="{f17494b3-cf10-46c0-8483-234010719e5d}">
+      <Declaration><![CDATA[// A rising park input starts the park exactly like Park(); the finished park is not replayed from the held input.
+METHOD PRIVATE Park_Input_Edge_Parks_Like_Park
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	nEdges		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Park_Input_Edge_Parks_Like_Park');
+sTest := 'Park_Input_Edge_Parks_Like_Park: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.SetParkInput(TRUE);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the edge starts the park, as Park() would
+	IF rig.fbTel.bParkActive THEN
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 10 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park input edge did not start the park');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park input edge did not start the park'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+	IF rig.fbTel.bIsParked THEN
+		nStep := 40;
+		nCycles := 0;
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the park did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+40:	// the park ended with the input still TRUE: it is not replayed and not cleared
+	IF nCycles >= 30 THEN
+		AssertTrue(Condition := NOT rig.fbTel.bParkActive, Message := 'the park request ended');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bParkActive), sText := CONCAT(sTest, 'the park request ended'));
+		AssertTrue(Condition := rig.fbTel.bIsParked, Message := 'the telescope stays parked');
+		F_Note(bFailed := NOT (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the telescope stays parked'));
+		AssertTrue(Condition := rig.fbTel.bPark, Message := 'the block did not clear the input');
+		F_Note(bFailed := NOT (rig.fbTel.bPark), sText := CONCAT(sTest, 'the block did not clear the input'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop_Method_And_Input_Edge_In_One_Scan_Count_Once" Id="{29a08ce9-a108-4305-b65a-c0856bef6315}">
+      <Declaration><![CDATA[// Stop() and a stop input edge in one scan are one command (the method sets the edge memory).
+METHOD PRIVATE Stop_Method_And_Input_Edge_In_One_Scan_Count_Once
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	nEdges		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Stop_Method_And_Input_Edge_In_One_Scan_Count_Once');
+sTest := 'Stop_Method_And_Input_Edge_In_One_Scan_Count_Once: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// an axis is moving
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		nCycles := 0;
+		nStep := 30;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not start an axis move'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// Stop() and the input edge in the same scan
+	IF nCycles >= 5 THEN
+		rig.fbTel.Stop();
+		rig.SetStopInput(TRUE);
+		nStep := 40;
+		nCycles := 0;
+	END_IF
+40:
+	IF NOT rig.fbTel.bStopActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
+		AssertTrue(Condition := rig.fbFocus.nStop = 1, Message := 'one Stop(): the focus stopped once');
+		F_Note(bFailed := NOT (rig.fbFocus.nStop = 1), sText := CONCAT(sTest, 'one Stop(): the focus stopped once'));
+		AssertTrue(Condition := rig.fbHa.nStopEdges + rig.fbDec.nStopEdges = 1, Message := 'one stop for the moving axis');
+		F_Note(bFailed := NOT (rig.fbHa.nStopEdges + rig.fbDec.nStopEdges = 1), sText := CONCAT(sTest, 'one stop for the moving axis'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 400 THEN
+		AssertTrue(Condition := FALSE, Message := 'the stop did not settle');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the stop did not settle'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Power_Input_Is_Not_Written_By_The_Block" Id="{fe2277a3-6300-45d2-a7e1-b017000bfbfe}">
+      <Declaration><![CDATA[// A rising power input is an Init(); the block neither clears the input nor repeats the request.
+METHOD PRIVATE Power_Input_Is_Not_Written_By_The_Block
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	nEdges		: UINT;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Power_Input_Is_Not_Written_By_The_Block');
+sTest := 'Power_Input_Is_Not_Written_By_The_Block: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.SetPowerInput(TRUE);
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the power-on ran from the input edge and finished: the latch is down, the input is what the writer left
+	IF nCycles >= 30 THEN
+		AssertTrue(Condition := rig.Online, Message := 'the telescope is online');
+		F_Note(bFailed := NOT (rig.Online), sText := CONCAT(sTest, 'the telescope is online'));
+		AssertTrue(Condition := NOT rig.fbTel.bPowerActive, Message := 'the power-on request ended');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bPowerActive), sText := CONCAT(sTest, 'the power-on request ended'));
+		AssertTrue(Condition := rig.fbTel.bPower, Message := 'the block did not clear the input');
+		F_Note(bFailed := NOT (rig.fbTel.bPower), sText := CONCAT(sTest, 'the block did not clear the input'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

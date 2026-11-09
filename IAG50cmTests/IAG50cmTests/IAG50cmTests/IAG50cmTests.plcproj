@@ -102,6 +102,9 @@
     <Compile Include="POUs\IagStopDuringSlew_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\IagCommandInputs_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\IagStuckStop_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
