@@ -61,8 +61,8 @@ CASE nStep OF
 	IF rig.fbTel.bError THEN
 		AssertTrue(Condition := rig.fbTel.bSoftwareError AND rig.fbTel.nSoftwareErrorID = 16#40, Message := 'the slew timeout is software error 16#40');
 		F_Note(bFailed := NOT (rig.fbTel.bSoftwareError AND rig.fbTel.nSoftwareErrorID = 16#40), sText := CONCAT(sTest, 'the slew timeout is software error 16#40'));
-		AssertTrue(Condition := NOT rig.fbTel.bSlew, Message := 'the slew is dropped');
-		F_Note(bFailed := NOT (NOT rig.fbTel.bSlew), sText := CONCAT(sTest, 'the slew is dropped'));
+		AssertTrue(Condition := NOT rig.fbTel.bSlewActive, Message := 'the slew is dropped');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'the slew is dropped'));
 		rig.SetTimeDivisor(nValue := 1);
 		nStep := 99;
 		TEST_FINISHED();

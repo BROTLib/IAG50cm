@@ -62,8 +62,8 @@ CASE nStep OF
 20:	// wait until one axis is moving (the slew moves HA and Dec one after the other)
 	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
 		bHaMoving := rig.fbHa.MoveAxis;
-		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'bSlew is set while the slew runs');
-		F_Note(bFailed := NOT (rig.fbTel.bSlew), sText := CONCAT(sTest, 'bSlew is set while the slew runs'));
+		AssertTrue(Condition := rig.fbTel.bSlewActive, Message := 'bSlew is set while the slew runs');
+		F_Note(bFailed := NOT (rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'bSlew is set while the slew runs'));
 		// IAG50cm#17 step 0.3: the coordinate chain runs inside the telescope (the migration must keep it running). The slew
 		// target az 180 / alt 45 is on the meridian: Dec about latitude - 45 = 6.56 deg, hour angle about 0.
 		AssertFalse(Condition := F_NoteNear(CONCAT(sTest, 'Julian date'), 2461000.0, rig.fbTel.fJd, 2000.0), Message := 'fJd follows the clock');
@@ -153,8 +153,8 @@ CASE nStep OF
 20:	// wait until one axis is moving (the slew moves HA and Dec one after the other)
 	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
 		bHaMoving := rig.fbHa.MoveAxis;
-		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'bSlew is set while the slew runs');
-		F_Note(bFailed := NOT (rig.fbTel.bSlew), sText := CONCAT(sTest, 'bSlew is set while the slew runs'));
+		AssertTrue(Condition := rig.fbTel.bSlewActive, Message := 'bSlew is set while the slew runs');
+		F_Note(bFailed := NOT (rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'bSlew is set while the slew runs'));
 		nStep := 30;
 		nCycles := 0;
 	ELSIF nCycles > 300 THEN
@@ -233,8 +233,8 @@ CASE nStep OF
 20:	// wait until one axis is moving (the slew moves HA and Dec one after the other)
 	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
 		bHaMoving := rig.fbHa.MoveAxis;
-		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'bSlew is set while the slew runs');
-		F_Note(bFailed := NOT (rig.fbTel.bSlew), sText := CONCAT(sTest, 'bSlew is set while the slew runs'));
+		AssertTrue(Condition := rig.fbTel.bSlewActive, Message := 'bSlew is set while the slew runs');
+		F_Note(bFailed := NOT (rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'bSlew is set while the slew runs'));
 		nStep := 30;
 		nCycles := 0;
 	ELSIF nCycles > 300 THEN
@@ -251,8 +251,8 @@ CASE nStep OF
 	END_IF
 40:
 	IF NOT rig.fbTel.bStopActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
-		AssertFalse(Condition := rig.fbTel.bSlew, Message := 'the stop dropped bSlew');
-		F_Note(bFailed := (rig.fbTel.bSlew), sText := CONCAT(sTest, 'the stop dropped bSlew'));
+		AssertFalse(Condition := rig.fbTel.bSlewActive, Message := 'the stop dropped bSlew');
+		F_Note(bFailed := (rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'the stop dropped bSlew'));
 		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'no axis move is left');
 		F_Note(bFailed := (rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis), sText := CONCAT(sTest, 'no axis move is left'));
 		AssertTrue(Condition := rig.fbTel.bReady, Message := 'the telescope is still ready after the stop');
