@@ -27,9 +27,6 @@
     <Compile Include="PlcTask.TcTTO">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_StopTransaction_Tests.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_HomeDropReason_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -75,9 +72,6 @@
     <Compile Include="POUs\ST_AxisStatus.TcDUT">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\ST_TelescopeConfig.TcDUT">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_AxisMockCore.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -106,6 +100,21 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\IagStopDuringSlew_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagCommandInputs_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagCommandAcceptance_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagAbortStop_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagParkPowerReset_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagSupersede_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\IagStuckStop_Tests.TcPOU">
@@ -153,9 +162,6 @@
     <Compile Include="POUs\MAIN.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_StopTransaction.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\FB_HomeDropReason.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -196,7 +202,7 @@
       <Namespace>AstroBROT</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.15.1 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.19.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Math">

@@ -64,7 +64,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 20:	// the slew has finished and the mount stands still: park
-	IF nCycles > 10 AND NOT rig.fbTel.bSlew AND rig.fbTel.bStopped AND rig.fbTel.TCS_command <> E_TCSCommand.slew THEN
+	IF nCycles > 10 AND NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND rig.fbTel.TCS_command <> E_TCSCommand.slew THEN
 		rig.fbTel.Park();
 		nStep := 30;
 		nCycles := 0;
@@ -78,12 +78,12 @@ CASE nStep OF
 	IF rig.fbHa.MoveAxis THEN
 		bHaMoved := TRUE;
 	END_IF
-	IF bHaMoved AND rig.fbDec.MoveAxis AND NOT rig.fbDec.fbAxis.InMotion AND rig.fbTel.bPark THEN
+	IF bHaMoved AND rig.fbDec.MoveAxis AND NOT rig.fbDec.fbAxis.InMotion AND rig.fbTel.bParkActive THEN
 		fDecAtStop := rig.fbDec.fActualPosition;
 		rig.fbTel.Stop();
 		nStep := 40;
 		nCycles := 0;
-	ELSIF NOT rig.fbTel.bPark AND nCycles > 5 THEN
+	ELSIF NOT rig.fbTel.bParkActive AND nCycles > 5 THEN
 		AssertTrue(Condition := FALSE, Message := 'the park ended before the HA stage could be observed');
 		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the park ended before the HA stage could be observed'));
 		nStep := 99;
@@ -101,8 +101,8 @@ CASE nStep OF
 	IF nCycles >= 100 THEN
 		AssertTrue(Condition := bSawStop, Message := 'the stop command ran (TCS_command passed stop)');
 		F_Note(bFailed := NOT (bSawStop), sText := CONCAT(sTest, 'the stop command ran (TCS_command passed stop)'));
-		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park is cancelled');
-		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park is cancelled'));
+		AssertFalse(Condition := rig.fbTel.bParkActive, Message := 'the park is cancelled');
+		F_Note(bFailed := (rig.fbTel.bParkActive), sText := CONCAT(sTest, 'the park is cancelled'));
 		AssertTrue(Condition := rig.fbDec.nStopEdges >= 1, Message := 'Dec was sent an axis stop (the Dec move had started)');
 		F_Note(bFailed := NOT (rig.fbDec.nStopEdges >= 1), sText := CONCAT(sTest, 'Dec was sent an axis stop (the Dec move had started)'));
 		AssertTrue(Condition := rig.fbDec.fActualPosition = fDecAtStop, Message := 'Dec did not move to home after the stop');

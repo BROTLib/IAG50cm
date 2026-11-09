@@ -174,6 +174,100 @@ fbTel.DeclinationOffset := fDeclination;
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetStopInput" Id="{7bdbc188-a661-4e04-b5d2-f62e1fdab845}">
+      <Declaration><![CDATA[// the command input bStop of the telescope under test, as an ADS writer sets it (not the method)
+METHOD SetStopInput
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bStop := bValue;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetParkInput" Id="{28ebb24d-6560-49cd-8361-4560c35e2adc}">
+      <Declaration><![CDATA[// the command input bPark of the telescope under test, as an ADS writer sets it (not the method)
+METHOD SetParkInput
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bPark := bValue;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetPowerInput" Id="{32f6aaab-4cad-4b81-b9f1-72e3e4955e55}">
+      <Declaration><![CDATA[// the command input bPower of the telescope under test, as an ADS writer sets it (not the method)
+METHOD SetPowerInput
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bPower := bValue;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetSlewInput" Id="{56f9b5ac-d946-4b7f-bf1f-220a8f105ee7}">
+      <Declaration><![CDATA[// the command input bSlew of the telescope under test, as an ADS writer sets it (not the method)
+METHOD SetSlewInput
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bSlew := bValue;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetSlewTargetInput" Id="{5fe36a9f-ab27-440f-842f-bdba6e7ceba4}">
+      <Declaration><![CDATA[// the slew target fields an ADS writer sets before it raises bSlew
+METHOD SetSlewTargetInput
+VAR_INPUT
+	fAzimuth	: LREAL;
+	fAltitude	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.fAzimuth := fAzimuth;
+fbTel.fElevation := fAltitude;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ForceGoHomeActive" Id="{abb77387-5b6c-4636-bc8b-2a95b777a604}">
+      <Declaration><![CDATA[// sets the request latch bGoHomeActive of the telescope under test (an output, written through a pointer): a request left over from before
+METHOD ForceGoHomeActive
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pBool := ADR(fbTel.bGoHomeActive);
+pBool^ := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ForceSlewActive" Id="{3ffb04e7-864e-4540-994d-94252b727107}">
+      <Declaration><![CDATA[// sets the request latch bSlewActive of the telescope under test (an output, written through a pointer): a request left over from before
+METHOD ForceSlewActive
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[pBool := ADR(fbTel.bSlewActive);
+pBool^ := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetSafeAltitude" Id="{5080fecd-12c1-4a4d-85b0-db08c61b38f5}">
+      <Declaration><![CDATA[// the pointing-model safe altitude of the telescope under test (an input of the telescope; a goto target below it is refused)
+METHOD SetSafeAltitude
+VAR_INPUT
+	fValue	: LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.fPointingSafeAltitude := fValue;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SetEstop" Id="{2e9b6f03-51a7-4c8d-b3f4-8a7d90e1c622}">
       <Declaration><![CDATA[// the E-stop input of the telescope under test (#14)
 METHOD SetEstop

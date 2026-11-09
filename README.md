@@ -29,7 +29,7 @@ IAG50cm/
 │   ├── IAG50cm.plcproj          # PLC project
 │   ├── PlcTask.TcTTO            # PLC task (10 ms, priority 20, calls MAIN)
 │   ├── PlcTask_Fast.TcTTO       # Fast task (2 ms, priority 19, calls SerialBackground)
-│   ├── DUTs/                    # E_MirrorCoverState, ST_TelescopeConfig
+│   ├── DUTs/                    # E_MirrorCoverState, ST_AxisStatus (ST_TelescopeConfig is BROTLib's)
 │   ├── GVLs/                    # GVL_Pointing, GVL_Safety, GVL_Serial
 │   ├── POUs/                    # Program and function blocks (see below)
 │   │   ├── MAIN.TcPOU
@@ -302,10 +302,12 @@ function blocks feeding it are currently commented out in `FB_SafetyHandling`).
 
 ## Dependencies
 
-- **BROTLib** (0.3.0) — `FB_Comm_MQTT_Influx`, `FB_Eventlog`, interfaces
+- **BROTLib** (pinned in `IAG50cm.plcproj`, 0.17.0) — `FB_Comm_MQTT_Influx`, `FB_Eventlog`, interfaces
   (`I_Telescope`, `I_RaDecTelescope`, `I_Dome`, `I_Focus`, `I_MirrorCovers`,
   `I_Axis`, `I_BaseAxis`, `I_Comm`), `E_TCSCommand`, `E_RoofState`,
-  `E_DomeRotationState`, `ST_RaDecCoordinate`, `ST_AltAzCoordinate`.
+  `E_DomeRotationState`, `ST_RaDecCoordinate`, `ST_AltAzCoordinate`,
+  `ST_TelescopeConfig` (shared with MONET; the equatorial park/home fields
+  need BROTLib >= 0.16.0, MONETcommon#24).
 - **AstroBROT** (0.3.0) — `FB_AstroClock`, `FB_EQ2HOR`, `FB_HOR2EQ`,
   `FB_HADEC2RADEC`, `FB_RADEC2HADEC`, `DateTime2JD`, `CT2LST`.
 - Beckhoff system libraries: `Tc2_MC2`, `Tc2_MC2_Drive`,

@@ -10,15 +10,16 @@ VAR
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current();
+      <ST><![CDATA[Axis_Error_Starts_The_Park_Without_Moving_The_Mount();
 Park_During_An_Error_Closes_The_Covers_And_Parks_The_Dome();
 Park_With_The_Axes_Off_Does_Not_Move_The_Mount();
 ]]></ST>
     </Implementation>
-    <Method Name="Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current" Id="{0423491c-a8e9-40cd-9002-9680002d64f8}">
-      <Declaration><![CDATA[// I:281-290: an axis error drops every move command and disables both axes, but IAG starts no emergency park on its own (MONET does,
-// MONETcommon#86). The telescope reports READY_STATE -1.0 and the covers stay as they are.
-METHOD PRIVATE Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current
+    <Method Name="Axis_Error_Starts_The_Park_Without_Moving_The_Mount" Id="{0423491c-a8e9-40cd-9002-9680002d64f8}">
+      <Declaration><![CDATA[// BROTLib#25 step 4.4d (Tim 2026-11-09): an axis error drops every move command, disables both axes and, like MONETcommon#86, starts the
+// park by itself: covers closed, dome parked, mount not moved, bIsParked not set. The telescope reports READY_STATE -1.0.
+// (Before: IAG started no park on its own and the covers stayed as they were.)
+METHOD PRIVATE Axis_Error_Starts_The_Park_Without_Moving_The_Mount
 VAR_INST
 	rig			: FB_IagRig;
 	nStep		: INT;
@@ -27,8 +28,8 @@ VAR_INST
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[TEST('Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current');
-sTest := 'Axis_Error_Disables_The_Axes_And_Does_Not_Park_Current: ';
+        <ST><![CDATA[TEST('Axis_Error_Starts_The_Park_Without_Moving_The_Mount');
+sTest := 'Axis_Error_Starts_The_Park_Without_Moving_The_Mount: ';
 IF nStep >= 90 THEN
 	RETURN;
 END_IF
@@ -63,10 +64,14 @@ CASE nStep OF
 		F_Note(bFailed := NOT (rig.fbTel.bError), sText := CONCAT(sTest, 'the error is reported'));
 		AssertFalse(Condition := rig.fbHa.bEnable OR rig.fbDec.bEnable, Message := 'both axes are disabled');
 		F_Note(bFailed := (rig.fbHa.bEnable OR rig.fbDec.bEnable), sText := CONCAT(sTest, 'both axes are disabled'));
-		AssertFalse(Condition := rig.fbTel.bPark OR rig.fbTel.bIsParked, Message := 'no emergency park');
-		F_Note(bFailed := (rig.fbTel.bPark OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'no emergency park'));
-		AssertTrue(Condition := rig.fbCovers.nCloseCalls = 0, Message := 'the covers were not closed');
-		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls = 0), sText := CONCAT(sTest, 'the covers were not closed'));
+		AssertTrue(Condition := rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1, Message := 'the error started the park: covers closed');
+		F_Note(bFailed := NOT (rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the error started the park: covers closed'));
+		AssertTrue(Condition := rig.fbDome.nParkCalls >= 1, Message := 'the dome is parked');
+		F_Note(bFailed := NOT (rig.fbDome.nParkCalls >= 1), sText := CONCAT(sTest, 'the dome is parked'));
+		AssertFalse(Condition := rig.fbTel.bParkActive, Message := 'the park command is consumed');
+		F_Note(bFailed := (rig.fbTel.bParkActive), sText := CONCAT(sTest, 'the park command is consumed'));
+		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'the mount was not moved');
+		F_Note(bFailed := (rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis), sText := CONCAT(sTest, 'the mount was not moved'));
 		AssertFalse(Condition := rig.fbTel.bIsPowered, Message := 'the powered state is cleared by the error (#100)');
 		F_Note(bFailed := rig.fbTel.bIsPowered, sText := CONCAT(sTest, 'the powered state is cleared by the error (#100)'));
 		AssertTrue(Condition := rig.fbTel.ReadyState = -1.0, Message := 'READY_STATE is -1.0 (error)');
@@ -138,8 +143,8 @@ CASE nStep OF
 		F_Note(bFailed := NOT (rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the covers are closed'));
 		AssertTrue(Condition := rig.fbDome.nParkCalls >= 1, Message := 'the dome is parked');
 		F_Note(bFailed := NOT (rig.fbDome.nParkCalls >= 1), sText := CONCAT(sTest, 'the dome is parked'));
-		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park command is dropped');
-		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park command is dropped'));
+		AssertFalse(Condition := rig.fbTel.bParkActive, Message := 'the park command is dropped');
+		F_Note(bFailed := (rig.fbTel.bParkActive), sText := CONCAT(sTest, 'the park command is dropped'));
 		AssertFalse(Condition := rig.fbTel.bIsParked, Message := 'the mount is not parked');
 		F_Note(bFailed := (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the mount is not parked'));
 		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'the mount was not moved');
@@ -194,8 +199,8 @@ CASE nStep OF
 		F_Note(bFailed := NOT (rig.fbCovers.bClosed AND rig.fbCovers.nCloseCalls >= 1), sText := CONCAT(sTest, 'the covers are closed'));
 		AssertTrue(Condition := rig.fbDome.nParkCalls >= 1, Message := 'the dome is parked');
 		F_Note(bFailed := NOT (rig.fbDome.nParkCalls >= 1), sText := CONCAT(sTest, 'the dome is parked'));
-		AssertFalse(Condition := rig.fbTel.bPark, Message := 'the park command is dropped');
-		F_Note(bFailed := (rig.fbTel.bPark), sText := CONCAT(sTest, 'the park command is dropped'));
+		AssertFalse(Condition := rig.fbTel.bParkActive, Message := 'the park command is dropped');
+		F_Note(bFailed := (rig.fbTel.bParkActive), sText := CONCAT(sTest, 'the park command is dropped'));
 		AssertTrue(Condition := rig.fbTel.bIsParked, Message := 'bIsParked is still TRUE, as from the start: the park changes nothing');
 		F_Note(bFailed := NOT (rig.fbTel.bIsParked), sText := CONCAT(sTest, 'bIsParked is still TRUE, as from the start: the park changes nothing'));
 		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'the mount was not moved');

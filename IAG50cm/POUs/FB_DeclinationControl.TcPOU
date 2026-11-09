@@ -4,10 +4,12 @@
     <Declaration><![CDATA[FUNCTION_BLOCK FB_DeclinationControl EXTENDS FB_AxisControl
 VAR_INPUT
 	bReleaseHold : BOOL;		// #159: a new power-on was accepted, release the hold (one scan, set by FB_TelescopeControl.Init)
+	bStopSweep : BOOL;		// #198: a stop arrived in the calibration sweep (one scan, set by FB_TelescopeControl): hold the homing request
 	fMinPosition : LREAL := -50.0;
 	fMaxPosition : LREAL := 180.0;
 END_VAR
 VAR_OUTPUT
+	bSweepActive : BOOL;		// #198: the calibration sweep is requested or running (a pause between two homing steps reports StandStill)
 END_VAR
 VAR
 	bAxisError : BOOL;
@@ -38,8 +40,9 @@ END_IF
 IF NOT bEnable THEN
 	bResetForAbort := FALSE;
 END_IF
-fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort, bRelease := bReleaseHold);
+fbHomeHold(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, bHoming := bHomeAxis, bStopAxis := bStopAxis, bReset := bReset AND NOT bResetForAbort, bRelease := bReleaseHold, bStopSweep := bStopSweep);
 bReleaseHold := FALSE;
+bStopSweep := FALSE;
 
 // #155: not before the NC axis is enabled, and not right after Ready either: the first reference step started 5 to 40 ms
 // after Ready still aborts about 80 ms later, and the abort and the re-arm can overlap (4B66). Ready for 0.5 s.
@@ -99,6 +102,9 @@ fbLatchHome(
 	ErrorID 			=> nLatchHomeErrorID);
 	
 
+
+// #198
+bSweepActive := bHomeAxis OR fbLatchHome.Busy;
 
 // #69: FB_LatchHome clears its error as soon as Execute falls, and Execute falls on bError, so the error lasted
 // one scan: the power-on was aborted, bError was FALSE again and no reset could fire. Hold it until the axis reset.

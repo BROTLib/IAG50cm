@@ -60,7 +60,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 15:	// wait until the slew is done and the mount stands still
-	IF NOT rig.fbTel.bSlew AND rig.fbTel.bStopped AND nCycles > 5 THEN
+	IF NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
 		nStopsHa := rig.fbHa.nStopEdges;
 		nStopsDec := rig.fbDec.nStopEdges;
 		// the mount now stands at 45 deg: raise the horizon limit above it and park (#84)
@@ -75,8 +75,8 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 20:	// the home out of the limit runs first, the park follows
-	bHomeSeen := bHomeSeen OR (rig.fbTel.bGoHome AND rig.fbTel.bPark);
-	IF rig.fbTel.bIsParked AND NOT rig.fbTel.bPark THEN
+	bHomeSeen := bHomeSeen OR (rig.fbTel.bGoHomeActive AND rig.fbTel.bParkActive);
+	IF rig.fbTel.bIsParked AND NOT rig.fbTel.bParkActive THEN
 		AssertTrue(Condition := bHomeSeen, Message := 'the home ran while the park was pending');
 		F_Note(bFailed := NOT (bHomeSeen), sText := CONCAT(sTest, 'the home ran while the park was pending'));
 		AssertTrue(Condition := rig.fbHa.nStopEdges = nStopsHa AND rig.fbDec.nStopEdges = nStopsDec, Message := 'no stop was sent to the axes');
@@ -140,7 +140,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 15:	// wait until the slew is done and the mount stands still
-	IF NOT rig.fbTel.bSlew AND rig.fbTel.bStopped AND nCycles > 5 THEN
+	IF NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
 		nStopsHa := rig.fbHa.nStopEdges;
 		nStopsDec := rig.fbDec.nStopEdges;
 		// the mount now stands at 45 deg: raise the horizon limit above it and park (#84)
@@ -155,7 +155,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 20:	// the park waits for the home: stop
-	IF rig.fbTel.bPark AND rig.fbTel.bGoHome AND nCycles >= 3 THEN
+	IF rig.fbTel.bParkActive AND rig.fbTel.bGoHomeActive AND nCycles >= 3 THEN
 		rig.fbTel.Stop();
 		nStep := 30;
 		nCycles := 0;
@@ -167,12 +167,12 @@ CASE nStep OF
 	END_IF
 30:	// the stop drops the park and the home; the park does not come back
 	IF nCycles = 5 THEN
-		AssertTrue(Condition := NOT rig.fbTel.bPark, Message := 'the stop cancelled the park');
-		F_Note(bFailed := NOT (NOT rig.fbTel.bPark), sText := CONCAT(sTest, 'the stop cancelled the park'));
+		AssertTrue(Condition := NOT rig.fbTel.bParkActive, Message := 'the stop cancelled the park');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bParkActive), sText := CONCAT(sTest, 'the stop cancelled the park'));
 	END_IF
 	IF nCycles > 400 THEN
-		AssertTrue(Condition := NOT rig.fbTel.bPark AND NOT rig.fbTel.bIsParked, Message := 'the park did not replay after the stop');
-		F_Note(bFailed := NOT (NOT rig.fbTel.bPark AND NOT rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the park did not replay after the stop'));
+		AssertTrue(Condition := NOT rig.fbTel.bParkActive AND NOT rig.fbTel.bIsParked, Message := 'the park did not replay after the stop');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bParkActive AND NOT rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the park did not replay after the stop'));
 		AssertTrue(Condition := rig.fbCovers.nCloseCalls = 0, Message := 'the covers stay open');
 		F_Note(bFailed := NOT (rig.fbCovers.nCloseCalls = 0), sText := CONCAT(sTest, 'the covers stay open'));
 		nStep := 99;

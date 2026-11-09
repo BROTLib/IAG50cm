@@ -18,16 +18,13 @@
     <LibraryReferences>{ec693b73-ba10-4552-8093-a205a0d9c8b6}</LibraryReferences>
     <Released>false</Released>
     <CompilerDefines />
-    <ProjectVersion>0.7.0</ProjectVersion>
+    <ProjectVersion>0.8.0</ProjectVersion>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DUTs\ST_AxisStatus.TcDUT">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="DUTs\ST_TelescopeConfig.TcDUT">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="GlobalTextList.TcGTLO">
@@ -121,9 +118,6 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\Functions\F_RoundLREAL.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="POUs\FB_StopTransaction.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_HomeDropReason.TcPOU">
@@ -236,7 +230,7 @@
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.16.0 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.19.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="System_VisuElemBase">

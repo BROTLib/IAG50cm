@@ -61,8 +61,8 @@ CASE nStep OF
 	IF rig.fbTel.bError THEN
 		AssertTrue(Condition := rig.fbTel.bSoftwareError AND rig.fbTel.nSoftwareErrorID = 16#40, Message := 'the slew timeout is software error 16#40');
 		F_Note(bFailed := NOT (rig.fbTel.bSoftwareError AND rig.fbTel.nSoftwareErrorID = 16#40), sText := CONCAT(sTest, 'the slew timeout is software error 16#40'));
-		AssertTrue(Condition := NOT rig.fbTel.bSlew, Message := 'the slew is dropped');
-		F_Note(bFailed := NOT (NOT rig.fbTel.bSlew), sText := CONCAT(sTest, 'the slew is dropped'));
+		AssertTrue(Condition := NOT rig.fbTel.bSlewActive, Message := 'the slew is dropped');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'the slew is dropped'));
 		rig.SetTimeDivisor(nValue := 1);
 		nStep := 99;
 		TEST_FINISHED();
@@ -122,10 +122,10 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 20:
-	IF rig.fbTel.bPark OR rig.fbTel.bIsParked THEN
+	IF rig.fbTel.bParkActive OR rig.fbTel.bIsParked THEN
 		rig.SetTimeDivisor(nValue := 1);
-		AssertTrue(Condition := rig.fbTel.bPark OR rig.fbTel.bIsParked, Message := 'the idle telescope parked itself');
-		F_Note(bFailed := NOT (rig.fbTel.bPark OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the idle telescope parked itself'));
+		AssertTrue(Condition := rig.fbTel.bParkActive OR rig.fbTel.bIsParked, Message := 'the idle telescope parked itself');
+		F_Note(bFailed := NOT (rig.fbTel.bParkActive OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the idle telescope parked itself'));
 		nStep := 99;
 		TEST_FINISHED();
 	ELSIF nCycles > 3000 THEN

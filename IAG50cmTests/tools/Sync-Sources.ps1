@@ -10,7 +10,7 @@
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $dest = Join-Path $PSScriptRoot '..\IAG50cmTests\IAG50cmTests\POUs'
-foreach ($n in 'FB_StopTransaction', 'FB_HomeDropReason', 'FB_HomeHold', 'FB_StartRequest', 'FB_StepDrain', 'FB_SweepStop') {
+foreach ($n in 'FB_HomeDropReason', 'FB_HomeHold', 'FB_StartRequest', 'FB_StepDrain', 'FB_SweepStop') {
   Copy-Item (Join-Path $repo "IAG50cm\POUs\$n.TcPOU") $dest -Force
   Write-Host "Copied $n.TcPOU"
 }
@@ -31,7 +31,8 @@ foreach ($f in 'FB_TelescopeControl.TcPOU', 'FB_HourAngleControl.TcPOU', 'FB_Dec
   Copy-Item (Join-Path $repo "IAG50cm\POUs\$f") $dest -Force
   Write-Host "Copied $f"
 }
-foreach ($d in 'ST_TelescopeConfig.TcDUT', 'ST_AxisStatus.TcDUT') {
+# ST_TelescopeConfig is BROTLib's (MONETcommon#24 step 2b), not copied
+foreach ($d in 'ST_AxisStatus.TcDUT') {
   Copy-Item (Join-Path $repo "IAG50cm\DUTs\$d") $dest -Force
   Write-Host "Copied $d"
 }
