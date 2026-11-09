@@ -109,6 +109,7 @@ VAR
 	tonParkPending		: FB_TimeoutTimer;		// #197: a park that is requested but never starts is forced into an in-place park after 2 min
 	bParkForceInPlace	: BOOL;		// #197: the pending-park watchdog fired
 	tonParkInPlace		: FB_TimeoutTimer;		// #187: an axes-off park gives up after 120 s if the covers or the dome do not finish
+	bHomeByCommand		: BOOL;		// the running or pending home was requested by a Home() call or a bGoHome edge; the power-on's own home and the limit homes are not: a move replaces them (the old precedence), only a commanded home rejects moves (gohome_active)
 	bCommandRejected	: BOOL;		// set by _NoteRejected, logged and cleared by the body (as MONETcommon, #83)
 	eLastRejectedCommand	: E_TCSCommand;
 	eLastRejectReason	: BROTLib.E_CommandRejectReason;
@@ -1099,6 +1100,9 @@ bParkChecked := bPark;
 bResetChecked := bReset;
 bPowerChecked := bPower;
 bGoHomeChecked := bGoHome;
+IF NOT bGoHomeActive AND TCS_command <> E_TCSCommand.gohome THEN
+	bHomeByCommand := FALSE;	// the commanded home is over
+END_IF
 bGotoChecked := bGoto;
 bSlewChecked := bSlew;
 bTrackChecked := bTrack;]]></ST>
@@ -1278,7 +1282,7 @@ _CommandState.bPowering		:= bPowerActive OR fbStartup.Initializing;
 _CommandState.bParkPending	:= bParkActive;
 _CommandState.bIsParked		:= bIsParked;
 _CommandState.bReady		:= bReady;
-_CommandState.bGoHomeActive	:= (bGoHomeActive AND eExcludeOwn <> E_TCSCommand.gohome) OR TCS_command = E_TCSCommand.gohome;
+_CommandState.bGoHomeActive	:= bHomeByCommand AND ((bGoHomeActive AND eExcludeOwn <> E_TCSCommand.gohome) OR TCS_command = E_TCSCommand.gohome);
 _CommandState.bMoveActive	:= (bGotoActive AND eExcludeOwn <> E_TCSCommand.goto) OR
 	(bSlewActive AND eExcludeOwn <> E_TCSCommand.slew) OR
 	(bTrackActive AND eExcludeOwn <> E_TCSCommand.track) OR
@@ -2597,6 +2601,7 @@ END_VAR]]></Declaration>
 IF NOT _AcceptMove(E_TCSCommand.gohome, E_TCSCommand.no_command) THEN
 	RETURN;
 END_IF
+bHomeByCommand := TRUE;
 bGoHomeActive := TRUE;
 Home := TRUE;]]></ST>
       </Implementation>
