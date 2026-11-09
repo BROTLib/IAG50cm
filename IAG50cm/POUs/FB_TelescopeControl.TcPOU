@@ -615,10 +615,7 @@ ELSIF bMoveAbortPending THEN
 	// #43: a movement was preempted. Its flag and stage are already reset; TCS_command must not stay on the old
 	// command (its method would keep the axes going), so run the stop until the axes stand still. The pending
 	// command is picked up below in the next scan.
-	TCS_command := E_TCSCommand.stop;
-	IF bSettled THEN
-		bMoveAbortPending := FALSE;
-	END_IF
+	TCS_command := E_TCSCommand.stop;	// released with the stop (bSettled) at the end of the body
 
 ELSIF bParkActive THEN
 	bTrackActive := FALSE;
@@ -1059,9 +1056,13 @@ ELSIF bTracking THEN
 END_IF
 	
 //----------------------------------------------------------------------------------------------
-// unset the STOP command if telescope is already stopped
-IF bStopped THEN
+// release the stop and the abort stop once the stop transaction has settled (every stopped axis reported Done and stood
+// still for 3 scans, no motion lock): a stop that has axes to stop is held until then (MONETcommon#96/#118)
+IF bSettled THEN
 	bStopActive := FALSE;
+	IF TCS_command = E_TCSCommand.stop THEN
+		bMoveAbortPending := FALSE;	// only after STOP was dispatched in this scan
+	END_IF
 END_IF
 
 // unset the RESET command when no Error is present
