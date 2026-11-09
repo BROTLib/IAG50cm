@@ -56,6 +56,7 @@ VAR
 	rtrigHorizonError	: R_TRIG;		// if the set Coordinate is below the Horizon threshold fHorizon
 	rtrigPoleError		: R_TRIG;		// if the set Coordinate is in the pole zone fPoleZone
 	
+	rtrigResetAny		: R_TRIG;		// every reset edge (method, input, cabinet key), also without an error: the request part of the reset
 	rtrigPoweredClear	: R_TRIG;		// #100: error or E-stop edge: the telescope is no longer powered
 	bAxisResetAfterAck	: BOOL;		// reset the errored axes a second time once the acknowledge is done (#11)
 	tonAxisResetAfterAck	: TON;
@@ -1361,8 +1362,36 @@ END_VAR
 // #36: the request from Reset() must not be overwritten by the key state, so it has its own flag
 // #59: also while the safety acknowledge after an E-stop is pending, so a reset sent during the E-stop (which
 // clears the axis errors but skips the acknowledge) or after an E-stop without an axis error is not lost
+rtrigResetAny(CLK := fbCabinet.Reset OR bResetRequest);
 rtrigReset(CLK := (fbCabinet.Reset OR bResetRequest) AND (bError OR bSafetyAckPending), Q=>bResetActive);
 bResetRequest := FALSE;
+
+// The request part of the reset runs on every reset edge, also without an error (MONETcommon#84/#85): pending moves are dropped,
+// a move that is still running is stopped (abort stop), a power-on that is running is aborted. The hardware part below (safety
+// acknowledge, axis reset passes, dome reset, coordinates) stays gated on an error or a pending acknowledge (#36, #59).
+IF rtrigResetAny.Q THEN
+	bGotoActive := FALSE;
+	bSlewActive := FALSE;
+	bTrackActive := FALSE;
+	bInterupted := TRUE;
+	_GotoTelescope();
+	_SlewTelescope();
+	IF NOT bLimitHome THEN	// the home of a park in a limit belongs to the park (#84)
+		bGoHomeActive := FALSE;
+		sHomeEnd := 'cancelled by reset';
+		_HomeTelescope();
+	END_IF
+	bInterupted := FALSE;
+	// not during an error (the drives are off) and not during a park (its motion is wanted)
+	bMoveAbortPending := bMoveAbortPending OR BROTLib.F_ResetMoveAbort(
+		bError := bError,
+		bParkRunning := TCS_command = E_TCSCommand.park,
+		bAnyAxisMoving := (fbHourAngle.bEnable AND (aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming))
+			OR (fbDeclination.bEnable AND (aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming)));
+	IF bPowerActive OR fbStartup.Initializing THEN
+		bStopActive := TRUE;	// aborts the power-on and marks the startup aborted (stop branch)
+	END_IF
+END_IF
 
 IF bResetActive THEN
     fbStartup.MarkAborted();
