@@ -73,7 +73,6 @@ VAR
 	bRestartGoto		: BOOL;		// Track() while a goto is running: the new target replaces the old one (#41)
 	bRestartSlew		: BOOL;		// Slew() while a slew is running: the new target replaces the old one (#41)
 	eLastTimeoutCommand	: E_TCSCommand;	// #40: command the timeout timer is running for
-	bUserStop			: BOOL;		// Stop() was called (one scan): aborts a running power-on, automatic stops do not (#27)
 	bParkInError		: BOOL;		// a park was requested during an error (one scan): covers closed, dome parked, mount not moved
 	sParkEnd			: STRING(160) := 'completed';	// the park log line when bParkActive falls: completed, or why it ended (#57)
 	bParkLogged			: BOOL;		// bParkActive as the park event saw it last scan: PARK commencing is logged, an end line follows (#57)
@@ -413,7 +412,7 @@ END_IF
 // is not ready before stage 100, so a mount inside a limit was stopped and the power-on aborted (any bStop aborts it).
 // Skip the automatic stop only while the axes that matter stand still; stage 100 hands over to bGoHome. Any motion, a
 // user stop or an error still stops.
-bPowerOnHold := bPowerActive AND NOT bUserStop AND NOT bError;
+bPowerOnHold := bPowerActive AND NOT bError;
 bHaMoving := aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming;
 bDecMoving := aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming;
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
@@ -556,7 +555,7 @@ IF bPowerActive AND bParkActive AND NOT bStopActive AND TCS_command = E_TCSComma
 END_IF
 // #27: an explicit Stop() outranks power-on, like in MONETcommon. The automatic stops (horizon, pole zone, no valid
 // time) are meant not to abort a running power-on, but _PowerOn aborts on any bStop, so they are held back in the checks above (#166).
-IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
+IF bStopActive THEN
     fbStartup.MarkAbortedIfStarting(Power := bPowerActive);
 	bTrackActive := FALSE;
 	bMoveAbortPending := FALSE;
@@ -841,7 +840,6 @@ END_IF
 // the restart requests are consumed above or void
 bRestartGoto := FALSE;
 bRestartSlew := FALSE;
-bUserStop := FALSE;
 
 // #40: every command gets its own timeout; the timer used to run on from one command into the next
 IF TCS_command <> eLastTimeoutCommand THEN
@@ -2820,7 +2818,6 @@ IF bStopActive THEN
 		fbFocus.Stop();
 	END_IF
 END_IF
-bUserStop := TRUE;
 bStopActive := TRUE;
 // MONETcommon#122: an explicit stop also stops a running focus move and holds the position reached; the automatic
 // stops of the mount (horizon, pole zone) leave the focus alone
