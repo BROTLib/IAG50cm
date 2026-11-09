@@ -290,20 +290,6 @@ ELSE
 	nErrorID := 0;
 END_IF
 
-// BROTLib#25 step 4.4d (decided by Tim 2026-11-09: MONETcommon wins): a new hardware error (hour angle, declination or focus; not a
-// software or cabinet error) while not parked and without E-stop starts the park by itself, like MONETcommon#86. The park branch
-// below does what is safe without the mount (the axes are disabled by the error): covers close, dome parks, focus off; the mount
-// is not moved and bIsParked is not set until the covers are closed and the dome is parked. A running power-on is aborted by
-// the park (#109). Edge only: a still present error does not start it again.
-bErrorParkStarted := BROTLib.F_ErrorParkRequest(
-	bHwError := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error),
-	bHwErrorLast := bHwErrorLast,
-	bIsParked := bIsParked,
-	bEstop := bEstopTriggered);
-bHwErrorLast := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error);
-IF bErrorParkStarted THEN
-	Park();
-END_IF
 
 
 // calculate fHourAngleApparent, fDeclinationApparent 
@@ -578,6 +564,22 @@ IF bSupersedeRequest THEN
 	END_IF
 	bSupersedeRequest := FALSE;
 END_IF
+// (Template body step S1.e, D2: after the supersede block and before the park pre-step, as MONETcommon#86, so the stop branch cannot clear the request in the scan it is made.)
+// BROTLib#25 step 4.4d (decided by Tim 2026-11-09: MONETcommon wins): a new hardware error (hour angle, declination or focus; not a
+// software or cabinet error) while not parked and without E-stop starts the park by itself, like MONETcommon#86. The park branch
+// below does what is safe without the mount (the axes are disabled by the error): covers close, dome parks, focus off; the mount
+// is not moved and bIsParked is not set until the covers are closed and the dome is parked. A running power-on is aborted by
+// the park (#109). Edge only: a still present error does not start it again.
+bErrorParkStarted := BROTLib.F_ErrorParkRequest(
+	bHwError := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error),
+	bHwErrorLast := bHwErrorLast,
+	bIsParked := bIsParked,
+	bEstop := bEstopTriggered);
+bHwErrorLast := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error);
+IF bErrorParkStarted THEN
+	Park();
+END_IF
+
 //----------------------------------------------------------------------------------------------
 // set TCS_command according to state variables ordered by precedence (command model step 3C.2: BROTLib.FB_CommandArbiter decides,
 // the block applies what it asks for, as MONETcommon). Order: stop (also a running power-on) > park aborts a running power-on >
