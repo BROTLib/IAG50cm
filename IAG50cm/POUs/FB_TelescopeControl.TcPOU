@@ -90,6 +90,10 @@ VAR
 	fbHomeDrop			: FB_HomeDropReason;	// #108/#120: why a pending home was dropped
 	tonHomePending		: FB_TimeoutTimer;		// #75: bGoHome set but the home is not running (not ready, powered off): cancelled after 2 min
 	
+	bInitRefused		: BOOL;		// Init() was refused because of a stop or a park (one scan): logs 'power-on ignored: <reason>'
+	sInitRefusedReason	: STRING(80);
+	nInitRefusedCount	: UDINT;	// diagnostics (ADS)
+	TCSinitRefusedEvent	: FB_Eventlog;
 	bPowerBlocked		: BOOL;		// a power-on request was refused because of an error (one scan): logs the reason, every time
 	bPowerParked		: BOOL;		// a park aborted a running power-on (one scan, #109)
 	bInHorizonLimit		: BOOL;		// #84: the mount is below the horizon limit (the safety block homes it out)
@@ -539,7 +543,7 @@ END_IF
 // #109: a park outranks a running power-on (like an explicit stop, #27, and like MONET): the startup is aborted
 // (READY_STATE -2 for the aborted init) and the park runs below in this scan. Only for a power-on that was already running
 // (TCS_command of the last scan): an Init() during a park still cancels the park, see the bPower branch below.
-IF bPowerActive AND bParkActive AND NOT bStopActive AND TCS_command = E_TCSCommand.poweron THEN
+IF bPowerActive AND bParkActive AND NOT bStopActive THEN
 	bPowerParked := TRUE;
 	bInterupted := TRUE;
 	IF _PowerOn() >= 40 THEN	// bInterupted: marks the startup aborted, clears bPowerActive, resets its stage; returns the stage it was in
@@ -601,18 +605,6 @@ IF bStopActive THEN
 	TCS_command := E_TCSCommand.stop;
 
 ELSIF bPowerActive THEN
-	// Init() during a park cancels the park: its stage is reset and the move flags dropped. Left alone, bPark
-	// survived the power-on, the park then preempted the go-home, resumed at its old stage and hung at 90 waiting
-	// for covers that the power-on had just reopened.
-	IF bParkActive THEN
-		bParkActive := FALSE;
-		sParkEnd := 'cancelled by power-on';
-		bInterupted := TRUE;
-		_ParkTelescope();
-		bInterupted := FALSE;
-		fbHourAngle.MoveAxis := FALSE;
-		fbDeclination.MoveAxis := FALSE;
-	END_IF
 	TCS_command := E_TCSCommand.poweron;
 
 ELSIF bMoveAbortPending THEN
@@ -1241,6 +1233,12 @@ TCSpowerParkEvent(	Trigger := bPowerParked,
 				OnMessage := 'Power-on aborted by park',
 				Comm := fbComm);
 bPowerParked := FALSE;
+TCSinitRefusedEvent(	Trigger := bInitRefused,
+				Level := ADSLOG_MSGTYPE_WARN,
+				FormatString := 'power-on ignored: %s',
+				OnMessage := sInitRefusedReason,
+				Comm := fbComm);
+bInitRefused := FALSE;
 // every rejection is logged (ADS log and MQTT log topic); an identical one repeated within 2 s once, all are counted. The event is
 // re-armed with FALSE first so that rejections in consecutive scans each give a rising edge (as MONETcommon).
 tonRejectRepeat(IN := TRUE, PT := T#2S);
@@ -2657,9 +2655,26 @@ END_VAR
       <Declaration><![CDATA[METHOD Init : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[// AcceptInit refuses while a startup runs or completed (also across a transient interlock, -2).
-bPowerChecked := TRUE;
-IF fbStartup.AcceptInit() THEN
+        <ST><![CDATA[bPowerChecked := TRUE;
+// park wins in both orders and a stop is not overridden by a power-on (MONETcommon#87); this comes before AcceptInit, a pending
+// park clears Initialized, so AcceptInit would accept. The in-place park (bSafeParked, up to 120 s) is refused as well.
+IF bStopActive OR bParkActive OR bParkAfterStop OR bSafeParked THEN
+    nInitRefusedCount := nInitRefusedCount + 1;
+    bInitRefused := TRUE;
+    IF bStopActive THEN
+        sInitRefusedReason := 'stop in progress';
+    ELSIF bSafeParked THEN
+        sInitRefusedReason := 'in-place park in progress, ends within 120 s';
+    ELSE
+        sInitRefusedReason := 'park in progress, send stop to cancel it';
+    END_IF
+// AcceptInit refuses while a startup runs or completed (also across a transient interlock, -2).
+ELSIF fbStartup.AcceptInit() THEN
+    // nothing stale after the power-on starts: a pending move or home from before would run into it (park is kept, it is the safe direction)
+    bGoHomeActive := FALSE;
+    bGotoActive := FALSE;
+    bSlewActive := FALSE;
+    bTrackActive := FALSE;
     bPowerActive := TRUE;
     fReadyState := 0.7;
     // #159: an automatic stop leaves the sweep hold set with the axes enabled; a new power-on releases it
