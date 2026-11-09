@@ -59,7 +59,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 15:	// wait until the slew is done and the mount stands still
-	IF NOT rig.fbTel.bSlew AND rig.fbTel.bStopped AND nCycles > 5 THEN
+	IF NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
 		nStopsHa := rig.fbHa.nStopEdges;
 		nStopsDec := rig.fbDec.nStopEdges;
 		// the mount now stands at 45 deg: raise the horizon limit above it and park (#84)
@@ -74,7 +74,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 20:	// the home out of the limit runs first, the park follows
-	bHomeSeen := bHomeSeen OR (rig.fbTel.bGoHome AND rig.fbTel.bParkActive);
+	bHomeSeen := bHomeSeen OR (rig.fbTel.bGoHomeActive AND rig.fbTel.bParkActive);
 	IF rig.fbTel.bIsParked AND NOT rig.fbTel.bParkActive THEN
 		AssertTrue(Condition := bHomeSeen, Message := 'the home ran while the park was pending');
 		F_Note(bFailed := NOT (bHomeSeen), sText := CONCAT(sTest, 'the home ran while the park was pending'));
@@ -139,7 +139,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 15:	// wait until the slew is done and the mount stands still
-	IF NOT rig.fbTel.bSlew AND rig.fbTel.bStopped AND nCycles > 5 THEN
+	IF NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
 		nStopsHa := rig.fbHa.nStopEdges;
 		nStopsDec := rig.fbDec.nStopEdges;
 		// the mount now stands at 45 deg: raise the horizon limit above it and park (#84)
@@ -154,7 +154,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 20:	// the park waits for the home: stop
-	IF rig.fbTel.bParkActive AND rig.fbTel.bGoHome AND nCycles >= 3 THEN
+	IF rig.fbTel.bParkActive AND rig.fbTel.bGoHomeActive AND nCycles >= 3 THEN
 		rig.fbTel.Stop();
 		nStep := 30;
 		nCycles := 0;

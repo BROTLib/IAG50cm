@@ -64,7 +64,7 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 20:	// the slew has finished and the mount stands still: park
-	IF nCycles > 10 AND NOT rig.fbTel.bSlew AND rig.fbTel.bStopped AND rig.fbTel.TCS_command <> E_TCSCommand.slew THEN
+	IF nCycles > 10 AND NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped AND rig.fbTel.TCS_command <> E_TCSCommand.slew THEN
 		rig.fbTel.Park();
 		nStep := 30;
 		nCycles := 0;

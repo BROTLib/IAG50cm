@@ -64,6 +64,7 @@ VAR
 	bHwErrorLast		: BOOL;		// BROTLib#25 step 4.4d: bHwError of the previous scan (edge for F_ErrorParkRequest)
 	bErrorParkStarted	: BOOL;		// the park that a new axis/focus error starts (MONETcommon#86)
 	bResetRequest		: BOOL;		// Reset() was called (one scan); kept apart from bResetActive, which the trigger below drives (#36)
+	bGoHomeChecked, bGotoChecked, bSlewChecked, bTrackChecked : BOOL;	// the same for the move inputs
 	bPowerChecked, bParkChecked, bStopChecked, bResetChecked : BOOL;	// the input as the edge block saw it last scan; a method sets its flag so an input edge in the same scan counts once
 	bSoftwareError		: BOOL;		// error set by the state machines (timeouts), latched until a reset (#30)
 	nSoftwareErrorID	: UDINT;	// 16#10 goto, 16#20 park, 16#30 home, 16#40 slew timeout
@@ -144,6 +145,10 @@ VAR_OUTPUT
 	bParkActive			: BOOL;		// a park is requested or running (was bPark)
 	bStopActive			: BOOL;		// a stop is requested or running (was bStop)
 	bResetActive		: BOOL;		// the reset is running, one scan (was bReset)
+	bGoHomeActive		: BOOL;		// a home is requested or running (was bGoHome)
+	bGotoActive			: BOOL;		// a goto/track-to-target is requested or running (was bGoto)
+	bSlewActive			: BOOL;		// a slew is requested or running (was bSlew)
+	bTrackActive		: BOOL;		// the tracking is requested or running (was bTrack)
 END_VAR
 VAR CONSTANT
 	fSiderialVelocity: LREAL := 360.0 / 86164.099;
@@ -162,6 +167,19 @@ END_IF
 IF bPower AND NOT bPowerChecked THEN
 	Init();
 END_IF
+// A rising move input sets its latch exactly as the direct write did (no gating yet); the target fields are set by the writer first.
+IF bGoHome AND NOT bGoHomeChecked THEN
+	Home();
+END_IF
+IF bGoto AND NOT bGotoChecked THEN
+	bGotoActive := TRUE;
+END_IF
+IF bSlew AND NOT bSlewChecked THEN
+	bSlewActive := TRUE;
+END_IF
+IF bTrack AND NOT bTrackChecked THEN
+	bTrackActive := TRUE;
+END_IF
 
 _ReadAxes();
 // Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
@@ -175,7 +193,7 @@ END_IF
 fLst := CT2LST(telescopeConfig.longitude, fJd);
 
 // without a trustworthy time nothing may be pointed or tracked: refuse through the normal stop path
-IF NOT fbTime.bValid AND (bGoto OR bSlew OR bTrack) THEN
+IF NOT fbTime.bValid AND (bGotoActive OR bSlewActive OR bTrackActive) THEN
 	bStopActive := TRUE;
 END_IF
 
@@ -232,10 +250,10 @@ IF rtrigPoweredClear.Q THEN
 END_IF
 
 IF bError THEN
-	bGoHome := 	FALSE;
-	bTrack := 	FALSE;
-	bGoto := 	FALSE;
-	bSlew := 	FALSE;
+	bGoHomeActive := 	FALSE;
+	bTrackActive := 	FALSE;
+	bGotoActive := 	FALSE;
+	bSlewActive := 	FALSE;
 	fbHourAngle.Enable := FALSE;
 	fbDeclination.Enable := FALSE;
 	fbCabinet.Error := TRUE;
@@ -383,7 +401,7 @@ bDecMoving := aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming;
 // If the Telescope dips under the fHorizon (e.g. while tracking, stop and gohome)
 // (also gated on fPointingSafeAltitude so tracking never lingers in the pointing model's chaotic zone)
 // #84: a park requested in a limit homes out of it first and then parks. The stop conditions are unchanged.
-IF NOT bGoHome THEN
+IF NOT bGoHomeActive THEN
 	bLimitHome := FALSE;
 END_IF
 IF NOT bParkActive THEN
@@ -392,28 +410,28 @@ IF NOT bParkActive THEN
 	bParkForceInPlace := FALSE;
 END_IF
 bInHorizonLimit := bAxesCalibrated AND fElevationCurrent < MAX(fHorizon+0.2, fPointingSafeAltitude);
-bInPoleLimit := (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrack AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)));
+bInPoleLimit := (fbDeclination.Calibrated AND fDeclinationCurrent > (90.0 - fPoleZone)) OR (bAxesCalibrated AND bTrackActive AND (fDeclinationApparent + fDeclinationOffset + fDeclinationPointingOffset > (90.0 - fPoleZone)));
 IF bInHorizonLimit THEN
-	IF NOT bSettled AND NOT bGoHome AND NOT (bPowerOnHold AND NOT bHaMoving AND NOT bDecMoving) THEN
+	IF NOT bSettled AND NOT bGoHomeActive AND NOT (bPowerOnHold AND NOT bHaMoving AND NOT bDecMoving) THEN
 		bStopActive := TRUE;
 	ELSIF bReady AND NOT bError AND NOT bParkHomeDone THEN	// #82: only when the home can run; the power-on homes (stage 100)
-		bGoHome := TRUE;
+		bGoHomeActive := TRUE;
 		bLimitHome := TRUE;		// #84: also when bGoHome was set already (Home(), power-on stage 100)
 	END_IF
 END_IF
 // If the Telescope goes into the forbidden polezone (e.g. while tracking, stop and gohome)
 IF bInPoleLimit THEN
-	IF NOT bSettled AND NOT bGoHome AND NOT (bPowerOnHold AND NOT bDecMoving) THEN
+	IF NOT bSettled AND NOT bGoHomeActive AND NOT (bPowerOnHold AND NOT bDecMoving) THEN
 		bStopActive := TRUE;
 	ELSIF bReady AND NOT bError AND NOT bParkHomeDone THEN	// #82: only when the home can run; the power-on homes (stage 100)
-		bGoHome := TRUE;
+		bGoHomeActive := TRUE;
 		bLimitHome := TRUE;		// #84
 	END_IF
 END_IF
 //----------------------------------------------------------------------------------------------
 // if the given coordinates to goto/slew are under the horizon
 // (also rejects targets below fPointingSafeAltitude, where the pointing model's inversion is chaotic -- see FB_PointingModelInversion)
-IF (bGoTo AND (fElevationCalc < MAX(fHorizon + 1.0, fPointingSafeAltitude))) OR (bSlew AND (fElevation < MAX(fHorizon, fPointingSafeAltitude))) THEN
+IF (bGoTo AND (fElevationCalc < MAX(fHorizon + 1.0, fPointingSafeAltitude))) OR (bSlewActive AND (fElevation < MAX(fHorizon, fPointingSafeAltitude))) THEN
 	// trigger event
 	rtrigHorizonError(CLK:=TRUE);
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
@@ -434,7 +452,7 @@ ELSE
 END_IF
 
 // if the given coordinates to goto/slew are in the PoleZone
-IF (bGoTo AND (fDeclinationApparent > (90.0 - fPoleZone))) OR (bSlew AND (fDeclinationCalc  > (90.0 - fPoleZone))) THEN
+IF (bGoTo AND (fDeclinationApparent > (90.0 - fPoleZone))) OR (bSlewActive AND (fDeclinationCalc  > (90.0 - fPoleZone))) THEN
 	// trigger event
 	rtrigPoleError(CLK:=TRUE);
 	// reset input coords to parking position (always over horizon to stop bHorizonError from occuring)
@@ -466,17 +484,17 @@ tonCommandTimeout();
 // Counting from the request, a command that never started (not ready, preempted) fired the timeout in the next
 // stop/park/reset after 600 s and latched an error, and with the horizon/pole auto-home setting bGoHome again every
 // scan the timer never dropped, so no reset cleared it.
-tonGotoTimeout(IN := bGoto AND TCS_command = E_TCSCommand.goto AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
-tonHomeTimeout(IN := bGoHome AND TCS_command = E_TCSCommand.gohome AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
-tonSlewTimeout(IN := bSlew AND TCS_command = E_TCSCommand.slew AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
+tonGotoTimeout(IN := bGotoActive AND TCS_command = E_TCSCommand.goto AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
+tonHomeTimeout(IN := bGoHomeActive AND TCS_command = E_TCSCommand.gohome AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
+tonSlewTimeout(IN := bSlewActive AND TCS_command = E_TCSCommand.slew AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
 tonParkTimeout(IN := bParkActive AND TCS_command = E_TCSCommand.park AND NOT bError, PT := T#600S, nDivisor := nTimeDivisor);
 // #75: a Home() that never starts (axes off, telescope not ready) left bGoHome set for good, swallowing Track() and
 // Slew(). Drop it after 2 min, with a log line, without an error. Not at once: the home that the power-on requests in
 // stage 100 can wait a few scans for bReady, and a stop from slew speed takes about 4 s. Not during a power-on.
-tonHomePending(IN := bGoHome AND TCS_command <> E_TCSCommand.gohome AND NOT bPowerActive AND NOT bError, PT := T#2M, nDivisor := nTimeDivisor);
+tonHomePending(IN := bGoHomeActive AND TCS_command <> E_TCSCommand.gohome AND NOT bPowerActive AND NOT bError, PT := T#2M, nDivisor := nTimeDivisor);
 IF tonHomePending.Q THEN
     fbStartup.MarkAbortedIfInitializing();
-	bGoHome := FALSE;
+	bGoHomeActive := FALSE;
 	// #108: say what was pending. "Not ready, power on" was also logged when a stop before the home had not finished.
 	fbHomeDrop(bReady := bReady, bStopPending := TCS_command = E_TCSCommand.stop OR NOT bSettled);
 	sHomeEnd := fbHomeDrop.sEnd;
@@ -522,7 +540,7 @@ END_IF
 // time) are meant not to abort a running power-on, but _PowerOn aborts on any bStop, so they are held back in the checks above (#166).
 IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
     fbStartup.MarkAbortedIfStarting(Power := bPowerActive);
-	bTrack := FALSE;
+	bTrackActive := FALSE;
 	bStopping := FALSE;
 
 	// If the stop is during a movement, reset the stage of the movement first
@@ -538,21 +556,21 @@ IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
 		sParkEnd := 'cancelled by stop';
 		fbSweepStop.Cancel();		// #197: the park is gone, the axes stay as they are
 		_ParkTelescope();
-		IF bGoHome THEN
+		IF bGoHomeActive THEN
 			// #84: the park was waiting for the limit home; the home goes with it (and its stage is reset, it would resume mid-way)
-			bGoHome := FALSE;
+			bGoHomeActive := FALSE;
 			sHomeEnd := 'cancelled by stop';
 			_HomeTelescope();
 		END_IF
 	// #84: a park that is only pending survives the automatic stop of a limit: the stop settles, the limit home runs, then the park
-	ELSIF bGoto THEN
-		bGoto := FALSE;
+	ELSIF bGotoActive THEN
+		bGotoActive := FALSE;
 		_GotoTelescope();
-	ELSIF bSlew THEN
-		bSlew := FALSE;
+	ELSIF bSlewActive THEN
+		bSlewActive := FALSE;
 		_SlewTelescope();
-	ELSIF bGoHome THEN
-		bGoHome := FALSE;
+	ELSIF bGoHomeActive THEN
+		bGoHomeActive := FALSE;
 		sHomeEnd := 'cancelled by stop';
 		_HomeTelescope();
 	ELSIF bSafeParked THEN
@@ -586,7 +604,7 @@ ELSIF bStopping THEN
 	END_IF
 
 ELSIF bParkActive THEN
-	bTrack := FALSE;
+	bTrackActive := FALSE;
 	IF bError OR bEstopTriggered OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
 		// Park during an error: the axes are disabled by the error and the park state machine aborts on bError, so
 		// bPark used to stay set and the park fired after the next Init() (or hung half way after a reset). Do what
@@ -598,10 +616,10 @@ ELSIF bParkActive THEN
 		// disables the axes itself and the park must go on to stage 100.
 		// An E-stop (#57) aborts a running park at any stage: after stage 60 the axes are off and no NC error is raised,
 		// so bError stayed FALSE and the park waited at stage 90 for covers that cannot move, until the 600 s timeout.
-		bGoHome := FALSE;
+		bGoHomeActive := FALSE;
 		sHomeEnd := 'cancelled by park';
-		bGoto := FALSE;
-		bSlew := FALSE;
+		bGotoActive := FALSE;
+		bSlewActive := FALSE;
 		bInterupted := TRUE;
 		_ParkTelescope();
 		_HomeTelescope();
@@ -676,10 +694,10 @@ ELSIF bParkActive THEN
 		fbSweepStop.ArmAll();
 		TCS_command := E_TCSCommand.no_command;
 	// #84: a park in a limit: the home out of the limit runs first, the park follows (see bParkHomeDone)
-	ELSIF bGoHome AND bLimitHome THEN
-		IF bGoto OR bSlew THEN
-			bGoto := FALSE;
-			bSlew := FALSE;
+	ELSIF bGoHomeActive AND bLimitHome THEN
+		IF bGotoActive OR bSlewActive THEN
+			bGotoActive := FALSE;
+			bSlewActive := FALSE;
 			bInterupted := TRUE;
 			_GotoTelescope();
 			_SlewTelescope();
@@ -699,11 +717,11 @@ ELSIF bParkActive THEN
 			END_IF
 		END_IF
 	// If lower presedence commands are ongoing, let them know they are interupted
-	ELSIF bGoto OR bSlew OR bGoHome THEN
-		bGoHome := FALSE;
+	ELSIF bGotoActive OR bSlewActive OR bGoHomeActive THEN
+		bGoHomeActive := FALSE;
 		sHomeEnd := 'cancelled by park';
-		bGoto := FALSE;
-		bSlew := FALSE;
+		bGotoActive := FALSE;
+		bSlewActive := FALSE;
 		bInterupted := TRUE;
 		_HomeTelescope();
 		_GotoTelescope();
@@ -724,12 +742,12 @@ ELSIF bParkActive THEN
 	
 	
 	
-ELSIF bGoHome THEN
-	bTrack := FALSE;
+ELSIF bGoHomeActive THEN
+	bTrackActive := FALSE;
 	// If lower presedence commands are ongoing, let them know they are interupted
-	IF bGoto OR bSlew THEN
-		bGoto := FALSE;
-		bSlew := FALSE;
+	IF bGotoActive OR bSlewActive THEN
+		bGotoActive := FALSE;
+		bSlewActive := FALSE;
 		bInterupted := TRUE;
 		_GotoTelescope();
 		_SlewTelescope();
@@ -752,11 +770,11 @@ ELSIF bGoHome THEN
 	END_IF
 	
 	
-ELSIF bGoto THEN
-	bTrack := FALSE;
+ELSIF bGotoActive THEN
+	bTrackActive := FALSE;
 	// If lower presedence commands are ongoing, let them know they are interupted
-	IF bSlew THEN
-		bSlew := FALSE;
+	IF bSlewActive THEN
+		bSlewActive := FALSE;
 		bInterupted := TRUE;
 		_SlewTelescope();
 		bInterupted := FALSE;	// #26: one-shot, see the park branch
@@ -778,8 +796,8 @@ ELSIF bGoto THEN
 	END_IF
 
 
-ELSIF bSlew THEN
-	bTrack := FALSE;
+ELSIF bSlewActive THEN
+	bTrackActive := FALSE;
 	IF bRestartSlew AND TCS_command = E_TCSCommand.slew THEN
 		// #41: Slew() during a slew: stop, then slew to the new target (bSlew stays set)
 		bInterupted := TRUE;
@@ -790,7 +808,7 @@ ELSIF bSlew THEN
 	ELSIF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.slew;
 	END_IF
-ELSIF bTrack THEN
+ELSIF bTrackActive THEN
 	IF bReady AND NOT bBusy THEN
 		TCS_command := E_TCSCommand.track;
 	END_IF
@@ -1045,7 +1063,7 @@ IF fbStartup.PublishDue(CommValid := fbComm <> 0, Heartbeat := FALSE) THEN
 END_IF
 // send telemetry
 
-IF bSliding OR bTrack OR bTracking THEN
+IF bSliding OR bTrackActive OR bTracking THEN
 	tonMQTTTimer.PT := T#1000MS; // during movement every second
 ELSE
 	tonMQTTTimer.PT := T#5000MS; // otherwise every five seconds
@@ -1064,7 +1082,11 @@ _LogEvents();
 bStopChecked := bStop;
 bParkChecked := bPark;
 bResetChecked := bReset;
-bPowerChecked := bPower;]]></ST>
+bPowerChecked := bPower;
+bGoHomeChecked := bGoHome;
+bGotoChecked := bGoto;
+bSlewChecked := bSlew;
+bTrackChecked := bTrack;]]></ST>
     </Implementation>
     <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
     <Folder Name="internal methods" Id="{43f8a5dc-2166-4fdb-b436-34a8f62ea04a}" />
@@ -1085,7 +1107,7 @@ TCSpowerEvent(	Trigger := bPowerFailure,
 				Comm := fbComm);
 
 TCSgohomeEvent.OffMessage := sHomeEnd;		// #75: "GOHOME completed" was also logged when the home was cancelled or timed out
-TCSgohomeEvent(	Trigger := bGoHome, 
+TCSgohomeEvent(	Trigger := bGoHomeActive, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'GOHOME %s',
 				OnMessage := 'commencing',
@@ -1113,13 +1135,13 @@ bParkInPlaceDone := FALSE;
 bParkLogged := bParkActive;
 sParkEnd := 'completed';
 TCSparkEvent.OffLevel := ADSLOG_MSGTYPE_HINT;
-TCSgotoEvent(	Trigger := bGoto, 
+TCSgotoEvent(	Trigger := bGotoActive, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'GOTO %s',
 				OnMessage := 'commencing',
 				OffMEssage := 'completed', 
 				Comm := fbComm);
-TCStrackEvent(	Trigger := bTrack, 
+TCStrackEvent(	Trigger := bTrackActive, 
 				Level := ADSLOG_MSGTYPE_HINT,
 				FormatString := 'TRACK %s',
 				OnMessage := 'commencing',
@@ -1253,9 +1275,9 @@ IF bResetActive THEN
 	// reset the stages of all statemachine methods
 	// #100: a goto/slew/track request that is still pending must not outlive the reset (the error clears them only
 	// while it lasts)
-	bGoto := FALSE;
-	bSlew := FALSE;
-	bTrack := FALSE;
+	bGotoActive := FALSE;
+	bSlewActive := FALSE;
+	bTrackActive := FALSE;
 	bInterupted := TRUE;
 	_HomeTelescope();
 	_GotoTelescope();
@@ -1310,7 +1332,7 @@ END_VAR]]></Declaration>
 IF tonGotoTimeout.Q THEN	// MONETcommon#17: fed every scan in the body, a method-local TON never kept its state
 	bSoftwareError := TRUE;		// #30: latched until a reset, bError is recomputed every scan
 	nSoftwareErrorID := 16#10;
-	bGoto := FALSE;
+	bGotoActive := FALSE;
 	nStage := 0;
 	RETURN;
 END_IF
@@ -1415,9 +1437,9 @@ CASE nStage OF
 			nStage := 100;
 		END_IF
 	100:
-		bGoto := FALSE;
+		bGotoActive := FALSE;
 		// enable automatic tracking
-		bTrack := bAutoTrack;
+		bTrackActive := bAutoTrack;
 		nStage := 0;
 END_CASE
 GoToEvent(Trigger := nStage > nLastStage, FormatString := 'GOTO progress: %s', OnMessage := USINT_TO_STRING(nStage), comm := fbComm);
@@ -1442,7 +1464,7 @@ IF tonHomeTimeout.Q THEN
     fbStartup.MarkAbortedIfInitializing();	// MONETcommon#17: fed every scan in the body
 	bSoftwareError := TRUE;		// #30
 	nSoftwareErrorID := 16#30;
-	bGoHome := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
+	bGoHomeActive := FALSE;	// like goto/slew; otherwise the expired timer would fire again right away
 	sHomeEnd := 'timed out';
 	nStage := 0;
 	RETURN;		// #75: like goto/slew/park; bError is recomputed next scan, do not run the stages on
@@ -1532,7 +1554,7 @@ CASE nStage OF
             fRightAscension := fRightAscensionCurrentICRS;
             fDeclination := fDeclinationCurrentICRS;
             bParkHomeDone := bParkAfterHome;	// #84
-            bGoHome := FALSE;
+            bGoHomeActive := FALSE;
             nStage := 0;
         END_IF
     110:
@@ -1543,7 +1565,7 @@ CASE nStage OF
             fRightAscension := fRightAscensionCurrentICRS;
             fDeclination := fDeclinationCurrentICRS;
             fbStartup.MarkCompleted();
-            bGoHome := FALSE;
+            bGoHomeActive := FALSE;
             nStage := 0;
         END_IF
 END_CASE
@@ -1894,7 +1916,7 @@ CASE nStage OF
 		bPowerActive := FALSE;
 		bIsPowered := TRUE;
 		// slew the telescope to the home position
-		bGoHome := TRUE;
+		bGoHomeActive := TRUE;
 		// set dome to tracking
 		fbDome.Position := 180.0;// reset Dome position
 		fbDome.Track();
@@ -1964,7 +1986,7 @@ ELSE
 END_IF
 
 // HORIZONTAL
-IF bSlew THEN
+IF bSlewActive THEN
 	fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.HORIZONTAL.ALT', fElevation);
 	fbComm.PublishLREAL('telescope', 'dome', 'OBJECT.HORIZONTAL.AZ', fAzimuth);
 ELSE
@@ -2133,7 +2155,7 @@ END_VAR]]></Declaration>
 IF tonSlewTimeout.Q THEN	// MONETcommon#17: fed every scan in the body
 	bSoftwareError := TRUE;		// #30
 	nSoftwareErrorID := 16#40;
-	bSlew := FALSE;
+	bSlewActive := FALSE;
 	nStage := 0;
 	RETURN;
 END_IF
@@ -2243,7 +2265,7 @@ CASE nStage OF
 		fbHourAngle.MoveAxis := FALSE;
 		fbDeclination.MoveAxis := FALSE;
 
-		bSlew := FALSE;
+		bSlewActive := FALSE;
 		nStage := 0;
 END_CASE
 SlewEvent(Trigger := nStage > nLastStage, FormatString := 'Slew progress: %s', OnMessage := USINT_TO_STRING(nStage), comm := fbComm);
@@ -2481,7 +2503,8 @@ END_VAR]]></Declaration>
       <Declaration><![CDATA[METHOD Home : BOOL
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[bGoHome := TRUE;]]></ST>
+        <ST><![CDATA[bGoHomeChecked := TRUE;
+bGoHomeActive := TRUE;]]></ST>
       </Implementation>
     </Method>
     <Property Name="HourAngleOffset" Id="{ac27a626-cead-47ea-868b-f24be3bdcddc}" FolderPath="properties\">
@@ -2637,6 +2660,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[// #100: not while the telescope is not ready (parked, powering on, error). The request used to stay latched and
 // fired unnoticed after the next power-on; a client sends init first and waits for ready.
+bSlewChecked := TRUE;
 IF NOT bReady THEN
 	TCScommandRefusedEvent.OnMessage := 'Slew refused: telescope not ready. Power on (init) and wait until it is ready, then send the slew again.';
 	bCommandRefused := TRUE;
@@ -2644,8 +2668,8 @@ IF NOT bReady THEN
 END_IF
 THIS^.fElevation 	:= fAltitude;
 THIS^.fAzimuth 	:= fAzimuth;
-bRestartSlew	:= bSlew;	// #41: a slew is already running, replace its target
-bSlew		:= TRUE;]]></ST>
+bRestartSlew	:= bSlewActive;	// #41: a slew is already running, replace its target
+bSlewActive		:= TRUE;]]></ST>
       </Implementation>
     </Method>
     <Method Name="Stop" Id="{e66d844d-991d-4af1-8b55-fe6740342385}" FolderPath="command methods\">
@@ -2672,6 +2696,7 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[// #100: see Slew(); a track request while the telescope is not ready is refused, not latched
+bGotoChecked := TRUE;
 IF NOT bReady THEN
 	TCScommandRefusedEvent.OnMessage := 'Track refused: telescope not ready. Power on (init) and wait until it is ready, then send the track again.';
 	bCommandRefused := TRUE;
@@ -2679,8 +2704,8 @@ IF NOT bReady THEN
 END_IF
 THIS^.fRightAscension	:= fRightAscension;
 THIS^.fDeclination	:= fDeclination;
-bRestartGoto	:= bGoto;	// #41: a goto is already running, replace its target
-bGoto			:= TRUE;]]></ST>
+bRestartGoto	:= bGotoActive;	// #41: a goto is already running, replace its target
+bGotoActive			:= TRUE;]]></ST>
       </Implementation>
     </Method>
     <LineIds Name="FB_TelescopeControl">

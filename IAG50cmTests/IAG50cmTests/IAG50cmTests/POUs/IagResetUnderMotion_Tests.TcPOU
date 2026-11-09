@@ -74,8 +74,8 @@ CASE nStep OF
 	END_IF
 40:
 	IF nCycles >= 10 THEN
-		AssertTrue(Condition := rig.fbTel.bSlew, Message := 'the slew goes on');
-		F_Note(bFailed := NOT (rig.fbTel.bSlew), sText := CONCAT(sTest, 'the slew goes on'));
+		AssertTrue(Condition := rig.fbTel.bSlewActive, Message := 'the slew goes on');
+		F_Note(bFailed := NOT (rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'the slew goes on'));
 		AssertTrue(Condition := rig.fbHa.nResetEdges = 0 AND rig.fbDec.nResetEdges = 0, Message := 'no axis was reset');
 		F_Note(bFailed := NOT (rig.fbHa.nResetEdges = 0 AND rig.fbDec.nResetEdges = 0), sText := CONCAT(sTest, 'no axis was reset'));
 		AssertTrue(Condition := rig.fbHa.nStopEdges = 0 AND rig.fbDec.nStopEdges = 0, Message := 'no axis was stopped');
