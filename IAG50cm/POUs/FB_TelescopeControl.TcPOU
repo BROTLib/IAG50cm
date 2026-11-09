@@ -183,28 +183,6 @@ END_IF
 IF bPower AND NOT bPowerChecked THEN
 	Init();
 END_IF
-// A rising move input is a command like the method call: decided at arrival (_AcceptMove); accepted, it sets the latch, rejected, it
-// is logged and nothing is set. The target fields are what the writer set before the edge. Nested IFs on purpose: ST does not
-// short-circuit AND and _AcceptMove must only run on the edge.
-IF bGoHome AND NOT bGoHomeChecked THEN
-	Home();
-END_IF
-IF bGoto AND NOT bGotoChecked THEN
-	IF _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
-		bGotoActive := TRUE;
-	END_IF
-END_IF
-IF bSlew AND NOT bSlewChecked THEN
-	IF _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
-		bSlewActive := TRUE;
-	END_IF
-END_IF
-IF bTrack AND NOT bTrackChecked THEN
-	IF _AcceptMove(E_TCSCommand.track, E_TCSCommand.no_command) THEN
-		bTrackActive := TRUE;
-	END_IF
-END_IF
-
 _ReadAxes();
 // Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
 // A repeated request to an already online telescope is dropped, it must not restart calibration.
@@ -271,6 +249,30 @@ bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFo
 rtrigPoweredClear(CLK := bError OR bEstopTriggered);
 IF rtrigPoweredClear.Q THEN
 	bIsPowered := FALSE;
+END_IF
+
+// (Template body step S1.d, D1: after the error computation like MONETcommon, so the gate sees bError, the clock and the power-on of this scan:
+// a move edge in the scan of a new error is rejected with a log, not accepted and dropped silently.)
+// A rising move input is a command like the method call: decided at arrival (_AcceptMove); accepted, it sets the latch, rejected, it
+// is logged and nothing is set. The target fields are what the writer set before the edge. Nested IFs on purpose: ST does not
+// short-circuit AND and _AcceptMove must only run on the edge.
+IF bGoHome AND NOT bGoHomeChecked THEN
+	Home();
+END_IF
+IF bGoto AND NOT bGotoChecked THEN
+	IF _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
+		bGotoActive := TRUE;
+	END_IF
+END_IF
+IF bSlew AND NOT bSlewChecked THEN
+	IF _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
+		bSlewActive := TRUE;
+	END_IF
+END_IF
+IF bTrack AND NOT bTrackChecked THEN
+	IF _AcceptMove(E_TCSCommand.track, E_TCSCommand.no_command) THEN
+		bTrackActive := TRUE;
+	END_IF
 END_IF
 
 IF bError THEN
