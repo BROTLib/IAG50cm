@@ -22,6 +22,7 @@ VAR
 	fbCommandInputsTests	: IagCommandInputs_Tests;
 	fbCommandAcceptanceTests	: IagCommandAcceptance_Tests;
 	fbAbortStopTests		: IagAbortStop_Tests;
+	fbParkPowerResetTests	: IagParkPowerReset_Tests;
 	fbTelemetryTests		: IagTelemetry_Tests;
 	fbCoordinatesTests		: IagCoordinates_Tests;
 END_VAR

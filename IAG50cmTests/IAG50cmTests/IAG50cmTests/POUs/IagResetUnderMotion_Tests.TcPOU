@@ -10,14 +10,14 @@ VAR
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[Reset_Without_An_Error_Is_Ignored();
+      <ST><![CDATA[Reset_Without_An_Error_Stops_The_Slew();
 Reset_With_An_Error_Resets_The_Errored_Axis_And_Later_All_Axes();
 ]]></ST>
     </Implementation>
-    <Method Name="Reset_Without_An_Error_Is_Ignored" Id="{bde6f57d-4f0e-4e28-9ef8-a287257843bd}">
-      <Declaration><![CDATA[// I:205: the reset trigger needs an error or a pending safety acknowledge: a reset during a slew without one does nothing, the slew
-// goes on, no axis is reset or stopped and no safety acknowledge is requested. (MONET resets the startup and stops the axes.)
-METHOD PRIVATE Reset_Without_An_Error_Is_Ignored
+    <Method Name="Reset_Without_An_Error_Stops_The_Slew" Id="{bde6f57d-4f0e-4e28-9ef8-a287257843bd}">
+      <Declaration><![CDATA[// Command model step 3B.4: a reset without an error is a command to stop what moves: the slew latch is dropped and the moving axis gets one
+// stop (abort stop). The hardware part stays gated: no axis is reset, no safety acknowledge is requested, the telescope stays online.
+METHOD PRIVATE Reset_Without_An_Error_Stops_The_Slew
 VAR_INST
 	rig			: FB_IagRig;
 	nStep		: INT;
@@ -26,8 +26,8 @@ VAR_INST
 END_VAR
 ]]></Declaration>
       <Implementation>
-        <ST><![CDATA[TEST('Reset_Without_An_Error_Is_Ignored');
-sTest := 'Reset_Without_An_Error_Is_Ignored: ';
+        <ST><![CDATA[TEST('Reset_Without_An_Error_Stops_The_Slew');
+sTest := 'Reset_Without_An_Error_Stops_The_Slew: ';
 IF nStep >= 90 THEN
 	RETURN;
 END_IF
@@ -74,12 +74,12 @@ CASE nStep OF
 	END_IF
 40:
 	IF nCycles >= 10 THEN
-		AssertTrue(Condition := rig.fbTel.bSlewActive, Message := 'the slew goes on');
-		F_Note(bFailed := NOT (rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'the slew goes on'));
+		AssertFalse(Condition := rig.fbTel.bSlewActive, Message := 'the slew is dropped');
+		F_Note(bFailed := (rig.fbTel.bSlewActive), sText := CONCAT(sTest, 'the slew is dropped'));
 		AssertTrue(Condition := rig.fbHa.nResetEdges = 0 AND rig.fbDec.nResetEdges = 0, Message := 'no axis was reset');
 		F_Note(bFailed := NOT (rig.fbHa.nResetEdges = 0 AND rig.fbDec.nResetEdges = 0), sText := CONCAT(sTest, 'no axis was reset'));
-		AssertTrue(Condition := rig.fbHa.nStopEdges = 0 AND rig.fbDec.nStopEdges = 0, Message := 'no axis was stopped');
-		F_Note(bFailed := NOT (rig.fbHa.nStopEdges = 0 AND rig.fbDec.nStopEdges = 0), sText := CONCAT(sTest, 'no axis was stopped'));
+		AssertTrue(Condition := rig.fbHa.nStopEdges + rig.fbDec.nStopEdges = 1, Message := 'the moving axis got one stop');
+		F_Note(bFailed := NOT (rig.fbHa.nStopEdges + rig.fbDec.nStopEdges = 1), sText := CONCAT(sTest, 'the moving axis got one stop'));
 		AssertFalse(Condition := rig.fbTel.bSafetyAckRequest, Message := 'no safety acknowledge is requested');
 		F_Note(bFailed := (rig.fbTel.bSafetyAckRequest), sText := CONCAT(sTest, 'no safety acknowledge is requested'));
 		AssertTrue(Condition := rig.fbTel.ReadyState = 1.0, Message := 'the telescope stays online');
