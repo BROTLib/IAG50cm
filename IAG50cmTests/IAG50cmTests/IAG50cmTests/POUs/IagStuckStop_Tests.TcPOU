@@ -71,10 +71,12 @@ CASE nStep OF
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
-30:	// the stop has taken the axes to rest, but the transaction is still open: nothing has reported Done
-	IF rig.fbTel.bStopped AND NOT rig.fbTel.bStopActive AND nCycles > 3 THEN
+30:	// the stop has taken the axes to rest, but the transaction is still open: nothing has reported Done, so the stop is held (3A.2)
+	IF rig.fbTel.bStopped AND nCycles > 3 THEN
 		AssertFalse(Condition := rig.fbTel.bSettled, Message := 'not settled before the timeout: the axis never reported Done');
 		F_Note(bFailed := rig.fbTel.bSettled, sText := CONCAT(sTest, 'not settled before the timeout: the axis never reported Done'));
+		AssertTrue(Condition := rig.fbTel.bStopActive, Message := 'the stop is held until the transaction settles');
+		F_Note(bFailed := NOT rig.fbTel.bStopActive, sText := CONCAT(sTest, 'the stop is held until the transaction settles'));
 		nStep := 40;
 		nCycles := 0;
 	ELSIF nCycles > 400 THEN

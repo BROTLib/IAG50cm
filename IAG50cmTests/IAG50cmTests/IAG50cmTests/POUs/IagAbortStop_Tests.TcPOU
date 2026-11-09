@@ -290,8 +290,8 @@ CASE nStep OF
 		nStep := 35;
 		nCycles := 0;
 	END_IF
-35:	// a second stop while the axis is already stopping
-	IF nCycles >= 2 THEN
+35:	// a second stop while the axis is already stopping (the stop reaches the axis in the third scan, the axis then reports Stopping)
+	IF nCycles >= 3 THEN
 		rig.fbTel.Stop();
 		nStep := 40;
 		nCycles := 0;
