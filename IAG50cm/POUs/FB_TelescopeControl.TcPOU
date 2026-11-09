@@ -183,29 +183,315 @@ END_IF
 IF bPower AND NOT bPowerChecked THEN
 	Init();
 END_IF
-_ReadAxes();
+
 // Startup events are reset once per scan. Internal bReady still drives mechanical sequencing.
 // A repeated request to an already online telescope is dropped, it must not restart calibration.
 bPowerActive := fbStartup.BeginScan(Power := bPowerActive, Ready := bReady);
-// get the system time; fJd only follows the clock while the clock is valid (synced, see FB_AstroClock)
-fbTime();
-IF fbTime.bValid THEN
-	fJd := DateTime2JD(fbTime.time_RTCEX2);
-END_IF
-fLst := CT2LST(telescopeConfig.longitude, fJd);
+_ScanBegin();
 
-// without a trustworthy time nothing may be pointed or tracked: refuse through the normal stop path
-IF NOT fbTime.bValid AND (bGotoActive OR bSlewActive OR bTrackActive) THEN
+IF NOT _UpdateClock() AND (bGotoActive OR bSlewActive OR bTrackActive) THEN
+	// without a trustworthy time nothing may be pointed or tracked: refuse through the normal stop path
 	_AutoStop();
 END_IF
 
+_ReadInputs();
+_HandleReset();
+_ReadErrors();
+_ErrorReaction();
+
+// A rising move input is a command like the method call: decided at arrival (_AcceptMove); accepted, it sets the request latch,
+// rejected, it is logged and nothing is set. Like a method call, an edge while the same command runs is a new command (replace,
+// latest wins). The input is never written; a held input is not a new edge. After the error computation, so that the gate sees
+// the error, the clock and the power-on of this scan. Nested IFs on purpose: ST does not short-circuit AND and _AcceptMove
+// must only run on the edge.
+IF bGoHome AND NOT bGoHomeChecked THEN
+	Home();
+END_IF
+IF bGoto AND NOT bGotoChecked THEN
+	IF _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
+		_OnMoveEdgeAccepted(E_TCSCommand.goto);
+		bGotoActive := TRUE;
+	END_IF
+END_IF
+IF bSlew AND NOT bSlewChecked THEN
+	IF _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
+		_OnMoveEdgeAccepted(E_TCSCommand.slew);
+		bSlewActive := TRUE;
+	END_IF
+END_IF
+IF bTrack AND NOT bTrackChecked THEN
+	IF _AcceptMove(E_TCSCommand.track, E_TCSCommand.no_command) THEN
+		_OnMoveEdgeAccepted(E_TCSCommand.track);
+		bTrackActive := TRUE;
+	END_IF
+END_IF
+
+IF bError THEN
+	bTrackActive := 	FALSE;
+	bGotoActive := 	FALSE;
+	bSlewActive := 	FALSE;
+	bGoHomeActive := 	FALSE;	// #85 (the horizon guard sets it again if still needed)
+	bMoveAbortPending := FALSE;	// #84: the drives are disabled below, nothing to wait for
+	bSupersedeRequest := FALSE;	// #83
+END_IF
+_ApplyError();
+IF NOT bError THEN
+	nErrorID := 0;
+END_IF
+
+// #24 step 4b: the target of this scan (refraction weather, eq2hor, pointing model, derotator, velocities, turn inside
+// the axis limits) and the reported position (inverse pointing model, both hor2eq); after the error reaction, before the
+// horizon guard and the arbitration below (SM plan D3 hook)
+_ComputeTargets();
+_Guards();
+tonCommandTimeout();
+_Timers();
+
+// #83: the latest move wins. Drop the other move flags, reset their stage machines and stop the axes (#84 path).
+// The kept command is already accepted and its target written; it starts once the axes are at standstill.
+IF bSupersedeRequest THEN
+	IF eSupersedeKeep <> E_TCSCommand.gohome THEN
+		bGoHomeActive := FALSE;
+	END_IF
+	IF eSupersedeKeep <> E_TCSCommand.goto THEN
+		bGotoActive := FALSE;
+	END_IF
+	IF eSupersedeKeep <> E_TCSCommand.slew THEN
+		bSlewActive := FALSE;
+	END_IF
+	IF eSupersedeKeep <> E_TCSCommand.track THEN
+		bTrackActive := FALSE;
+	END_IF
+	bInterrupted := TRUE;
+	_DoGoHome();
+	_DoGoto();
+	_DoSlew();
+	bInterrupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage
+	// #56: the replacement gets its own timeout, the timer must not go on counting from the first request
+	_RestartMoveTimeout(eSupersedeKeep);
+	IF NOT bError THEN
+		bMoveAbortPending := TRUE;
+	END_IF
+	bSupersedeRequest := FALSE;
+END_IF
+
+// the automatic parks (error park, cover error, E-stop / safety error); after the supersede block, before the arbitration, so the
+// stop branch cannot clear a request in the scan it is made
+_ParkRequests();
+
+// A park that waits (the telescope-specific pre-step) is not given to the arbiter
+bParkHeld := FALSE;
+IF bParkActive AND NOT bStopActive AND NOT bPowerActive AND NOT fbStartup.Initializing AND NOT (bMoveAbortPending AND NOT bError) THEN
+	bParkHeld := _ParkPreStep();
+END_IF
+
+// set TCS_command according to state variables ordered by precedence (BROTLib.FB_CommandArbiter decides, the block applies what it
+// asks for). Order: stop (also a running power-on) > park aborts a running power-on > power-on > a running abort stop > park >
+// gohome > goto > slew > track > idle.
+// A command that waits (not ready, busy, behind an abort stop) leaves TCS_command as it was in the last scan; only a scan
+// without any request goes idle. The arbiter says "no command" in both cases, so the idle case is derived here from the same inputs.
+fbArbiter.bStop := bStopActive;
+fbArbiter.bPower := bPowerActive;
+fbArbiter.bInitializing := fbStartup.Initializing;
+fbArbiter.bPark := bParkActive AND NOT bParkHeld;
+fbArbiter.bGoHome := bGoHomeActive;
+fbArbiter.bGoto := bGotoActive;
+fbArbiter.bSlew := bSlewActive;
+fbArbiter.bTrack := bTrackActive;
+fbArbiter.bError := bError;
+fbArbiter.bEmergencyPark := _EmergencyPark();
+fbArbiter.bReady := bReady;
+fbArbiter.bBusy := bBusy;
+fbArbiter.bStopped := _AtRest();
+fbArbiter.bMoveAbortPending := bMoveAbortPending;
+fbArbiter.bParkWinsOverPowerOn := TRUE;	// #87
+bRequestIdle := NOT (bStopActive OR bPowerActive OR bParkActive OR bGoHomeActive OR bGotoActive OR bSlewActive OR bTrackActive
+	OR (bMoveAbortPending AND NOT bError));
+bWasPower := bPowerActive;
+bWasPark := bParkActive;
+bWasGoHome := bGoHomeActive;
+bWasMove := bGotoActive OR bSlewActive;
+fbArbiter();
+
+// #80: a stop always aborts a startup, also when bPower is already FALSE; the park that aborts a power-on does too (#87).
+// The flag it looks at is the one of the scan, before the clears below.
+IF fbArbiter.bAbortStartup THEN
+	fbStartup.MarkAbortedIfStarting(Power := bPowerActive);
+END_IF
+IF fbArbiter.bClearPower THEN
+	bPowerActive := FALSE;
+END_IF
+IF fbArbiter.bClearTrack THEN
+	bTrackActive := FALSE;
+END_IF
+IF fbArbiter.bClearPark THEN
+	bParkActive := FALSE;
+END_IF
+IF fbArbiter.bClearGoto THEN
+	bGotoActive := FALSE;
+END_IF
+IF fbArbiter.bClearSlew THEN
+	bSlewActive := FALSE;
+END_IF
+IF fbArbiter.bClearGoHome THEN
+	bGoHomeActive := FALSE;
+END_IF
+// #26: the interrupted state machines reset their stage in one call with bInterrupted TRUE; bInterrupted is a one-shot
+IF fbArbiter.bInterruptPower OR fbArbiter.bInterruptPark OR fbArbiter.bInterruptGoto OR fbArbiter.bInterruptSlew
+		OR fbArbiter.bInterruptGoHome THEN
+	bInterrupted := TRUE;
+	IF fbArbiter.bInterruptPower THEN
+		_InterruptPower();
+	END_IF
+	IF fbArbiter.bInterruptPark THEN
+		_InterruptPark();
+	END_IF
+	IF fbArbiter.bInterruptGoto THEN
+		_InterruptGoto();
+	END_IF
+	IF fbArbiter.bInterruptSlew THEN
+		_InterruptSlew();
+	END_IF
+	IF fbArbiter.bInterruptGoHome THEN
+		_InterruptGoHome();
+	END_IF
+	bInterrupted := FALSE;
+END_IF
+IF fbArbiter.bSetMoveAbortPending THEN
+	bMoveAbortPending := TRUE;	// #84
+END_IF
+IF fbArbiter.bPowerAbortedByPark THEN
+	bPowerAbortedByPark := TRUE;	// #87, logged below
+END_IF
+_AfterArbiter();
+
+IF fbArbiter.eCommand <> E_TCSCommand.no_command THEN
+	TCS_command := fbArbiter.eCommand;
+ELSIF bRequestIdle THEN
+	TCS_command := E_TCSCommand.no_command;
+	_DropAxisCommands();
+END_IF
+
+// #56: each command counts its timeout from its own dispatch. A preemption never has a scan without command, so
+// the timer used to go on from the previous command (a stop after a long track timed out in its first scan).
+IF TCS_command <> eTimeoutCommand THEN
+	tonCommandTimeout(IN := FALSE);
+	eTimeoutCommand := TCS_command;
+	_OnCommandChanged();
+END_IF
+
+IF TCS_command = E_TCSCommand.poweron THEN
+	_DoPowerOn();
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.poweron, PT := _CommandTimeout(TCS_command), nDivisor := nTimeDivisor);
+	TCSCTOEvent.OnMessage := 'POWER';
+ELSIF TCS_command = E_TCSCommand.stop THEN
+	_DoStop();
+	TCSCTOEvent.OnMessage := 'STOP';
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.stop, PT := _CommandTimeout(TCS_command), nDivisor := nTimeDivisor);
+ELSIF TCS_command = E_TCSCommand.park THEN
+	_DoPark();
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.park, PT := _CommandTimeout(TCS_command), nDivisor := nTimeDivisor);
+	TCSCTOEvent.OnMessage := 'PARK';
+ELSIF TCS_command = E_TCSCommand.gohome THEN
+	_DoGoHome();
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.gohome, PT := _CommandTimeout(TCS_command), nDivisor := nTimeDivisor);
+	TCSCTOEvent.OnMessage := 'GOHOME';
+ELSIF TCS_command = E_TCSCommand.goto THEN
+	_DoGoto();
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.goto, PT := _CommandTimeout(TCS_command), nDivisor := nTimeDivisor);
+	TCSCTOEvent.OnMessage := 'GOTO';
+ELSIF TCS_command = E_TCSCommand.slew THEN
+	_DoSlew();
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.slew, PT := _CommandTimeout(TCS_command), nDivisor := nTimeDivisor);
+	TCSCTOEvent.OnMessage := 'SLEW';
+ELSIF TCS_command = E_TCSCommand.track THEN
+	_DoTrack();
+	tonCommandTimeout(IN := TCS_command = E_TCSCommand.track, PT := _CommandTimeout(TCS_command), nDivisor := nTimeDivisor);
+	TCSCTOEvent.OnMessage := 'TRACK';
+ELSE
+	// disable command timeout
+	tonCommandTimeout(IN := FALSE);
+	TCSCTOEvent.OnMessage := 'NOCOMMAND';
+END_IF
+_AfterDispatch();
+
+_UpdateStatus();
+(* STATUS STATES*)
+// Public completion is latched only by the final startup stage, never by mechanical bReady alone.
+fReadyState := fbStartup.Update(
+    Error := bError OR bSoftwareError OR bPowerFailure OR bEstopTriggered,
+    Parked := bIsParked,
+    Parking := _ReadyStateParking(),
+    Operational := bReady AND bMainReady AND NOT bEstopTriggered,
+    AbortExtra := bEstopTriggered);
+//MotionState
+IF bStopped THEN
+	nMotionState := 0;
+ELSIF _IsSlewing() OR bBusy THEN
+	nMotionState := 1;
+ELSIF bTracking THEN
+	nMotionState := 8;
+END_IF
+
+// unset the STOP command if the telescope is stopped (#96: and the stop transaction has settled)
+_ReleaseStop();
+_ReleaseReset();
+_SafeStateEndOfScan();
+
+// send telemetry
+// The readiness field uses its existing topic and numeric format.
+IF fbStartup.PublishDue(CommValid := fbComm <> 0, Heartbeat := FALSE) THEN
+    fbComm.PublishLREAL('telescope', 'dome', 'TELESCOPE.READY_STATE', fReadyState);
+END_IF
+tonMQTTTimer.PT := _TelemetryPeriod();
+tonMQTTTimer(IN:=TRUE);
+IF tonMQTTTimer.Q THEN
+	tonMQTTTimer(IN:=FALSE);
+	_SendTelemetry();
+END_IF
+
+_LogEvents();
+_EndOfScan();
+
+// #24 step 5: edge memory of the command inputs (the #83 gate snapshot, now of the inputs, not of the requests). A method
+// called after this point sets its b*Checked TRUE until the next snapshot, so an input that rises meanwhile is not a second
+// command.
+bGoHomeChecked := bGoHome;
+bGotoChecked := bGoto;
+bSlewChecked := bSlew;
+bTrackChecked := bTrack;
+bPowerChecked := bPower;
+bParkChecked := bPark;
+bStopChecked := bStop;
+bResetChecked := bReset;]]></ST>
+    </Implementation>
+    <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
+    <Folder Name="internal methods" Id="{43f8a5dc-2166-4fdb-b436-34a8f62ea04a}" />
+    <Method Name="_ScanBegin" Id="{69ccb1e4-5ed8-4b33-8b32-527be9b9a8f0}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Start of the scan after the startup scan.
+METHOD PRIVATE _ScanBegin
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// nothing]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ReadInputs" Id="{af4314b2-e999-4026-9f11-f74b6e7dc8b9}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Reads the inputs of the axes and the cabinet.
+METHOD PRIVATE _ReadInputs
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_ReadAxes();
 // State of the Cabinet
 fbCabinet(bEstop := bEstopTriggered, bSafetyAckPending := bSafetyAckPending);	// #93: error LED during E-stop / pending acknowledge
-bLocalMode := fbCabinet.LocalMode;
-
-_HandleReset();
-
-// get error ID
+bLocalMode := fbCabinet.LocalMode;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ReadErrors" Id="{98a12957-2fbf-495b-a37b-adfd985f2c64}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Error ID, axis resets, slew time and the error flag of this scan.
+METHOD PRIVATE _ReadErrors
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// get error ID
 IF fbHourAngle.Error THEN
 	nErrorID := fbHourAngle.nErrorID;
 ELSIF fbDeclination.bError THEN
@@ -242,57 +528,53 @@ END_IF
 fSlewTime := fbHourAngle.fSlewTime + fbDeclination.fSlewTime;
 
 // ERROR (either one of the Axis or below safe Horizon (fHorizon))
-bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error OR bTestError OR bSoftwareError;
-			
-// #100: an error or an E-stop ends the powered state. Only a power-on or a park wrote bIsPowered, so it stayed TRUE and the
+bError := fbHourAngle.Error OR fbDeclination.Error OR(fbFocus <> 0 AND_THEN fbFocus.Error) OR fbCabinet.Error OR bTestError OR bSoftwareError;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ErrorReaction" Id="{c1780515-8c28-492e-9250-ace6f3e56191}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The reaction to an error before the move gate.
+METHOD PRIVATE _ErrorReaction
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// #100: an error or an E-stop ends the powered state. Only a power-on or a park wrote bIsPowered, so it stayed TRUE and the
 // next power=1 could be taken for a running telescope. bReady needs bIsPowered, so this only forces the full power-on.
 rtrigPoweredClear(CLK := bError OR bEstopTriggered);
 IF rtrigPoweredClear.Q THEN
 	bIsPowered := FALSE;
-END_IF
-
-// (Template body step S1.d, D1: after the error computation like MONETcommon, so the gate sees bError, the clock and the power-on of this scan:
-// a move edge in the scan of a new error is rejected with a log, not accepted and dropped silently.)
-// A rising move input is a command like the method call: decided at arrival (_AcceptMove); accepted, it sets the latch, rejected, it
-// is logged and nothing is set. The target fields are what the writer set before the edge. Nested IFs on purpose: ST does not
-// short-circuit AND and _AcceptMove must only run on the edge.
-IF bGoHome AND NOT bGoHomeChecked THEN
-	Home();
-END_IF
-IF bGoto AND NOT bGotoChecked THEN
-	IF _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
-		bGotoActive := TRUE;
-	END_IF
-END_IF
-IF bSlew AND NOT bSlewChecked THEN
-	IF _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
-		bSlewActive := TRUE;
-	END_IF
-END_IF
-IF bTrack AND NOT bTrackChecked THEN
-	IF _AcceptMove(E_TCSCommand.track, E_TCSCommand.no_command) THEN
-		bTrackActive := TRUE;
-	END_IF
-END_IF
-
-IF bError THEN
-	bSupersedeRequest := FALSE;
-	bMoveAbortPending := FALSE;	// the drives are disabled below, nothing to wait for (MONETcommon#84)
-	bGoHomeActive := 	FALSE;
-	bTrackActive := 	FALSE;
-	bGotoActive := 	FALSE;
-	bSlewActive := 	FALSE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_OnMoveEdgeAccepted" Id="{ce98ff0a-3b98-4ad7-9bc7-3f0e8c90757d}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). A move input edge was accepted.
+METHOD PRIVATE _OnMoveEdgeAccepted
+VAR_INPUT
+	eCommand	: E_TCSCommand;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// nothing]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ApplyError" Id="{79a0423b-d992-41a9-8dd9-6759ec5302b9}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The axes and the cabinet LED on an error.
+METHOD PRIVATE _ApplyError
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bError THEN
 	fbHourAngle.Enable := FALSE;
 	fbDeclination.Enable := FALSE;
 	fbCabinet.Error := TRUE;
 ELSE
 	fbCabinet.Error := FALSE;
-	nErrorID := 0;
-END_IF
-
-
-
-// calculate fHourAngleApparent, fDeclinationApparent 
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ComputeTargets" Id="{39a07f06-7eab-4842-b1ba-c5b3cddcad64}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The target of this scan and the reported position.
+METHOD PRIVATE _ComputeTargets
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// calculate fHourAngleApparent, fDeclinationApparent 
 
 fbRaDec2HaDec(
 	ra := fRightAscension,
@@ -394,9 +676,15 @@ fbEq2Hor(
 	refract_to_observed := FALSE,
 	JD := fJd + fTimeOffset,
 	alt => fElevationCurrentSky,
-	az => fAzimuthCurrentSky);
-//----------------------------------------------------------------------------------------------
-// #161: while an axis is uncalibrated (e.g. after a PLC activation) its counter is meaningless, so the horizon and
+	az => fAzimuthCurrentSky);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_Guards" Id="{7de697b9-8dd1-4334-b9e3-11896fbb6ded}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Horizon and pole-zone guards, limit homes, target checks.
+METHOD PRIVATE _Guards
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// #161: while an axis is uncalibrated (e.g. after a PLC activation) its counter is meaningless, so the horizon and
 // pole-zone stops must not act on it, otherwise the power-on sweep and the jog are stopped. Protection then is the NC
 // software limits, the sweep's DistanceLimit and the operator.
 bAxesCalibrated := fbHourAngle.Calibrated AND fbDeclination.Calibrated;
@@ -485,14 +773,17 @@ IF (bGotoActive AND (fDeclinationApparent > (90.0 - fPoleZone))) OR (bSlewActive
 ELSE
 	// reset event trigger
 	rtrigPoleError(CLK:=FALSE);
-END_IF
-//----------------------------------------------------------------------------------------------
-
-tpPowerOnWarning(IN := bPowerActive OR (NOT fbHourAngle.bEnable), PT := T#250MS);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_Timers" Id="{f5ac4a19-815a-48ce-aa91-a7e245e3fd2b}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Power-on warning, idle park, state-machine timeouts, pending home and park.
+METHOD PRIVATE _Timers
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[tpPowerOnWarning(IN := bPowerActive OR (NOT fbHourAngle.bEnable), PT := T#250MS);
 
 tonPowerTimeout(IN := TCS_command = E_TCSCommand.no_command AND NOT bIsParked, PT := T#12H, nDivisor := nTimeDivisor);
-tonCommandTimeout();
-
 // MONETcommon#17: state-machine timeouts, checked in _GotoTelescope/_HomeTelescope/_SlewTelescope
 // #75: count only while the command is the one being run (TCS_command is last scan's dispatch) and without an error.
 // Counting from the request, a command that never started (not ready, preempted) fired the timeout in the next
@@ -530,42 +821,30 @@ IF tonPowerTimeout.Q AND NOT bIsParked THEN
 	// #83: fire once. With the axes off or in error the park does not set bIsParked, so Q stayed TRUE and bPark was
 	// set again every scan (dropping Track/Goto/Slew/Home, re-commanding the dome). The timer counts again from now.
 	tonPowerTimeout(IN := FALSE);
-END_IF
-//----------------------------------------------------------------------------------------------
-// The latest move wins (MONETcommon#83, D6/D7; replaces the restart flags of #41 and the home-during-tracking branch of #72): _AcceptMove
-// accepted a move as replace of the running one and wrote its target. Drop the other move latches, reset their stage machines and stop
-// the axes (abort stop, #43); the kept move starts once the axes are at standstill.
-IF bSupersedeRequest THEN
-	IF eSupersedeKeep <> E_TCSCommand.gohome THEN
-		bGoHomeActive := FALSE;
-	END_IF
-	IF eSupersedeKeep <> E_TCSCommand.goto THEN
-		bGotoActive := FALSE;
-	END_IF
-	IF eSupersedeKeep <> E_TCSCommand.slew THEN
-		bSlewActive := FALSE;
-	END_IF
-	IF eSupersedeKeep <> E_TCSCommand.track THEN
-		bTrackActive := FALSE;
-	END_IF
-	bInterrupted := TRUE;
-	_HomeTelescope();
-	_GotoTelescope();
-	_SlewTelescope();
-	bInterrupted := FALSE;	// #26: one-shot, the interrupted state machines have reset their stage
-	// the replacement gets its own 600 s, the timer must not go on counting from the first request
-	CASE eSupersedeKeep OF
-		E_TCSCommand.gohome:	tonHomeTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
-		E_TCSCommand.goto:		tonGotoTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
-		E_TCSCommand.slew:		tonSlewTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
-	END_CASE
-	IF NOT bError THEN
-		bMoveAbortPending := TRUE;
-	END_IF
-	bSupersedeRequest := FALSE;
-END_IF
-// (Template body step S1.e, D2: after the supersede block and before the park pre-step, as MONETcommon#86, so the stop branch cannot clear the request in the scan it is made.)
-// BROTLib#25 step 4.4d (decided by Tim 2026-11-09: MONETcommon wins): a new hardware error (hour angle, declination or focus; not a
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_RestartMoveTimeout" Id="{a360d10e-6a59-40fc-8d4b-a2d75946ccc3}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The replacement gets its own timeout.
+METHOD PRIVATE _RestartMoveTimeout
+VAR_INPUT
+	eKeep	: E_TCSCommand;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE eKeep OF
+	E_TCSCommand.gohome:	tonHomeTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
+	E_TCSCommand.goto:		tonGotoTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
+	E_TCSCommand.slew:		tonSlewTimeout(IN := FALSE, PT := T#600S, nDivisor := nTimeDivisor);
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ParkRequests" Id="{844845fc-6fdb-4187-acd2-d29c542ffad9}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The automatic parks.
+METHOD PRIVATE _ParkRequests
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// BROTLib#25 step 4.4d (decided by Tim 2026-11-09: MONETcommon wins): a new hardware error (hour angle, declination or focus; not a
 // software or cabinet error) while not parked and without E-stop starts the park by itself, like MONETcommon#86. The park branch
 // below does what is safe without the mount (the axes are disabled by the error): covers close, dome parks, focus off; the mount
 // is not moved and bIsParked is not set until the covers are closed and the dome is parked. A running power-on is aborted by
@@ -578,195 +857,236 @@ bErrorParkStarted := BROTLib.F_ErrorParkRequest(
 bHwErrorLast := fbHourAngle.Error OR fbDeclination.Error OR (fbFocus <> 0 AND_THEN fbFocus.Error);
 IF bErrorParkStarted THEN
 	Park();
-END_IF
-
-//----------------------------------------------------------------------------------------------
-// set TCS_command according to state variables ordered by precedence (command model step 3C.2: BROTLib.FB_CommandArbiter decides,
-// the block applies what it asks for, as MONETcommon). Order: stop (also a running power-on) > park aborts a running power-on >
-// power-on > a running abort stop > park > gohome > goto > slew > track > idle.
-// The park pre-step keeps what the arbiter does not know about IAG50cm: the park with an error, an E-stop or the axes off is the
-// in-place park, a park while the mount is not powered or forced waits for the axes to be switched off (#197), a park in a limit waits
-// for the limit home (#84), and a park is only dispatched when the telescope is ready and not busy (the arbiter alone would park at
-// standstill without ready, which on IAG50cm could drive uncalibrated axes, #161). A held park is not given to the arbiter.
-bParkHeld := FALSE;
-IF bParkActive AND NOT bStopActive AND NOT bPowerActive AND NOT fbStartup.Initializing AND NOT (bMoveAbortPending AND NOT bError) THEN
-	bTrackActive := FALSE;
-	IF bError OR bEstopTriggered OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
-		_ParkInPlace();
-		bParkHeld := TRUE;
-	ELSIF (NOT bIsPowered OR bParkForceInPlace) AND TCS_command <> E_TCSCommand.park THEN
-		// #197: no completed power-on (aborted by this park, or stopped in stage 40 or later) but an axis is on: the park can
-		// never be dispatched. Switch the axes off once they are at rest, then the axes-off park parks in place.
-		// TCS_command must not stay on poweron: _PowerOn and its 12 h timeout would stay selected.
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ParkPreStep" Id="{05a3a385-eeb5-443f-91a3-5109b3bc5761}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). TRUE: the pending park waits. The gate (no stop, no power-on, no abort stop) is in the body.
+METHOD PRIVATE _ParkPreStep : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_ParkPreStep := FALSE;
+bTrackActive := FALSE;
+IF bError OR bEstopTriggered OR (TCS_command <> E_TCSCommand.park AND NOT fbHourAngle.Enable AND NOT fbDeclination.Enable) THEN
+	_ParkInPlace();
+	_ParkPreStep := TRUE;
+ELSIF (NOT bIsPowered OR bParkForceInPlace) AND TCS_command <> E_TCSCommand.park THEN
+	// #197: no completed power-on (aborted by this park, or stopped in stage 40 or later) but an axis is on: the park can
+	// never be dispatched. Switch the axes off once they are at rest, then the axes-off park parks in place.
+	// TCS_command must not stay on poweron: _PowerOn and its 12 h timeout would stay selected.
+	fbSweepStop.ArmAll();
+	TCS_command := E_TCSCommand.no_command;
+	_ParkPreStep := TRUE;
+ELSIF bGoHomeActive AND bLimitHome THEN
+	// #84: a park in a limit: the home out of the limit runs first (the arbiter dispatches it), the park follows (bParkHomeDone)
+	IF NOT bParkAfterHome THEN
+		bParkAfterHome := TRUE;
+		bParkHomeFirst := TRUE;
+	END_IF
+	_ParkPreStep := TRUE;
+ELSIF NOT (bReady AND NOT bBusy) THEN
+	_ParkPreStep := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_EmergencyPark" Id="{1fce47db-52d5-4e8f-8830-dce2ed613a3e}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The arbiter input bEmergencyPark.
+METHOD PRIVATE _EmergencyPark : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_EmergencyPark := FALSE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_AtRest" Id="{02f74f7a-9e33-433b-bca7-1cc87c427b13}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The arbiter input bStopped: at rest and no stop transaction running.
+METHOD PRIVATE _AtRest : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_AtRest := bSettled;	// IAG50cm: at rest and no stop transaction running]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_InterruptPower" Id="{b823f462-7c7e-4769-abb2-a73d057f39e5}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The arbiter interrupts the power-on.
+METHOD PRIVATE _InterruptPower
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _DoPowerOn() >= 40 THEN	// abort path: bPowerActive FALSE, startup marked aborted, stage 0; returns the stage it was in
+	IF fbArbiter.bPowerAbortedByPark THEN
+		// #197: the axes are on and may be sweeping: stop them. The park then switches them off (nothing else can: bReady
+		// needs the completed power-on) and parks in place.
 		fbSweepStop.ArmAll();
-		TCS_command := E_TCSCommand.no_command;
-		bParkHeld := TRUE;
-	ELSIF bGoHomeActive AND bLimitHome THEN
-		// #84: a park in a limit: the home out of the limit runs first (the arbiter dispatches it), the park follows (bParkHomeDone)
-		IF NOT bParkAfterHome THEN
-			bParkAfterHome := TRUE;
-			bParkHomeFirst := TRUE;
-		END_IF
-		bParkHeld := TRUE;
-	ELSIF NOT (bReady AND NOT bBusy) THEN
-		bParkHeld := TRUE;
+	ELSE
+		fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
+	END_IF
+	fbHourAngle.bStopSweep := TRUE;		// #198: no new sweep step after this stop, also before the sweep has started
+	fbDeclination.bStopSweep := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_InterruptPark" Id="{3a689de4-5be6-4fd3-8413-ed7b0cb662e7}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The arbiter interrupts the park.
+METHOD PRIVATE _InterruptPark
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bWasPark THEN
+	sParkEnd := 'cancelled by stop';
+	fbSweepStop.Cancel();		// #197: the park is gone, the axes stay as they are
+END_IF
+_DoPark();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_InterruptGoto" Id="{b9c192ce-d0e0-4af4-8db8-6acabdc788c4}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The arbiter interrupts the goto.
+METHOD PRIVATE _InterruptGoto
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_DoGoto();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_InterruptSlew" Id="{8aacbfb5-0cec-48bb-bf7c-31f98866be61}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The arbiter interrupts the slew.
+METHOD PRIVATE _InterruptSlew
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_DoSlew();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_InterruptGoHome" Id="{79b6b6a9-c37f-4e8f-bc64-84e66edf7204}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The arbiter interrupts the home.
+METHOD PRIVATE _InterruptGoHome
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bWasGoHome THEN
+	IF bStopActive THEN
+		sHomeEnd := 'cancelled by stop';	// #84: also the home that a park waited for
+	ELSE
+		sHomeEnd := 'cancelled by park';
 	END_IF
 END_IF
-
-fbArbiter.bStop := bStopActive;
-fbArbiter.bPower := bPowerActive;
-fbArbiter.bInitializing := fbStartup.Initializing;
-fbArbiter.bPark := bParkActive AND NOT bParkHeld;
-fbArbiter.bGoHome := bGoHomeActive;
-fbArbiter.bGoto := bGotoActive;
-fbArbiter.bSlew := bSlewActive;
-fbArbiter.bTrack := bTrackActive;
-fbArbiter.bError := bError;
-fbArbiter.bEmergencyPark := FALSE;
-fbArbiter.bReady := bReady;
-fbArbiter.bBusy := bBusy;
-fbArbiter.bStopped := bSettled;	// IAG50cm: at rest and no stop transaction running
-fbArbiter.bMoveAbortPending := bMoveAbortPending;
-fbArbiter.bParkWinsOverPowerOn := TRUE;
-bRequestIdle := NOT (bStopActive OR bPowerActive OR bParkActive OR bGoHomeActive OR bGotoActive OR bSlewActive OR bTrackActive
-	OR (bMoveAbortPending AND NOT bError));
-bWasPower := bPowerActive;
-bWasPark := bParkActive;
-bWasGoHome := bGoHomeActive;
-bWasMove := bGotoActive OR bSlewActive;
-fbArbiter();
-
-// a stop always aborts a startup, also when bPower is already FALSE; the park that aborts a power-on does too
-IF fbArbiter.bAbortStartup THEN
-	fbStartup.MarkAbortedIfStarting(Power := bPowerActive);
-END_IF
-IF fbArbiter.bClearPower THEN
-	bPowerActive := FALSE;
-END_IF
-IF fbArbiter.bClearTrack THEN
-	bTrackActive := FALSE;
-END_IF
-IF fbArbiter.bClearPark THEN
-	bParkActive := FALSE;
-END_IF
-IF fbArbiter.bClearGoto THEN
-	bGotoActive := FALSE;
-END_IF
-IF fbArbiter.bClearSlew THEN
-	bSlewActive := FALSE;
-END_IF
-IF fbArbiter.bClearGoHome THEN
-	bGoHomeActive := FALSE;
-END_IF
-// #26: the interrupted state machines reset their stage in one call with bInterrupted TRUE; bInterrupted is a one-shot
-IF fbArbiter.bInterruptPower OR fbArbiter.bInterruptPark OR fbArbiter.bInterruptGoto OR fbArbiter.bInterruptSlew
-		OR fbArbiter.bInterruptGoHome THEN
-	bInterrupted := TRUE;
-	IF fbArbiter.bInterruptPower THEN
-		IF _PowerOn() >= 40 THEN	// abort path: bPowerActive FALSE, startup marked aborted, stage 0; returns the stage it was in
-			IF fbArbiter.bPowerAbortedByPark THEN
-				// #197: the axes are on and may be sweeping: stop them. The park then switches them off (nothing else can: bReady
-				// needs the completed power-on) and parks in place.
-				fbSweepStop.ArmAll();
-			ELSE
-				fbSweepStop.Arm();		// #113: stopped in the calibration sweep (stage 40 and later)
-			END_IF
-			fbHourAngle.bStopSweep := TRUE;		// #198: no new sweep step after this stop, also before the sweep has started
-			fbDeclination.bStopSweep := TRUE;
-		END_IF
-	END_IF
-	IF fbArbiter.bInterruptPark THEN
-		IF bWasPark THEN
-			sParkEnd := 'cancelled by stop';
-			fbSweepStop.Cancel();		// #197: the park is gone, the axes stay as they are
-		END_IF
-		_ParkTelescope();
-	END_IF
-	IF fbArbiter.bInterruptGoto THEN
-		_GotoTelescope();
-	END_IF
-	IF fbArbiter.bInterruptSlew THEN
-		_SlewTelescope();
-	END_IF
-	IF fbArbiter.bInterruptGoHome THEN
-		IF bWasGoHome THEN
-			IF bStopActive THEN
-				sHomeEnd := 'cancelled by stop';	// #84: also the home that a park waited for
-			ELSE
-				sHomeEnd := 'cancelled by park';
-			END_IF
-		END_IF
-		_HomeTelescope();
-	END_IF
-	bInterrupted := FALSE;
-END_IF
-IF fbArbiter.bSetMoveAbortPending THEN
-	bMoveAbortPending := TRUE;	// #43/#84
-END_IF
-IF fbArbiter.bPowerAbortedByPark THEN
-	bPowerAbortedByPark := TRUE;	// logged: 'Power-on aborted by park' (#109)
-END_IF
-// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
+_DoGoHome();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_AfterArbiter" Id="{dda4d906-4b1f-4b0f-9b5d-ea64e8e7972f}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). After the arbiter has been applied.
+METHOD PRIVATE _AfterArbiter
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
 IF bStopActive AND bSafeParked AND NOT bWasPark AND NOT bWasPower AND NOT bWasMove AND NOT bWasGoHome THEN
 	bStopIgnored := TRUE;
-END_IF
-
-IF fbArbiter.eCommand <> E_TCSCommand.no_command THEN
-	TCS_command := fbArbiter.eCommand;
-ELSIF bRequestIdle THEN
-	TCS_command := E_TCSCommand.no_command;
-	fbHourAngle.MoveAxis := FALSE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_DropAxisCommands" Id="{79f0235a-66ef-4f2e-a214-67cdf13e3e0b}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Idle: the axis commands are dropped.
+METHOD PRIVATE _DropAxisCommands
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[	fbHourAngle.MoveAxis := FALSE;
 	fbDeclination.MoveAxis := FALSE;
 	fbHourAngle.bTracking := FALSE;
-	fbDeclination.bTracking := FALSE;
-END_IF
-
-// #40: every command gets its own timeout; the timer used to run on from one command into the next
-IF TCS_command <> eTimeoutCommand THEN
-	tonCommandTimeout(IN := FALSE);
-	eTimeoutCommand := TCS_command;
-	// #108: a stop transaction starts here and lasts as long as TCS_command stays stop (also through the wait of a
-	// gohome that preempted a track): each axis gets one stop in it
-	IF TCS_command = E_TCSCommand.stop THEN
-		fbStopTx.Begin();
-	END_IF
-END_IF
-
-IF TCS_command = E_TCSCommand.poweron THEN
-	_PowerOn();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.poweron, PT := T#12H, nDivisor := nTimeDivisor);
-	TCSCTOEvent.OnMessage := 'POWER';
-ELSIF TCS_command = E_TCSCommand.stop THEN
-	_StopTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.stop, PT := T#30S, nDivisor := nTimeDivisor);	// #40: a stop from slew speed takes about 4 s, a preempting stop can follow a long move
-	TCSCTOEvent.OnMessage := 'STOP';
-ELSIF TCS_command = E_TCSCommand.park THEN
-	_ParkTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.park, PT := T#2M, nDivisor := nTimeDivisor);
-	TCSCTOEvent.OnMessage := 'PARK';
-ELSIF TCS_command = E_TCSCommand.gohome THEN
-	_HomeTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.gohome, PT := T#2M, nDivisor := nTimeDivisor);
-	TCSCTOEvent.OnMessage := 'GOHOME';
-ELSIF TCS_command = E_TCSCommand.goto THEN
-	_GotoTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.goto, PT := T#2M, nDivisor := nTimeDivisor);
-	TCSCTOEvent.OnMessage := 'GOTO';
-ELSIF TCS_command = E_TCSCommand.slew THEN
-	_SlewTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.slew, PT := T#2M, nDivisor := nTimeDivisor);
-	TCSCTOEvent.OnMessage := 'SLEW';
-ELSIF TCS_command = E_TCSCommand.track THEN
-	_TrackTelescope();
-	tonCommandTimeout(IN := TCS_command = E_TCSCommand.track, PT := T#12H, nDivisor := nTimeDivisor);
-	TCSCTOEvent.OnMessage := 'TRACK';
+	fbDeclination.bTracking := FALSE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_OnCommandChanged" Id="{f346392c-2817-43c8-8907-287d92fd8956}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). TCS_command changed.
+METHOD PRIVATE _OnCommandChanged
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// #108: a stop transaction starts here and lasts as long as TCS_command stays stop (also through the wait of a
+// gohome that preempted a track): each axis gets one stop in it
+IF TCS_command = E_TCSCommand.stop THEN
+	fbStopTx.Begin();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_DoPowerOn" Id="{454c13ff-2a44-40fe-9a9f-2af34564ef90}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Calls the stage machine; returns the stage it was in.
+METHOD PRIVATE _DoPowerOn : USINT
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_DoPowerOn := _PowerOn();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_DoPark" Id="{b5264596-9ee8-4f0a-afa0-d22e2a0b4f11}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Calls the stage machine.
+METHOD PRIVATE _DoPark
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_ParkTelescope();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_DoGoHome" Id="{3b936219-2cea-4274-b961-23091a26a747}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Calls the stage machine.
+METHOD PRIVATE _DoGoHome
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_HomeTelescope();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_DoGoto" Id="{004b73df-348a-4a65-9a02-c72ce9d78c0f}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Calls the stage machine.
+METHOD PRIVATE _DoGoto
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_GotoTelescope();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_DoSlew" Id="{4a88c6d3-4e35-43d1-93cd-57728314805b}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Calls the stage machine.
+METHOD PRIVATE _DoSlew
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_SlewTelescope();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_DoTrack" Id="{b1bdd141-25f6-40a8-9621-d21903e5c547}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Calls the stage machine.
+METHOD PRIVATE _DoTrack
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_TrackTelescope();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_DoStop" Id="{d21af247-3e6e-4829-b3e2-c95f07ff097e}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Calls the stage machine.
+METHOD PRIVATE _DoStop
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_StopTelescope();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_CommandTimeout" Id="{338bbb57-390b-4e28-9d6e-df29401b077c}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The timeout of a command.
+METHOD PRIVATE _CommandTimeout : TIME
+VAR_INPUT
+	eCommand	: E_TCSCommand;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE eCommand OF
+	E_TCSCommand.poweron:	_CommandTimeout := T#12H;
+	E_TCSCommand.stop:		_CommandTimeout := T#30S;	// #40: a stop from slew speed takes about 4 s, a preempting stop can follow a long move
+	E_TCSCommand.track:		_CommandTimeout := T#12H;
 ELSE
-	// disable command timeout
-	tonCommandTimeout(IN := FALSE);
-	TCSCTOEvent.OnMessage := 'NOCOMMAND';
-END_IF
-//----------------------------------------------------------------------------------------------
-(* STATUS BOOLS*)
+	_CommandTimeout := T#2M;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_AfterDispatch" Id="{30cc36e7-894f-477a-80da-c4ca526c5b90}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). After the dispatch.
+METHOD PRIVATE _AfterDispatch
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// nothing]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_UpdateStatus" Id="{9a359329-5c54-4b0b-92c4-a82608059586}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Motion, stop transaction, sweep stop, readiness and the in-place park status.
+METHOD PRIVATE _UpdateStatus
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(* STATUS BOOLS*)
 bSliding := NOT bTracking AND (aAxis[1].bInMotion OR aAxis[1].bInRamp OR
 			aAxis[2].bInMotion OR aAxis[2].bInRamp );
 
@@ -922,83 +1242,113 @@ ELSIF bSafeParked AND (tonParkInPlace.Q OR fbDome.Error) THEN
 	sParkInPlaceEnd := 'aborted: the covers did not close or the dome did not park within 120 s, or the dome is in error.';
 	nParkInPlaceLevel := ADSLOG_MSGTYPE_WARN;
 	bParkInPlaceDone := TRUE;
-END_IF
-fReadyState := fbStartup.Update(
-    Error := bError OR bSoftwareError OR bPowerFailure OR bEstopTriggered,
-    Parked := bIsParked,
-    Parking := (bParkActive OR bSafeParked) AND NOT bPowerActive,
-    Operational := bReady AND bMainReady AND NOT bEstopTriggered,
-    AbortExtra := bEstopTriggered);
-//nMotionState
-IF bStopped THEN
-	nMotionState := 0;
-ELSIF bSliding OR bBusy THEN
-	nMotionState := 1;
-ELSIF bTracking THEN
-	nMotionState := 8;
-END_IF
-	
-//----------------------------------------------------------------------------------------------
-// release the stop and the abort stop once the stop transaction has settled (every stopped axis reported Done and stood
-// still for 3 scans, no motion lock): a stop that has axes to stop is held until then (MONETcommon#96/#118)
-IF bSettled THEN
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ReadyStateParking" Id="{88028a50-c2ca-4b03-acbc-fb2e926b6d1b}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The Parking input of the READY_STATE.
+METHOD PRIVATE _ReadyStateParking : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_ReadyStateParking := (bParkActive OR bSafeParked) AND NOT bPowerActive;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_IsSlewing" Id="{2af0092a-3810-4785-ae7e-21e90e06e14d}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The slewing flag of the motion state.
+METHOD PRIVATE _IsSlewing : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_IsSlewing := bSliding;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_StopSettled" Id="{ba012c82-2fb0-46d9-b276-40ac40c40998}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The stop transaction has settled.
+METHOD PRIVATE _StopSettled : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_StopSettled := bSettled;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_OnAbortStopReleased" Id="{5e7ee996-2062-4ffc-b9db-4a9110b8e543}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The abort stop has been released.
+METHOD PRIVATE _OnAbortStopReleased
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// nothing]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ReleaseStop" Id="{00419f47-4d0f-4941-8b8d-069bdefc4ee4}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Release the stop and the abort stop once the stop transaction has settled (every stopped axis reported Done and stood
+// still for 3 scans, no motion lock): a stop that has axes to stop is held until then (MONETcommon#96/#118). A park queued during the
+// stop runs from the next scan, once the stop is released.
+METHOD PRIVATE _ReleaseStop
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _StopSettled() THEN
 	bStopActive := FALSE;
 	IF TCS_command = E_TCSCommand.stop THEN
 		bMoveAbortPending := FALSE;	// only after STOP was dispatched in this scan
+		_OnAbortStopReleased();
 	END_IF
-END_IF
-// a park queued during the stop runs from the next scan, once the stop is released
-IF bParkAfterStop AND NOT bStopActive THEN
-	bParkActive := TRUE;
-	bParkAfterStop := FALSE;
-END_IF
-
-// unset the RESET command when no Error is present
+	IF bParkAfterStop AND NOT bStopActive THEN
+		bParkActive := TRUE;
+		bParkAfterStop := FALSE;
+	END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_ReleaseReset" Id="{16858d95-be95-42c6-89a2-6f193b9ba85a}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The reset is released.
+METHOD PRIVATE _ReleaseReset
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// unset the RESET command when no Error is present
 IF NOT bError THEN
 	bResetActive := FALSE;
-END_IF
-
-IF bEstopTriggered THEN
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_SafeStateEndOfScan" Id="{23aaa3a3-d319-45d1-a1a9-1948dea8722a}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). End of the scan: the drives are cut on an E-stop.
+METHOD PRIVATE _SafeStateEndOfScan
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bEstopTriggered THEN
 	fbHourAngle.Enable := FALSE;
 	fbDeclination.Enable := FALSE;
-END_IF
-//----------------------------------------------------------------------------------------------
-// The readiness field uses its existing topic and numeric format.
-IF fbStartup.PublishDue(CommValid := fbComm <> 0, Heartbeat := FALSE) THEN
-    fbComm.PublishLREAL('telescope', 'dome', 'TELESCOPE.READY_STATE', fReadyState);
-END_IF
-// send telemetry
-
-IF bSliding OR bTrackActive OR bTracking THEN
-	tonMQTTTimer.PT := T#1000MS; // during movement every second
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_TelemetryPeriod" Id="{41c0c6f9-cff0-44ee-b857-7a38ef9d173e}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The period of the telemetry.
+METHOD PRIVATE _TelemetryPeriod : TIME
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bSliding OR bTrackActive OR bTracking THEN
+	_TelemetryPeriod := T#1000MS;	// during movement every second
 ELSE
-	tonMQTTTimer.PT := T#5000MS; // otherwise every five seconds
-END_IF
-tonMQTTTimer(IN:=TRUE);
-IF tonMQTTTimer.Q THEN
-	tonMQTTTimer(IN:=FALSE);
-	THIS^._SendTelemetryEquitorial();
-END_IF
-
-//----------------------------------------------------------------------------------------------
-
-_LogEvents();
-
-// the inputs as seen this scan (the edge block above compares against them)
-bStopChecked := bStop;
-bParkChecked := bPark;
-bResetChecked := bReset;
-bPowerChecked := bPower;
-bGoHomeChecked := bGoHome;
-IF NOT bGoHomeActive AND TCS_command <> E_TCSCommand.gohome THEN
+	_TelemetryPeriod := T#5000MS;	// otherwise every five seconds
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_SendTelemetry" Id="{c13d6275-e349-4a1b-a971-89e069fd0198}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). Sends the telemetry.
+METHOD PRIVATE _SendTelemetry
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^._SendTelemetryEquitorial();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_EndOfScan" Id="{abdb2eda-d02c-4cb5-b472-dab166d7ca3c}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). End of the scan.
+METHOD PRIVATE _EndOfScan
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT bGoHomeActive AND TCS_command <> E_TCSCommand.gohome THEN
 	bHomeByCommand := FALSE;	// the commanded home is over
-END_IF
-bGotoChecked := bGoto;
-bSlewChecked := bSlew;
-bTrackChecked := bTrack;]]></ST>
-    </Implementation>
-    <Folder Name="command methods" Id="{f8e9235d-f769-45dd-a5d6-c3922581f371}" />
-    <Folder Name="internal methods" Id="{43f8a5dc-2166-4fdb-b436-34a8f62ea04a}" />
+END_IF]]></ST>
+      </Implementation>
+    </Method>
     <Folder Name="properties" Id="{65c2c08a-67b2-43de-bf16-65ce2beac397}" />
     <Method Name="_LogEvents" Id="{2e11d121-0e66-42d3-bda8-e55c8ad61884}" FolderPath="internal methods\">
       <Declaration><![CDATA[// plan step 3.4: the event function blocks at the end of the body (ADS log and MQTT log), moved unchanged; called at the end of the body.
