@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagSupersede_Tests" Id="{13d274ef-8a35-4ee1-8794-8b29387ea876}" SpecialFunc="None">
+    <Declaration><![CDATA[// The latest move wins (supersede) in FB_TelescopeControl (IAG50cm), command model step 3C.1 (BROTLib
+// specs/plans/2026-11-09-iag50cm-command-model-unification.md). The goto targets are not checked against the sky of the day
+// (horizon and safe altitude -90). One rig per test, one Scan() per PLC cycle.
+FUNCTION_BLOCK IagSupersede_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Slew_During_Goto_Replaces_It();
+Track_During_Goto_Retargets();
+Home_During_Track_Stops_Then_Homes();
+]]></ST>
+    </Implementation>
+    <Method Name="Slew_During_Goto_Replaces_It" Id="{8fdc4cb6-e149-4a5a-a42c-ee134c8c2b04}">
+      <Declaration><![CDATA[// A slew during a goto replaces it: the latest move wins (D6).
+METHOD PRIVATE Slew_During_Goto_Replaces_It
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bSeen		: BOOL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_During_Goto_Replaces_It');
+sTest := 'Slew_During_Goto_Replaces_It: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.SetHorizon(-90.0);
+		rig.SetSafeAltitude(-90.0);
+		rig.fbTel.Track(fRightAscension := 100.0, fDeclination := 30.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the goto is moving an axis
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		nCycles := 0;
+		nStep := 30;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the goto did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the goto did not start an axis move'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+	IF nCycles >= 5 THEN
+		rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 45.0);
+		nStep := 40;
+		nCycles := 0;
+	END_IF
+40:	// the slew replaced the goto: the goto latch is gone, the abort stop runs, then the slew
+	IF rig.fbTel.bMoveAbortPending THEN
+		bSeen := TRUE;
+	END_IF
+	IF nCycles = 2 THEN
+		AssertTrue(Condition := NOT rig.fbTel.bGotoActive, Message := 'the goto is gone');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bGotoActive), sText := CONCAT(sTest, 'the goto is gone'));
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 0, Message := 'the slew was accepted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 0), sText := CONCAT(sTest, 'the slew was accepted'));
+	END_IF
+	IF nCycles > 5 AND NOT rig.fbTel.bSlewActive AND rig.fbTel.bStopped THEN
+		AssertTrue(Condition := bSeen, Message := 'the replacement ran the abort stop');
+		F_Note(bFailed := NOT (bSeen), sText := CONCAT(sTest, 'the replacement ran the abort stop'));
+		AssertTrue(Condition := NOT rig.fbTel.bGotoActive, Message := 'the goto did not come back');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bGotoActive), sText := CONCAT(sTest, 'the goto did not come back'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Track_During_Goto_Retargets" Id="{99c6ae02-adf7-4235-bb30-b45efad74886}">
+      <Declaration><![CDATA[// A track during a goto retargets it through the abort stop (IAG#41).
+METHOD PRIVATE Track_During_Goto_Retargets
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bSeen		: BOOL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Track_During_Goto_Retargets');
+sTest := 'Track_During_Goto_Retargets: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.SetHorizon(-90.0);
+		rig.SetSafeAltitude(-90.0);
+		rig.fbTel.Track(fRightAscension := 100.0, fDeclination := 30.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the goto is moving an axis
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		nCycles := 0;
+		nStep := 30;
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the goto did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the goto did not start an axis move'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:
+	IF nCycles >= 5 THEN
+		rig.fbTel.Track(fRightAscension := 110.0, fDeclination := 31.0);
+		nStep := 40;
+		nCycles := 0;
+	END_IF
+40:	// the second target replaces the first through the abort stop (IAG#41)
+	IF rig.fbTel.bMoveAbortPending THEN
+		bSeen := TRUE;
+	END_IF
+	IF nCycles > 5 AND rig.fbTel.bTracking THEN
+		AssertTrue(Condition := bSeen, Message := 'the new target ran the abort stop');
+		F_Note(bFailed := NOT (bSeen), sText := CONCAT(sTest, 'the new target ran the abort stop'));
+		AssertTrue(Condition := ABS(rig.fbTel.fRightAscension - 110.0) < 0.001, Message := 'the new target is the one');
+		F_Note(bFailed := NOT (ABS(rig.fbTel.fRightAscension - 110.0) < 0.001), sText := CONCAT(sTest, 'the new target is the one'));
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 0, Message := 'nothing was rejected');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 0), sText := CONCAT(sTest, 'nothing was rejected'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the telescope did not reach the new target');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the telescope did not reach the new target'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Home_During_Track_Stops_Then_Homes" Id="{b7da66e9-ebbc-4924-b56f-3ae3261c295d}">
+      <Declaration><![CDATA[// A home during tracking stops the tracking, then homes (IAG#72).
+METHOD PRIVATE Home_During_Track_Stops_Then_Homes
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bSeen		: BOOL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Home_During_Track_Stops_Then_Homes');
+sTest := 'Home_During_Track_Stops_Then_Homes: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished (READY_STATE 1.0)
+	IF rig.Online THEN
+		rig.SetHorizon(-90.0);
+		rig.SetSafeAltitude(-90.0);
+		rig.fbTel.Track(fRightAscension := 100.0, fDeclination := 30.0);
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// wait until the mount tracks
+	IF rig.fbTel.bTracking THEN
+		rig.fbTel.Home();
+		nStep := 30;
+		nCycles := 0;
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the telescope did not track');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the telescope did not track'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+30:	// the home replaces the tracking: the abort stop ends the tracking, then the home runs (IAG#72)
+	IF rig.fbTel.bMoveAbortPending THEN
+		bSeen := TRUE;
+	END_IF
+	IF nCycles > 5 AND NOT rig.fbTel.bGoHomeActive AND rig.fbTel.bStopped THEN
+		AssertTrue(Condition := bSeen, Message := 'the tracking was ended through the abort stop');
+		F_Note(bFailed := NOT (bSeen), sText := CONCAT(sTest, 'the tracking was ended through the abort stop'));
+		AssertTrue(Condition := NOT rig.fbTel.bTracking, Message := 'the telescope no longer tracks');
+		F_Note(bFailed := NOT (NOT rig.fbTel.bTracking), sText := CONCAT(sTest, 'the telescope no longer tracks'));
+		AssertTrue(Condition := rig.fbTel.nCommandRejectCount = 0, Message := 'the home was accepted');
+		F_Note(bFailed := NOT (rig.fbTel.nCommandRejectCount = 0), sText := CONCAT(sTest, 'the home was accepted'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 3000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the home did not finish');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the home did not finish'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
