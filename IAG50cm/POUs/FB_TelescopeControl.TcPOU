@@ -109,7 +109,14 @@ VAR
 	tonParkPending		: FB_TimeoutTimer;		// #197: a park that is requested but never starts is forced into an in-place park after 2 min
 	bParkForceInPlace	: BOOL;		// #197: the pending-park watchdog fired
 	tonParkInPlace		: FB_TimeoutTimer;		// #187: an axes-off park gives up after 120 s if the covers or the dome do not finish
-	bCommandRefused		: BOOL;		// a Slew()/Track() request was refused because the telescope is not ready (one scan, #100)
+	bCommandRejected	: BOOL;		// set by _NoteRejected, logged and cleared by the body (as MONETcommon, #83)
+	eLastRejectedCommand	: E_TCSCommand;
+	eLastRejectReason	: BROTLib.E_CommandRejectReason;
+	nCommandRejectCount	: UDINT;	// diagnostics (ADS)
+	sRejectMessage		: STRING(120);
+	tonRejectRepeat		: TON;		// an identical rejection within 2 s is logged once (all are counted)
+	eLoggedCommand		: E_TCSCommand;
+	eLoggedReason		: BROTLib.E_CommandRejectReason;
 	sStopNoDone			: STRING(10);	// #120: the axes named in the stop timeout text
 	bStopTimeoutLog		: BOOL;		// #120: the stop transaction timed out or was released by the timeout (one scan); text in TCSstopTimeoutEvent.OnMessage
 	// MONETcommon#17: 600 s timeouts of the goto/home/slew state machines. They were TONs in the methods' plain VAR, which is
@@ -127,8 +134,8 @@ VAR
 	TCShomeCancelEvent,
 	TCSpowerBlockedEvent,
 	TCSpowerParkEvent,
-	TCSparkHomeEvent,
-	TCScommandRefusedEvent		: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request); #100, a refused slew/track
+	TCSparkHomeEvent		: FB_Eventlog;	// #30, park during an error, a blocked power-on (every request)
+	RejectEvent				: FB_Eventlog;	// a move command that the acceptance table rejects (was TCScommandRefusedEvent, #100)
 	TCSstopTimeoutEvent		: FB_Eventlog;	// #120: a stop transaction passed 30 s without a Done of an axis, and its release
 
 	nStatusWord, nLastStatus:	UDINT;
@@ -167,18 +174,26 @@ END_IF
 IF bPower AND NOT bPowerChecked THEN
 	Init();
 END_IF
-// A rising move input sets its latch exactly as the direct write did (no gating yet); the target fields are set by the writer first.
+// A rising move input is a command like the method call: decided at arrival (_AcceptMove); accepted, it sets the latch, rejected, it
+// is logged and nothing is set. The target fields are what the writer set before the edge. Nested IFs on purpose: ST does not
+// short-circuit AND and _AcceptMove must only run on the edge.
 IF bGoHome AND NOT bGoHomeChecked THEN
 	Home();
 END_IF
 IF bGoto AND NOT bGotoChecked THEN
-	bGotoActive := TRUE;
+	IF _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
+		bGotoActive := TRUE;
+	END_IF
 END_IF
 IF bSlew AND NOT bSlewChecked THEN
-	bSlewActive := TRUE;
+	IF _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
+		bSlewActive := TRUE;
+	END_IF
 END_IF
 IF bTrack AND NOT bTrackChecked THEN
-	bTrackActive := TRUE;
+	IF _AcceptMove(E_TCSCommand.track, E_TCSCommand.no_command) THEN
+		bTrackActive := TRUE;
+	END_IF
 END_IF
 
 _ReadAxes();
@@ -1212,11 +1227,22 @@ TCSpowerParkEvent(	Trigger := bPowerParked,
 				OnMessage := 'Power-on aborted by park',
 				Comm := fbComm);
 bPowerParked := FALSE;
-TCScommandRefusedEvent(	Trigger := bCommandRefused,
-				Level := ADSLOG_MSGTYPE_WARN,
-				FormatString := '%s',
-				Comm := fbComm);
-bCommandRefused := FALSE;
+// every rejection is logged (ADS log and MQTT log topic); an identical one repeated within 2 s once, all are counted. The event is
+// re-armed with FALSE first so that rejections in consecutive scans each give a rising edge (as MONETcommon).
+tonRejectRepeat(IN := TRUE, PT := T#2S);
+RejectEvent(Trigger := FALSE, Comm := fbComm);
+IF bCommandRejected THEN
+	IF tonRejectRepeat.Q OR eLastRejectedCommand <> eLoggedCommand OR eLastRejectReason <> eLoggedReason THEN
+		sRejectMessage := CONCAT(CONCAT(BROTLib.F_TCSCommandText(eLastRejectedCommand), ' rejected: '),
+			BROTLib.F_CommandRejectText(eLastRejectReason));
+		RejectEvent(Trigger := TRUE, Level := ADSLOG_MSGTYPE_WARN, FormatString := '%s',
+			OnMessage := sRejectMessage, Comm := fbComm);
+		eLoggedCommand := eLastRejectedCommand;
+		eLoggedReason := eLastRejectReason;
+		tonRejectRepeat(IN := FALSE);
+	END_IF
+	bCommandRejected := FALSE;
+END_IF
 TCSstopTimeoutEvent(	Trigger := bStopTimeoutLog,
 				Level := ADSLOG_MSGTYPE_WARN,
 				FormatString := '%s',
@@ -1233,6 +1259,69 @@ TCSCTOEvent(	Trigger := tonCommandTimeout.Q,
 				FormatString := 'A timeout occured during %s command!',
 				Comm := fbComm);
 ]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_CommandState" Id="{dcfc70aa-b99e-45a8-9b01-d3cbca8d7345}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// The state BROTLib.F_CommandAcceptance decides on. eExcludeOwn leaves the own request out of bMoveActive. bStopping stands in for
+// bMoveAbortPending until the abort stop (command model step 3A).
+METHOD PRIVATE _CommandState : BROTLib.ST_CommandState
+VAR_INPUT
+	eExcludeOwn	: E_TCSCommand;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_CommandState.bEstop		:= bEstopTriggered;
+_CommandState.bError		:= bError;
+_CommandState.bClockValid	:= fbTime.bValid;
+_CommandState.bStop			:= bStopActive;
+_CommandState.bPowering		:= bPowerActive OR fbStartup.Initializing;
+_CommandState.bParkPending	:= bParkActive;
+_CommandState.bIsParked		:= bIsParked;
+_CommandState.bReady		:= bReady;
+_CommandState.bGoHomeActive	:= (bGoHomeActive AND eExcludeOwn <> E_TCSCommand.gohome) OR TCS_command = E_TCSCommand.gohome;
+_CommandState.bMoveActive	:= (bGotoActive AND eExcludeOwn <> E_TCSCommand.goto) OR
+	(bSlewActive AND eExcludeOwn <> E_TCSCommand.slew) OR
+	(bTrackActive AND eExcludeOwn <> E_TCSCommand.track) OR
+	(bGoHomeActive AND eExcludeOwn <> E_TCSCommand.gohome) OR
+	TCS_command = E_TCSCommand.goto OR TCS_command = E_TCSCommand.slew OR TCS_command = E_TCSCommand.track OR
+	bTracking OR bStopping;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_AcceptMove" Id="{51edef40-3393-4d6a-a494-75062c704f44}" FolderPath="internal methods\">
+      <Declaration><![CDATA[// TRUE if the move may run (accepted, or it replaces the running one), FALSE if it was rejected (logged by the body, nothing written).
+// Until the supersede of step 3C, a replace is carried out by the old preemption (bRestartGoto/bRestartSlew, precedence).
+METHOD PRIVATE _AcceptMove : BOOL
+VAR_INPUT
+	eCommand	: E_TCSCommand;
+	eExcludeOwn	: E_TCSCommand;
+END_VAR
+VAR
+	eReason		: BROTLib.E_CommandRejectReason;
+	eDecision	: BROTLib.E_CommandDecision;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[eDecision := BROTLib.F_CommandAcceptance(eCommand := eCommand, stState := _CommandState(eExcludeOwn := eExcludeOwn), eReason => eReason);
+IF eDecision = BROTLib.E_CommandDecision.reject THEN
+	_NoteRejected(eCommand := eCommand, eReason := eReason);
+	_AcceptMove := FALSE;
+ELSE
+	_AcceptMove := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="_NoteRejected" Id="{ccf0eb00-1bf6-40a0-b632-603d24022ec2}" FolderPath="internal methods\">
+      <Declaration><![CDATA[METHOD PRIVATE _NoteRejected
+VAR_INPUT
+	eCommand	: E_TCSCommand;
+	eReason		: BROTLib.E_CommandRejectReason;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nCommandRejectCount := nCommandRejectCount + 1;
+eLastRejectedCommand := eCommand;
+eLastRejectReason := eReason;
+bCommandRejected := TRUE;]]></ST>
       </Implementation>
     </Method>
     <Method Name="_HandleReset" Id="{d3bbfeba-2cbb-4111-9ae3-4525c9154e5c}" FolderPath="internal methods\">
@@ -2504,7 +2593,12 @@ END_VAR]]></Declaration>
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[bGoHomeChecked := TRUE;
-bGoHomeActive := TRUE;]]></ST>
+// decide first (a home while not ready, powering on or parked is rejected, no longer waited for 2 min); a rejection writes nothing
+IF NOT _AcceptMove(E_TCSCommand.gohome, E_TCSCommand.no_command) THEN
+	RETURN;
+END_IF
+bGoHomeActive := TRUE;
+Home := TRUE;]]></ST>
       </Implementation>
     </Method>
     <Property Name="HourAngleOffset" Id="{ac27a626-cead-47ea-868b-f24be3bdcddc}" FolderPath="properties\">
@@ -2661,9 +2755,8 @@ END_VAR
         <ST><![CDATA[// #100: not while the telescope is not ready (parked, powering on, error). The request used to stay latched and
 // fired unnoticed after the next power-on; a client sends init first and waits for ready.
 bSlewChecked := TRUE;
-IF NOT bReady THEN
-	TCScommandRefusedEvent.OnMessage := 'Slew refused: telescope not ready. Power on (init) and wait until it is ready, then send the slew again.';
-	bCommandRefused := TRUE;
+// decided at arrival (F_CommandAcceptance): a rejected slew writes nothing, not even the target, and is never left pending
+IF NOT _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
 	RETURN;
 END_IF
 THIS^.fElevation 	:= fAltitude;
@@ -2697,9 +2790,7 @@ END_VAR
       <Implementation>
         <ST><![CDATA[// #100: see Slew(); a track request while the telescope is not ready is refused, not latched
 bGotoChecked := TRUE;
-IF NOT bReady THEN
-	TCScommandRefusedEvent.OnMessage := 'Track refused: telescope not ready. Power on (init) and wait until it is ready, then send the track again.';
-	bCommandRefused := TRUE;
+IF NOT _AcceptMove(E_TCSCommand.goto, E_TCSCommand.no_command) THEN
 	RETURN;
 END_IF
 THIS^.fRightAscension	:= fRightAscension;
