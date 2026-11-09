@@ -122,10 +122,10 @@ CASE nStep OF
 		TEST_FINISHED();
 	END_IF
 20:
-	IF rig.fbTel.bPark OR rig.fbTel.bIsParked THEN
+	IF rig.fbTel.bParkActive OR rig.fbTel.bIsParked THEN
 		rig.SetTimeDivisor(nValue := 1);
-		AssertTrue(Condition := rig.fbTel.bPark OR rig.fbTel.bIsParked, Message := 'the idle telescope parked itself');
-		F_Note(bFailed := NOT (rig.fbTel.bPark OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the idle telescope parked itself'));
+		AssertTrue(Condition := rig.fbTel.bParkActive OR rig.fbTel.bIsParked, Message := 'the idle telescope parked itself');
+		F_Note(bFailed := NOT (rig.fbTel.bParkActive OR rig.fbTel.bIsParked), sText := CONCAT(sTest, 'the idle telescope parked itself'));
 		nStep := 99;
 		TEST_FINISHED();
 	ELSIF nCycles > 3000 THEN

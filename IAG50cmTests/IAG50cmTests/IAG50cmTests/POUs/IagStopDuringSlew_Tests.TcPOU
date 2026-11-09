@@ -89,7 +89,7 @@ CASE nStep OF
 		nCycles := 0;
 	END_IF
 40:	// wait until the stop has settled
-	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
+	IF NOT rig.fbTel.bStopActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
 		AssertEquals_UINT(Expected := SEL(bHaMoving, UINT#0, UINT#1), Actual := rig.fbHa.nStopEdges, Message := 'HA: one stop if it was the moving axis, none otherwise');
 		F_Note(bFailed := (SEL(bHaMoving, UINT#0, UINT#1)) <> (rig.fbHa.nStopEdges), sText := CONCAT(sTest, 'HA: one stop if it was the moving axis, none otherwise'));
 		AssertEquals_UINT(Expected := SEL(bHaMoving, UINT#1, UINT#0), Actual := rig.fbDec.nStopEdges, Message := 'Dec: one stop if it was the moving axis, none otherwise');
@@ -250,7 +250,7 @@ CASE nStep OF
 		nCycles := 0;
 	END_IF
 40:
-	IF NOT rig.fbTel.bStop AND rig.fbTel.bStopped AND nCycles > 5 THEN
+	IF NOT rig.fbTel.bStopActive AND rig.fbTel.bStopped AND nCycles > 5 THEN
 		AssertFalse(Condition := rig.fbTel.bSlew, Message := 'the stop dropped bSlew');
 		F_Note(bFailed := (rig.fbTel.bSlew), sText := CONCAT(sTest, 'the stop dropped bSlew'));
 		AssertFalse(Condition := rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis, Message := 'no axis move is left');
