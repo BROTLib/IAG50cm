@@ -580,19 +580,23 @@ IF bStopActive AND (bUserStop OR NOT bPowerActive) THEN
 			_HomeTelescope();
 		END_IF
 	// #84: a park that is only pending survives the automatic stop of a limit: the stop settles, the limit home runs, then the park
-	ELSIF bGotoActive THEN
+	ELSIF bSafeParked AND NOT (bGotoActive OR bSlewActive OR bGoHomeActive) THEN
+		// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
+		bStopIgnored := TRUE;
+	END_IF
+	// a stop clears every pending move and interrupts its stage machine, not only the first of a chain (MONETcommon#84)
+	IF bGotoActive THEN
 		bGotoActive := FALSE;
 		_GotoTelescope();
-	ELSIF bSlewActive THEN
+	END_IF
+	IF bSlewActive THEN
 		bSlewActive := FALSE;
 		_SlewTelescope();
-	ELSIF bGoHomeActive THEN
+	END_IF
+	IF bGoHomeActive THEN
 		bGoHomeActive := FALSE;
 		sHomeEnd := 'cancelled by stop';
 		_HomeTelescope();
-	ELSIF bSafeParked THEN
-		// #196: the axes are off, there is nothing to stop; the covers have no stop command and the park goes on
-		bStopIgnored := TRUE;
 	END_IF
 	TCS_command := E_TCSCommand.stop;
 
