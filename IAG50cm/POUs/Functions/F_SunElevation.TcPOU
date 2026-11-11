@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="F_SunElevation" Id="{6f0c1a52-3b7e-4d1e-9a52-0c7d2f4b8e31}" SpecialFunc="None">
+    <Declaration><![CDATA[// Geometric elevation of the sun's centre in degrees (no refraction), NOAA low-precision series, about 0.1 deg.
+// tUTC is UTC (the PLC clock runs UTC, see FB_AstroClock). Used by FB_CabinetControl: the warning lamp must never be
+// on with the sun below the horizon.
+FUNCTION F_SunElevation : LREAL
+VAR_INPUT
+	tUTC	: TIMESTRUCT;
+	fLat	: LREAL;	// degrees north
+	fLon	: LREAL;	// degrees east
+END_VAR
+VAR
+	nDoy	: INT;
+	fHour, fG, fEqTime, fDecl, fTst, fHa, fLatR, fSinEl : LREAL;
+	bLeap	: BOOL;
+	aCum	: ARRAY[1..12] OF INT := [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+END_VAR
+VAR CONSTANT
+	cPi		: LREAL := 3.14159265358979;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF tUTC.wMonth < 1 OR tUTC.wMonth > 12 THEN
+	F_SunElevation := -90.0;	// invalid time: sun counted as down
+	RETURN;
+END_IF
+bLeap := (tUTC.wYear MOD 4 = 0 AND tUTC.wYear MOD 100 <> 0) OR tUTC.wYear MOD 400 = 0;
+nDoy := aCum[tUTC.wMonth] + tUTC.wDay;
+IF bLeap AND tUTC.wMonth > 2 THEN
+	nDoy := nDoy + 1;
+END_IF
+fHour := WORD_TO_LREAL(tUTC.wHour) + WORD_TO_LREAL(tUTC.wMinute) / 60.0 + WORD_TO_LREAL(tUTC.wSecond) / 3600.0;
+fG := 2.0 * cPi / 365.0 * (INT_TO_LREAL(nDoy - 1) + (fHour - 12.0) / 24.0);
+fEqTime := 229.18 * (0.000075 + 0.001868 * COS(fG) - 0.032077 * SIN(fG) - 0.014615 * COS(2.0 * fG) - 0.040849 * SIN(2.0 * fG));	// minutes
+fDecl := 0.006918 - 0.399912 * COS(fG) + 0.070257 * SIN(fG) - 0.006758 * COS(2.0 * fG) + 0.000907 * SIN(2.0 * fG) - 0.002697 * COS(3.0 * fG) + 0.00148 * SIN(3.0 * fG);	// rad
+fTst := fHour * 60.0 + fEqTime + 4.0 * fLon;	// true solar time, minutes
+fHa := (fTst / 4.0 - 180.0) * cPi / 180.0;
+fLatR := fLat * cPi / 180.0;
+fSinEl := SIN(fLatR) * SIN(fDecl) + COS(fLatR) * COS(fDecl) * COS(fHa);
+F_SunElevation := ASIN(LIMIT(-1.0, fSinEl, 1.0)) * 180.0 / cPi;]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

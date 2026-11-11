@@ -1474,22 +1474,6 @@ External Setpoint Generation:
 			</SubItem>
 		</DataType>
 		<DataType>
-			<Name GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib" AutoDeleteType="true">ST_InfoDataGroup</Name>
-			<BitSize>16</BitSize>
-			<SubItem>
-				<Name>usiMapState</Name>
-				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
-				<BitSize>8</BitSize>
-				<BitOffs>0</BitOffs>
-			</SubItem>
-			<SubItem>
-				<Name>usiMapDiag</Name>
-				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
-				<BitSize>8</BitSize>
-				<BitOffs>8</BitOffs>
-			</SubItem>
-		</DataType>
-		<DataType>
 			<Name GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib" AutoDeleteType="true">ST_InfoDataFB</Name>
 			<BitSize>24</BitSize>
 			<SubItem>
@@ -1531,6 +1515,22 @@ External Setpoint Generation:
 				<Type GUID="{18071995-0000-0000-0000-000000000001}">BYTE</Type>
 				<BitSize>8</BitSize>
 				<BitOffs>16</BitOffs>
+			</SubItem>
+		</DataType>
+		<DataType>
+			<Name GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib" AutoDeleteType="true">ST_InfoDataGroup</Name>
+			<BitSize>16</BitSize>
+			<SubItem>
+				<Name>usiMapState</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>0</BitOffs>
+			</SubItem>
+			<SubItem>
+				<Name>usiMapDiag</Name>
+				<Type GUID="{18071995-0000-0000-0000-000000000002}">USINT</Type>
+				<BitSize>8</BitSize>
+				<BitOffs>8</BitOffs>
 			</SubItem>
 		</DataType>
 		<DataType>
@@ -2324,7 +2324,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{14C6A8BB-65DF-7C17-E658-E8F4FFABB760}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{B896B3DD-90F5-E66B-6BA3-6C43BCC97603}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -2368,6 +2368,27 @@ External Setpoint Generation:
 							<Type GUID="{25521FAA-EA5F-4C7F-8864-BBCCDACD2E98}" Namespace="MC">NCTOPLC_AXIS_REF</Type>
 						</Var>
 						<Var>
+							<Name>MAIN.safetyHandling.stInfoEStop1</Name>
+							<Type GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib">ST_InfoDataFB</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoSafetyIn</Name>
+							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoSafetyOut</Name>
+							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.inError</Name>
+							<Comment><![CDATA[ Safety Error Condition]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.stInfoGroup1</Name>
+							<Type GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib">ST_InfoDataGroup</Type>
+						</Var>
+						<Var>
 							<Name>MAIN.telescopeControl.fbCabinet.bAuxiliaryContact24V</Name>
 							<Comment><![CDATA[ Auxilary Contact of the 24V DC: TRUE = operational]]></Comment>
 							<Type>BOOL</Type>
@@ -2403,27 +2424,6 @@ External Setpoint Generation:
 						<Var>
 							<Name>MAIN.telescopeControl.fbCabinet.bIMode</Name>
 							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.inError</Name>
-							<Comment><![CDATA[ Safety Error Condition]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoGroup1</Name>
-							<Type GUID="{3C3F6E44-B5A2-08B5-8373-E690BB7B431C}" Namespace="BROTLib">ST_InfoDataGroup</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoEStop1</Name>
-							<Type GUID="{C1EE62EE-4B85-17B2-E533-05C8266E1902}" Namespace="BROTLib">ST_InfoDataFB</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoSafetyIn</Name>
-							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
-						</Var>
-						<Var>
-							<Name>MAIN.safetyHandling.stInfoSafetyOut</Name>
-							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
 						</Var>
 					</Vars>
 					<Vars VarGrpType="2" ContextId="1" AreaNo="17">
@@ -2473,10 +2473,6 @@ External Setpoint Generation:
 							<Type GUID="{96B75FEB-2D84-43BE-A3EC-D9A681F27D52}" Namespace="MC">PLCTONC_AXIS_REF</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.telescopeControl.fbCabinet.bOErrorLED</Name>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
 							<Name>MAIN.safetyHandling.outRun</Name>
 							<Comment><![CDATA[ Run/Stop Safety]]></Comment>
 							<Type>BOOL</Type>
@@ -2489,6 +2485,20 @@ External Setpoint Generation:
 						<Var>
 							<Name>MAIN.safetyHandling.outErrAck</Name>
 							<Comment><![CDATA[ Error Acknowledgement ]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bOErrorLED</Name>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bOWarnLamp</Name>
+							<Comment><![CDATA[ Reset 24V (EL2004) channel 3: warning lamp, telescope in use during the day]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.telescopeControl.fbCabinet.bOWarnSiren</Name>
+							<Comment><![CDATA[ Reset 24V (EL2004) channel 4: warning sound while the telescope slews]]></Comment>
 							<Type>BOOL</Type>
 						</Var>
 					</Vars>
@@ -5672,13 +5682,15 @@ Bit 8 - 15 : reserved]]></Comment>
 								</Entry>
 							</Pdo>
 							<Pdo Name="Channel 3" Index="#x1602" InOut="1" Flags="#x0011" SyncMan="0">
-								<Entry Name="Output" Index="#x7020" Sub="#x01">
+								<Entry Name="MAIN.telescopeControl.fbCabinet.bOWarnLamp" Index="#x7020" Sub="#x01">
 									<Type>BIT</Type>
+									<Comment><![CDATA[ Reset 24V (EL2004) channel 3: warning lamp, telescope in use during the day]]></Comment>
 								</Entry>
 							</Pdo>
 							<Pdo Name="Channel 4" Index="#x1603" InOut="1" Flags="#x0011" SyncMan="0">
-								<Entry Name="Output" Index="#x7030" Sub="#x01">
+								<Entry Name="MAIN.telescopeControl.fbCabinet.bOWarnSiren" Index="#x7030" Sub="#x01">
 									<Type>BIT</Type>
+									<Comment><![CDATA[ Reset 24V (EL2004) channel 4: warning sound while the telescope slews]]></Comment>
 								</Entry>
 							</Pdo>
 						</EtherCAT>
@@ -8041,18 +8053,16 @@ Bit 8 - 15 : reserved]]></Comment>
 		<MappingInfo Identifier="{03040050-0050-0304-5000-040350000403}" Id="#x02030030" Watchdog="04000000040000000400000004000000"/>
 		<OwnerA Name="TIID^Device 1 (EtherCAT)">
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^FOCUS (ELM7221-9016)">
-				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionOutputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 RxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1"/>
+				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionInputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 TxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
 				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionInputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 TxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1"/>
-				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionOutputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 RxPDO" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Safety (EL1918)">
-				<Link VarA="Term 1 (EK1200)^FOCUS (ELM7221-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Receive Message^Message_1" VarB="ConnectionInputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 TxPDO"/>
+				<Link VarA="Term 1 (EK1200)^FOCUS (ELM7221-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1" VarB="ConnectionOutputs^TwinSafeGroup1.Connection to Term 12 (ELM7221-9016)_3 RxPDO"/>
+				<Link VarA="Term 1 (EK1200)^HA DEC (ELM7212-9016)^Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1" VarB="ConnectionOutputs^TwinSafeGroup1.Connection to Term 4 (ELM7212-9016)_4 RxPDO"/>
 				<Link VarA="Term 1 (EK1200)^Safety Out (EL2904)^Module 1 (FSOES)^RxPDO^FSOE" VarB="ConnectionInputs^TwinSafeGroup1.EL2904, 4 digital outputs_1_7 TxPDO"/>
-			</OwnerB>
-			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Safety Out (EL2904)">
-				<Link VarA="Term 1 (EK1200)^Safety (EL1918)^ConnectionOutputs^TwinSafeGroup1.EL2904, 4 digital outputs_1_7 RxPDO" VarB="Module 1 (FSOES)^TxPDO^FSOE"/>
+				<Link VarA="Term 1 (EK1200)^Safety Out (EL2904)^Module 1 (FSOES)^TxPDO^FSOE" VarB="ConnectionOutputs^TwinSafeGroup1.EL2904, 4 digital outputs_1_7 RxPDO"/>
 			</OwnerB>
 		</OwnerA>
 		<OwnerA Name="TINC^NC-Task 1 SAF^Axes^Declination">
@@ -8256,6 +8266,8 @@ Bit 8 - 15 : reserved]]></Comment>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Reset 24V (EL2004)">
 				<Link VarA="PlcTask Outputs^MAIN.telescopeControl.fbCabinet.bOErrorLED" VarB="Channel 2^MAIN.telescopeControl.fbCabinet.bOErrorLED"/>
+				<Link VarA="PlcTask Outputs^MAIN.telescopeControl.fbCabinet.bOWarnLamp" VarB="Channel 3^MAIN.telescopeControl.fbCabinet.bOWarnLamp"/>
+				<Link VarA="PlcTask Outputs^MAIN.telescopeControl.fbCabinet.bOWarnSiren" VarB="Channel 4^MAIN.telescopeControl.fbCabinet.bOWarnSiren"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^Safety (EL1918)">
 				<Link VarA="PlcTask Inputs^MAIN.safetyHandling.stInfoEStop1" VarB="Function Block Info Data^TwinSafeGroup1.SS1.FBMon1 Info Data"/>

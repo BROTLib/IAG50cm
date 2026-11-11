@@ -135,6 +135,9 @@
     <Compile Include="POUs\FB_SweepStop.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\Functions\F_SunElevation.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\PendantControl\FB_PendantControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>

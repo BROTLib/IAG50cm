@@ -168,7 +168,9 @@ METHOD PROTECTED _ReadInputs
       <Implementation>
         <ST><![CDATA[_ReadAxes();
 // State of the Cabinet
-fbCabinet(bEstop := bEstopTriggered, bSafetyAckPending := bSafetyAckPending);	// #93: error LED during E-stop / pending acknowledge
+fbCabinet(bEstop := bEstopTriggered, bSafetyAckPending := bSafetyAckPending,
+	bInUse := NOT bIsParked OR bIsPowered OR bPowerActive OR fbStartup.Initializing, bSlewing := bSliding, bClockValid := fbTime.bValid, tUTC := fbTime.time_RTCEX2,
+	fLatitude := telescopeConfig.latitude, fLongitude := telescopeConfig.longitude);	// #93: error LED during E-stop / pending acknowledge
 bLocalMode := fbCabinet.LocalMode;]]></ST>
       </Implementation>
     </Method>

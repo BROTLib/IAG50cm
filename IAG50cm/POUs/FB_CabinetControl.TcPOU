@@ -5,6 +5,14 @@
 VAR_INPUT
 	bEstop				: BOOL;	// E-stop pressed (telescope bEstopTriggered, previous scan) (#93)
 	bSafetyAckPending	: BOOL;	// safety acknowledge after an E-stop not yet run, drives still in STO (#93)
+	bInUse				: BOOL;	// telescope in use (not parked, or power-on running): warning lamp, only while the sun is up
+	bSlewing			: BOOL;	// telescope slews (fast move, bSliding): warning siren
+	bClockValid			: BOOL;	// fbTime synchronised; without it the lamp is on whenever the telescope is in use
+	tUTC				: TIMESTRUCT;	// UTC time of the astro clock (the PLC clock runs UTC, see FB_AstroClock)
+	fLatitude			: LREAL;	// site, degrees north
+	fLongitude			: LREAL;	// site, degrees east
+	tLampOffDelay		: TIME := T#30S;	// lamp stays on this long after the telescope is parked: the covers have no end switches, Closed is a timer and can run ahead of the real motion
+	fDayElevation		: LREAL := 0.0;	// lamp only with the sun's centre above this elevation (deg), 0 = geometric horizon
 END_VAR
 VAR_OUTPUT
 END_VAR
@@ -23,6 +31,10 @@ VAR
 	bState24VFuse AT %I*: BOOL; 
 	
 	bOErrorLED	AT %Q* : BOOL;
+	bOWarnLamp	AT %Q* : BOOL;	// Reset 24V (EL2004) channel 3: warning lamp, telescope in use during the day
+	bOWarnSiren	AT %Q* : BOOL;	// Reset 24V (EL2004) channel 4: warning sound while the telescope slews
+	bDay		: BOOL;
+	tofLamp		: TOF;
 	bIReset     AT %I* : BOOL;
 	bIMode      AT %I* : BOOL;
 END_VAR
@@ -37,6 +49,13 @@ bCabinetError := NOT( bAuxiliaryContact24V AND bAuxiliaryContact48V AND bAuxilia
 // #93: also while the E-stop is pressed and until the safety acknowledge has run (the drives are in STO and a reset
 // is needed). Not part of bError, which would change the reset condition, the power-on block and STATUS.GLOBAL.
 bOErrorLED := bTelescopeError OR bEstop OR bSafetyAckPending;
+
+// warning lamp: telescope in use while the sun is above the horizon (computed for the site; clock not synced -> lamp on)
+bDay := NOT bClockValid OR (F_SunElevation(tUTC, fLatitude, fLongitude) > fDayElevation);
+tofLamp(IN := bInUse AND bDay, PT := tLampOffDelay);
+bOWarnLamp := tofLamp.Q;
+// warning siren: whenever the telescope slews
+bOWarnSiren := bSlewing;
 
 // if reset -> trigger reset
 rtrigReset(CLK:= bIReset,Q=>bReset);
