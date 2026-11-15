@@ -14,6 +14,7 @@ VAR
 	fTarget	: LREAL;
 	fVel	: LREAL;
 	nStop	: INT;		// number of Stop() calls
+	bJogSlow	: BOOL;	// I_BaseAxis.JogSlow (BROTLib 0.26.0, X8): stored only, the mock has no jog motion
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -201,6 +202,25 @@ END_VAR
 ]]></Declaration>
         <Implementation>
           <ST><![CDATA[bNeg := MoveNeg;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="JogSlow" Id="{7a3e9c15-2b84-4d60-8f1e-5c9d0b6a4e72}">
+      <Declaration><![CDATA[PROPERTY JogSlow : BOOL]]></Declaration>
+      <Get Name="Get" Id="{c41f8a2e-6d97-4b35-a0e8-13b7f5d29c60}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[JogSlow := bJogSlow;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{e83b5d07-1a4c-49f2-b6d3-7f20c8e1a954}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[bJogSlow := JogSlow;]]></ST>
         </Implementation>
       </Set>
     </Property>

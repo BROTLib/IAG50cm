@@ -17,4 +17,6 @@ FB_PointingModelInversion.TcPOU
 F_HourAngleOffsetOnAxis.TcPOU
 F_RoundLREAL.TcPOU
 NCError_TO_STRING.TcPOU
+F_SunElevation.TcPOU
+FB_StepDrain.TcPOU
 ST_AxisStatus.TcDUT

@@ -27,7 +27,8 @@ Write-Host 'Copied GVL_Homing.TcGVL'
 # not copied, they are mocks (FB_DomeMock, FB_FocusMock, FB_CoversMock).
 foreach ($f in 'FB_TelescopeControl.TcPOU', 'FB_HourAngleControl.TcPOU', 'FB_DeclinationControl.TcPOU', 'FB_AxisControl.TcPOU',
               'FB_LatchHome.TcPOU', 'FB_CabinetControl.TcPOU', 'Pointing\FB_PointingModelInversion.TcPOU',
-              'Functions\F_HourAngleOffsetOnAxis.TcPOU', 'Functions\F_RoundLREAL.TcPOU', 'Functions\NCError_TO_STRING.TcPOU') {
+              'Functions\F_HourAngleOffsetOnAxis.TcPOU', 'Functions\F_RoundLREAL.TcPOU', 'Functions\NCError_TO_STRING.TcPOU',
+              'Functions\F_SunElevation.TcPOU') {
   Copy-Item (Join-Path $repo "IAG50cm\POUs\$f") $dest -Force
   Write-Host "Copied $f"
 }

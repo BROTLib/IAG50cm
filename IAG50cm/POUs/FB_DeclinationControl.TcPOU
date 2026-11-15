@@ -74,6 +74,7 @@ fbAxis(
 	Enable_Negative := NOT axisRef.Status.SoftLimitMinExceeded,
 	Jog_Forward 	:= bMovePos,
 	Jog_Backwards 	:= bMoveNeg,
+	Jog_Slow		:= bJogSlow,	// X7: JogSlow property, set by the HMI gateway; FALSE = the fast jog of the pendant and the VISU
 	ActualPosition 	=> fActualPosition,
 	Error 			=> bAxisError,
 	ErrorID 		=> nAxisErrorID,		// was nErrorID: nAxisErrorID below was never written, so every Dec error read 0 (#55)

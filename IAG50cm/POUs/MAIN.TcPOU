@@ -12,12 +12,25 @@ VAR
 	domeControl		: FB_DomeControl(comm := comm);
 	pendantControl 	: FB_PendantControl(comm:=comm);
 	safetyHandling	: FB_SafetyHandling(comm:=comm);
+	// X1 (BROTLib 0.26.0): I_Cabinet for the comm layer and the HMI gateway. No Local/Remote switch is wired into it yet: FB_FixedCabinet has
+	// the fixed policy eMode = remote (the project constant, not an ADS-writable value), which keeps every MQTT command accepted as before
+	// and makes the gateway reject its motion commands (only Stop passes). The physical switch is FB_CabinetControl.bIMode (polarity to be
+	// checked on site, plan O16) and the pendant-active signal does not exist yet (plan I3): both go in when they are verified.
+	cabinet			: FB_FixedCabinet := (eMode := E_ControlMode.remote);
+	// X10 (BROTLib 0.26.0): the HMI gateway (TcHMI maintenance UI). Called once per cycle, unconditionally, before the axis blocks (contract 7.5).
+	Hmi				: FB_HmiGateway;
 	rtrigStartUpDone: R_TRIG;
 	//search			: FB_RefMarkerSearch(); // use for searching for the Heideinhain encoder reference markers
 
 	
 END_VAR
 VAR CONSTANT
+	// HMI axis descriptors (contract 5.2). fMin/fMax are the only limit of HMI jog and go-to-position and are a required, reviewed
+	// item per telescope: they are NOT set here (0.0), and bCanJog/bCanMoveTo/bCanHome/bCanEnable are FALSE, so the HMI shows the axes
+	// read-only until the limits are chosen with the telescope owner (inside the NC soft limits) and verified on site.
+	stHaInfo			: ST_HmiAxisInfo := (sName := 'axis.hour_angle', eRole := E_HmiAxisRole.hour_angle, sUnit := 'deg');
+	stDecInfo			: ST_HmiAxisInfo := (sName := 'axis.declination', eRole := E_HmiAxisRole.declination, sUnit := 'deg');
+	stFocusInfo			: ST_HmiAxisInfo := (sName := 'axis.focus', eRole := E_HmiAxisRole.focus, sUnit := 'mm');	// the range comes from I_Focus.MinPosition/MaxPosition
 	telescopeConfig		: ST_TelescopeConfig := (longitude := 9.9452433, latitude := 51.5592378, altitude := 100.0, 
 													houranglePark := 0.0, declinationPark := 52.0, focusPark:= 16.3,
 													hourangleHome := 0.0, declinationHome := 52.0, focusHome:= 16.3,
@@ -26,6 +39,30 @@ VAR CONSTANT
 END_VAR]]></Declaration>
     <Implementation>
       <ST><![CDATA[//search(Enable:=TRUE); // use for reference marker search
+
+// X1: the cabinet state of the previous cycle (safetyHandling runs below, like the signals of telescopeControl)
+cabinet(
+	bEstop				:= safetyHandling.estop,
+	bSafetyError		:= safetyHandling.error,
+	bSafetyAckPending	:= safetyHandling.ackPending);
+	// bPendantActive stays FALSE: FB_PendantControl has no pendant-active signal yet (plan I3)
+
+// X10: the HMI gateway, before the axis blocks and unconditionally (no IF, no RETURN above it): its jog dead-man lives here.
+// Wired: the telescope (RaDec), the cabinet, the two mount axes, the focus, the covers and the dome. Left out on purpose:
+// ipSafety (FB_SafetyHandling has no I_SafetyDiagnostics yet, plan I5) and ipTelescopeStatus (I_TelescopeStatus, X2, later);
+// IAG50cm has no hydraulics, brake, roof, filter or Nasmyth.
+Hmi.aipAxes[1]			:= haControl;
+Hmi.aipAxes[2]			:= decControl;
+Hmi.astAxisInfo[1]		:= stHaInfo;
+Hmi.astAxisInfo[2]		:= stDecInfo;
+Hmi(
+	ipRaDec					:= telescopeControl,
+	ipCabinet				:= cabinet,
+	ipFocus					:= focusControl,
+	stFocusInfo				:= stFocusInfo,
+	ipCovers				:= coverControl,
+	ipDome					:= domeControl,
+	bTelescopeRunsInLocal	:= TRUE);	// the IAG50cm telescope control runs with the switch on Local as well (contract 5.3)
 
 domeControl(ipTelescope	:= telescopeControl);
 
@@ -78,6 +115,7 @@ comm(
 	sTopicSub  		 	:= '50cm/Telescope/SET',
 	sTopicPublish		:= '50cm/Telemetry',
 	sTopicLog			:= '50cm/Log',
+	Cabinet				:= cabinet,		// X9: with the switch on Local the motion and reset verbs would be refused; the fixed policy is remote: no change
 	Telescope			:= telescopeControl,
 	RaDecTelescope		:= telescopeControl,
 	Focus				:= focusControl,

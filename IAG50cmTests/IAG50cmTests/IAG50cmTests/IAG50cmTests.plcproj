@@ -69,6 +69,9 @@
     <Compile Include="POUs\NCError_TO_STRING.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\F_SunElevation.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\ST_AxisStatus.TcDUT">
       <SubType>Code</SubType>
     </Compile>
@@ -100,6 +103,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\IagStopDuringSlew_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagSlewHaDec_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\IagCommandInputs_Tests.TcPOU">
@@ -202,7 +208,7 @@
       <Namespace>AstroBROT</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.20.0 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.26.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Math">

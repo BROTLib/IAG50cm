@@ -70,6 +70,7 @@ fbAxis(
 	Enable_Negative := TRUE,// NOT axisRef.Status.SoftLimitMinExceeded,
 	Jog_Forward 	:= bMovePos,
 	Jog_Backwards 	:= bMoveNeg,
+	Jog_Slow		:= bJogSlow,	// X7: JogSlow property, set by the HMI gateway; FALSE = the fast jog of the pendant and the VISU
 	isModuloAxis 	:= FALSE,
 	ActualPosition 	=> fActualPosition,
 	Error 			=> bError,
