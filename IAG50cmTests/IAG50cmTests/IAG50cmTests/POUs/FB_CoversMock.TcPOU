@@ -11,6 +11,7 @@ VAR
 	bHoldClose	: BOOL;
 	nOpenCalls	: UINT;
 	nCloseCalls	: UINT;
+	nStopCalls	: UINT;
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -61,6 +62,16 @@ METHOD FinishClose
         <ST><![CDATA[bHoldClose := FALSE;
 bOpened := FALSE;
 bClosed := TRUE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop" Id="{5b1c7e0a-3d42-4f8e-9a16-c2e4d7a90b31}">
+      <Declaration><![CDATA[// I_MirrorCovers.Stop (BROTLib 0.26.0, X6): counted only, the mock has no running motion to stop
+METHOD Stop : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nStopCalls := nStopCalls + 1;
+Stop := TRUE;
 ]]></ST>
       </Implementation>
     </Method>
