@@ -26,6 +26,7 @@ VAR
 	fbSupersedeTests		: IagSupersede_Tests;
 	fbTelemetryTests		: IagTelemetry_Tests;
 	fbCoordinatesTests		: IagCoordinates_Tests;
+	fbSlewHaDecTests		: IagSlewHaDec_Tests;
 END_VAR
 ]]></Declaration>
     <Implementation>

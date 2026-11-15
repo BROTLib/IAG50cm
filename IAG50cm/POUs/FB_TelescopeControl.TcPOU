@@ -132,6 +132,12 @@ VAR
 	RejectEvent				: FB_Eventlog;	// a move command that the acceptance table rejects (was TCScommandRefusedEvent, #100)
 	TCSstopTimeoutEvent		: FB_Eventlog;	// #120: a stop transaction passed 30 s without a Done of an axis, and its release
 
+	// SlewHaDec (I_RaDecTelescope, BROTLib 0.26.0, X5): the running slew takes its target from the mount's own HA/Dec, not from Az/Alt
+	bSlewHaDec			: BOOL;		// the slew that is active (bSlewActive) was started by SlewHaDec(); cleared by every Slew()
+	fSlewHaDecHa		: LREAL;	// deg, apparent hour angle of that slew
+	fSlewHaDecDec		: LREAL;	// deg, apparent declination of that slew
+	fSlewHaDecDecIcrs	: LREAL;	// the same declination in ICRS (for the goto coordinates and the horizon check), set by _ComputeTargets
+
 	nStatusWord, nLastStatus:	UDINT;
 	bTestError : BOOL; // Test Error, deactivates under reset command
 END_VAR
@@ -260,6 +266,9 @@ END_IF]]></ST>
     <Method Name="_ComputeTargets" Id="{39a07f06-7eab-4842-b1ba-c5b3cddcad64}" FolderPath="internal methods\">
       <Declaration><![CDATA[// Hook of the template body (BROTLib#25 step 5.4, S3: the body of this block is the template text, the differences are in these methods). The target of this scan and the reported position.
 METHOD PROTECTED _ComputeTargets
+VAR
+	bHaDecSlew	: BOOL;	// a SlewHaDec() is running
+END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[// calculate fHourAngleApparent, fDeclinationApparent 
@@ -283,21 +292,46 @@ fbEq2Hor(
 	alt => fElevationCalc,
 	az => fAzimuthCalc);
 	
-// calculate equatorial coordinates (used by Slew command, takes Alt/Az -> moves telescope)
-fbHor2Eq(alt := fElevation, 
-		az := fAzimuth,
-		jd := fJd+fTimeOffset,
-		lat := telescopeConfig.latitude,
+bHaDecSlew := bSlewHaDec AND bSlewActive;
+IF bHaDecSlew THEN
+	// SlewHaDec (X5): the target is the apparent HA/Dec itself. Its ICRS position and horizontal coordinates are derived
+	// from it, so that the horizon and pole guards, the dome azimuth and the goto coordinates follow the same target.
+	fHourAngleCalc := fSlewHaDecHa;
+	fDeclinationCalc := fSlewHaDecDec;
+	fbHaDec2RaDec(
+		ha := fSlewHaDecHa,
+		dec := fSlewHaDecDec,
+		jd := fJd + fTimeOffset,
 		lon := telescopeConfig.longitude,
+		ra_out => fRightAscensionCalc,
+		dec_out => fSlewHaDecDecIcrs);
+	fbEq2Hor(
+		ra := fRightAscensionCalc,
+		dec := fSlewHaDecDecIcrs,
+		lon := telescopeConfig.longitude,
+		lat := telescopeConfig.latitude,
 		altitude := telescopeConfig.altitude,
-		alt_is_observed := FALSE,
-		ra => fRightAscensionCalc,
-		dec => fDeclinationCalc,
-		ha => fHourAngleCalc);		
-// caluclate pointing offsets
+		refract_to_observed := FALSE,
+		JD := fJd + fTimeOffset,
+		alt => fElevation,
+		az => fAzimuth);
+ELSE
+	// calculate equatorial coordinates (used by Slew command, takes Alt/Az -> moves telescope)
+	fbHor2Eq(alt := fElevation,
+			az := fAzimuth,
+			jd := fJd+fTimeOffset,
+			lat := telescopeConfig.latitude,
+			lon := telescopeConfig.longitude,
+			altitude := telescopeConfig.altitude,
+			alt_is_observed := FALSE,
+			ra => fRightAscensionCalc,
+			dec => fDeclinationCalc,
+			ha => fHourAngleCalc);
+END_IF
+// caluclate pointing offsets (of the slew target while a SlewHaDec runs: the slew stage adds them to its target)
 fbPointingForward(
-	HourAngle	:= fHourAngleApparent,
-	Declination	:= fDeclinationApparent,
+	HourAngle	:= SEL(bHaDecSlew, fHourAngleApparent, fSlewHaDecHa),
+	Declination	:= SEL(bHaDecSlew, fDeclinationApparent, fSlewHaDecDec),
 	Latitude	:= telescopeConfig.latitude,
 	HourAngle_correction => fHourAnglePointingOffset,
 	Declination_correction => fDeclinationPointingOffset,
@@ -2346,7 +2380,7 @@ CASE nStage OF
 		THIS^.HourAngleOffset := 0.0;
 		THIS^.DeclinationOffset := 0.0;
 		// write the calculated coordinates into the goto coordinates
-		THIS^.fDeclination := fDeclinationCalc;
+		THIS^.fDeclination := SEL(bSlewHaDec, fDeclinationCalc, fSlewHaDecDecIcrs);
 		THIS^.fRightAscension := fRightAscensionCalc;
 		nStage := 25;
 	25:
@@ -2848,7 +2882,39 @@ IF NOT _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
 END_IF
 THIS^.fElevation 	:= fAltitude;
 THIS^.fAzimuth 	:= fAzimuth;
+bSlewHaDec		:= FALSE;	// an Az/Alt slew replaces a running SlewHaDec
 bSlewActive		:= TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SlewHaDec" Id="{9d2f6b41-7c3a-4e85-b0d9-1a64e8c2f537}" FolderPath="command methods\">
+      <Declaration><![CDATA[// I_RaDecTelescope.SlewHaDec (BROTLib 0.26.0, X5): a native move to an apparent hour angle / declination (degrees), without
+// tracking, through the HA/Dec slew stage of _SlewTelescope (the one Slew() uses) and the checks of a slew. The pointing model
+// is applied to the target like for every other move. TRUE when the command was accepted, FALSE when it was refused: a target that is
+// no hour angle / declination (not a number, |HA| > 360, |Dec| > 90) writes nothing; the acceptance table (F_CommandAcceptance)
+// refuses it in a state where Slew() is refused, counted and logged like those. The horizon and pole-zone guards of the slew
+// (_Guards) stop a target below fHorizon / fPointingSafeAltitude or in the pole zone.
+METHOD SlewHaDec : BOOL
+VAR_INPUT
+	fHourAngle		: LREAL;	// deg, apparent
+	fDeclination	: LREAL;	// deg, apparent
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SlewHaDec := FALSE;
+bSlewChecked := TRUE;
+// not a number or out of range: refuse before anything is written (NaN fails every comparison)
+IF NOT (ABS(fHourAngle) <= 360.0 AND ABS(fDeclination) <= 90.0) THEN
+	RETURN;
+END_IF
+// decided at arrival like Slew(): a rejected slew writes nothing and is never left pending
+IF NOT _AcceptMove(E_TCSCommand.slew, E_TCSCommand.no_command) THEN
+	RETURN;
+END_IF
+fSlewHaDecHa	:= fHourAngle;
+fSlewHaDecDec	:= fDeclination;
+bSlewHaDec		:= TRUE;
+bSlewActive		:= TRUE;
+SlewHaDec := TRUE;]]></ST>
       </Implementation>
     </Method>
     <Method Name="Stop" Id="{e66d844d-991d-4af1-8b55-fe6740342385}" FolderPath="command methods\">
