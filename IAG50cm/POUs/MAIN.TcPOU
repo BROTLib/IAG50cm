@@ -12,11 +12,11 @@ VAR
 	domeControl		: FB_DomeControl(comm := comm);
 	pendantControl 	: FB_PendantControl(comm:=comm);
 	safetyHandling	: FB_SafetyHandling(comm:=comm);
-	// X1 (BROTLib 0.26.0): I_Cabinet for the comm layer and the HMI gateway. No Local/Remote switch is wired into it yet: FB_FixedCabinet has
-	// the fixed policy eMode = remote (the project constant, not an ADS-writable value), which keeps every MQTT command accepted as before
-	// and makes the gateway reject its motion commands (only Stop passes). The physical switch is FB_CabinetControl.bIMode (polarity to be
-	// checked on site, plan O16) and the pendant-active signal does not exist yet (plan I3): both go in when they are verified.
-	cabinet			: FB_FixedCabinet := (eMode := E_ControlMode.remote);
+	// X1: I_Cabinet for the comm layer and the HMI gateway, with the physical Local/Remote key (FB_CabinetControl.bIMode, via
+	// telescopeControl.fbCabinet.LocalMode): key Local -> E_ControlMode.local, otherwise remote. Polarity of the key (TRUE = Local) is NOT yet
+	// verified on site (plan O16). In Local the MQTT comm layer refuses the motion and reset verbs and the HMI may move the axes (gateway).
+	// The pendant-active signal does not exist yet (plan I3): bPendantActive stays FALSE. No setter: the mode is not software-writable.
+	cabinet			: FB_IagCabinet;
 	// X10 (BROTLib 0.26.0): the HMI gateway (TcHMI maintenance UI). Called once per cycle, unconditionally, before the axis blocks (contract 7.5).
 	Hmi				: FB_HmiGateway;
 	rtrigStartUpDone: R_TRIG;
@@ -42,6 +42,7 @@ END_VAR]]></Declaration>
 
 // X1: the cabinet state of the previous cycle (safetyHandling runs below, like the signals of telescopeControl)
 cabinet(
+	bLocalKey			:= telescopeControl.fbCabinet.LocalMode,	// the Local/Remote key, previous cycle (telescopeControl runs below); polarity unverified (O16)
 	bEstop				:= safetyHandling.estop,
 	bSafetyError		:= safetyHandling.error,
 	bSafetyAckPending	:= safetyHandling.ackPending);
@@ -116,7 +117,7 @@ comm(
 	sTopicSub  		 	:= '50cm/Telescope/SET',
 	sTopicPublish		:= '50cm/Telemetry',
 	sTopicLog			:= '50cm/Log',
-	Cabinet				:= cabinet,		// X9: with the switch on Local the motion and reset verbs would be refused; the fixed policy is remote: no change
+	Cabinet				:= cabinet,		// X9: with the key on Local the motion and reset verbs are refused (the HMI moves the axes instead)
 	Telescope			:= telescopeControl,
 	RaDecTelescope		:= telescopeControl,
 	Focus				:= focusControl,

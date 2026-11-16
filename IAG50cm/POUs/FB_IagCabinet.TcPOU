@@ -1,0 +1,86 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_IagCabinet" Id="{0af73759-ceed-421e-bb67-e4c267a398e7}" SpecialFunc="None">
+    <Declaration><![CDATA[// I_Cabinet of the IAG50cm for the comm layer and the HMI gateway, with the physical Local/Remote key. The control mode is
+// local while bLocalKey is TRUE and remote otherwise. Like FB_FixedCabinet, everything is an input of the block and there
+// is no setter on I_Cabinet: the mode cannot become a software ownership switch over ADS, MQTT or the HMI.
+FUNCTION_BLOCK FB_IagCabinet IMPLEMENTS I_Cabinet
+VAR_INPUT
+	bLocalKey			: BOOL;		// the Local/Remote key (FB_CabinetControl.LocalMode); TRUE = Local, polarity still to be verified on site (plan O16)
+	bEstop				: BOOL;		// E-stop pressed or not yet released
+	bSafetyError		: BOOL;		// TwinSAFE group in error
+	bSafetyAckPending	: BOOL;		// E-stop released, acknowledge not run yet
+	bPendantActive		: BOOL;		// a pendant holds motion authority
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Property Name="ControlMode" Id="{989b5f90-4bc4-4926-8fd8-01e2823b7953}">
+      <Declaration><![CDATA[PROPERTY ControlMode : E_ControlMode]]></Declaration>
+      <Get Name="Get" Id="{8e379851-e3bc-4cc3-905f-775300fb0343}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ControlMode := SEL(bLocalKey, E_ControlMode.remote, E_ControlMode.local);]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="SwitchPresent" Id="{f618fcda-ea00-43a9-842a-0ecd1b26acde}">
+      <Declaration><![CDATA[PROPERTY SwitchPresent : BOOL]]></Declaration>
+      <Get Name="Get" Id="{a1dece7c-8509-4e1e-b4c5-e94fc1126cbd}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SwitchPresent := TRUE;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="EstopActive" Id="{cf1ddcc9-d60f-4390-b8b3-24e54950c1b6}">
+      <Declaration><![CDATA[PROPERTY EstopActive : BOOL]]></Declaration>
+      <Get Name="Get" Id="{42f2cb1b-ab4f-4c26-a8c1-1586be79ce68}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[EstopActive := bEstop;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="SafetyError" Id="{14df7396-2676-4c14-9a7f-60216c8fac3d}">
+      <Declaration><![CDATA[PROPERTY SafetyError : BOOL]]></Declaration>
+      <Get Name="Get" Id="{09444a16-d9be-4a9f-8c96-258e701a461d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SafetyError := bSafetyError;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="SafetyAckPending" Id="{f58b446c-f55b-4fb2-8515-03e06d4dc75b}">
+      <Declaration><![CDATA[PROPERTY SafetyAckPending : BOOL]]></Declaration>
+      <Get Name="Get" Id="{c471cda5-cf96-4e27-b999-6c3eda3059cd}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SafetyAckPending := bSafetyAckPending;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="PendantActive" Id="{cc33a887-2004-43a2-b1ca-75555544a19f}">
+      <Declaration><![CDATA[PROPERTY PendantActive : BOOL]]></Declaration>
+      <Get Name="Get" Id="{ef27777f-2f4b-4055-a690-be2c85222a07}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[PendantActive := bPendantActive;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>
