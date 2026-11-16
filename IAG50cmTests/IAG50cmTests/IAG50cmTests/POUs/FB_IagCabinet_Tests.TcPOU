@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_IagCabinet_Tests" Id="{2c4fdf76-ff0e-413b-b54b-092c338eacf4}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for FB_IagCabinet, the I_Cabinet with the physical Local/Remote key: key to control mode and the safety pass-through.
+FUNCTION_BLOCK FB_IagCabinet_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Key_Off_Is_Remote();
+Key_On_Is_Local();
+Mode_Follows_The_Key();
+Switch_Is_Present();
+Estop_Passes_Through();
+Safety_Error_Passes_Through();
+Ack_Pending_Passes_Through();
+Pendant_Passes_Through_And_Is_Independent();
+]]></ST>
+    </Implementation>
+    <Method Name="Key_Off_Is_Remote" Id="{b44a8da9-fbe0-4161-b67e-ffd9def771d9}">
+      <Declaration><![CDATA[METHOD PRIVATE Key_Off_Is_Remote
+VAR
+	fbCabinet	: FB_IagCabinet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Key_Off_Is_Remote');
+fbCabinet(bLocalKey := FALSE);
+AssertTrue(Condition := fbCabinet.ControlMode = E_ControlMode.remote, Message := 'remote');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Key_On_Is_Local" Id="{3a67a2c6-2031-48a2-9405-ed8ee7756bc4}">
+      <Declaration><![CDATA[METHOD PRIVATE Key_On_Is_Local
+VAR
+	fbCabinet	: FB_IagCabinet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Key_On_Is_Local');
+fbCabinet(bLocalKey := TRUE);
+AssertTrue(Condition := fbCabinet.ControlMode = E_ControlMode.local, Message := 'local');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Mode_Follows_The_Key" Id="{ba521a62-d79e-46bf-a8c4-158292f594b2}">
+      <Declaration><![CDATA[METHOD PRIVATE Mode_Follows_The_Key
+VAR
+	fbCabinet	: FB_IagCabinet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Mode_Follows_The_Key');
+fbCabinet(bLocalKey := TRUE);
+fbCabinet(bLocalKey := FALSE);
+AssertTrue(Condition := fbCabinet.ControlMode = E_ControlMode.remote, Message := 'back to remote');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Switch_Is_Present" Id="{7058100b-2cc8-4cb3-abe9-4e30739a616c}">
+      <Declaration><![CDATA[METHOD PRIVATE Switch_Is_Present
+VAR
+	fbCabinet	: FB_IagCabinet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Switch_Is_Present');
+fbCabinet(bLocalKey := FALSE);
+AssertTrue(Condition := fbCabinet.SwitchPresent, Message := 'switch present, key off');
+fbCabinet(bLocalKey := TRUE);
+AssertTrue(Condition := fbCabinet.SwitchPresent, Message := 'switch present, key on');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Estop_Passes_Through" Id="{4356b4ad-ca03-4c7e-8d35-1b2874a9b2b1}">
+      <Declaration><![CDATA[METHOD PRIVATE Estop_Passes_Through
+VAR
+	fbCabinet	: FB_IagCabinet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Estop_Passes_Through');
+fbCabinet(bEstop := FALSE);
+AssertFalse(Condition := fbCabinet.EstopActive, Message := 'no e-stop');
+fbCabinet(bEstop := TRUE);
+AssertTrue(Condition := fbCabinet.EstopActive, Message := 'e-stop');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Safety_Error_Passes_Through" Id="{baad3948-2599-455b-a6b3-a0e5d8f7901f}">
+      <Declaration><![CDATA[METHOD PRIVATE Safety_Error_Passes_Through
+VAR
+	fbCabinet	: FB_IagCabinet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Safety_Error_Passes_Through');
+fbCabinet(bSafetyError := FALSE);
+AssertFalse(Condition := fbCabinet.SafetyError, Message := 'no error');
+fbCabinet(bSafetyError := TRUE);
+AssertTrue(Condition := fbCabinet.SafetyError, Message := 'error');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Ack_Pending_Passes_Through" Id="{e5b761fa-238d-4dcb-bb29-991c0f149908}">
+      <Declaration><![CDATA[METHOD PRIVATE Ack_Pending_Passes_Through
+VAR
+	fbCabinet	: FB_IagCabinet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Ack_Pending_Passes_Through');
+fbCabinet(bSafetyAckPending := FALSE);
+AssertFalse(Condition := fbCabinet.SafetyAckPending, Message := 'no ack pending');
+fbCabinet(bSafetyAckPending := TRUE);
+AssertTrue(Condition := fbCabinet.SafetyAckPending, Message := 'ack pending');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Pendant_Passes_Through_And_Is_Independent" Id="{edbe0fb8-afad-4407-bea4-05b56ab3e283}">
+      <Declaration><![CDATA[METHOD PRIVATE Pendant_Passes_Through_And_Is_Independent
+VAR
+	fbCabinet	: FB_IagCabinet;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Pendant_Passes_Through_And_Is_Independent');
+fbCabinet(bLocalKey := TRUE, bPendantActive := FALSE);
+AssertFalse(Condition := fbCabinet.PendantActive, Message := 'no pendant');
+fbCabinet(bLocalKey := FALSE, bPendantActive := TRUE);
+AssertTrue(Condition := fbCabinet.PendantActive, Message := 'pendant');
+AssertFalse(Condition := fbCabinet.EstopActive, Message := 'other signals untouched');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

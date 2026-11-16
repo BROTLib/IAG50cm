@@ -180,6 +180,12 @@
     <Compile Include="POUs\FB_StartRequest_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FB_IagCabinet.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_IagCabinet_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\FB_StepDrain.TcPOU">
       <SubType>Code</SubType>
     </Compile>
