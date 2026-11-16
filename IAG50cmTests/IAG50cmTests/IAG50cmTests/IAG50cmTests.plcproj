@@ -208,7 +208,7 @@
       <Namespace>AstroBROT</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.26.0 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.27.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Math">
