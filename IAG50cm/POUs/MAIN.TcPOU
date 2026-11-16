@@ -62,6 +62,7 @@ Hmi(
 	stFocusInfo				:= stFocusInfo,
 	ipCovers				:= coverControl,
 	ipDome					:= domeControl,
+	sTelescopeName			:= 'IAG 50cm',
 	bTelescopeRunsInLocal	:= TRUE);	// the IAG50cm telescope control runs with the switch on Local as well (contract 5.3)
 
 domeControl(ipTelescope	:= telescopeControl);
