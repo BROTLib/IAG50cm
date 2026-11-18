@@ -235,7 +235,7 @@
                         </o>
                         <o>
                           <v n="Id">1649127785L</v>
-                          <v n="Value">260</v>
+                          <v n="Value">170</v>
                         </o>
                         <o>
                           <v n="Id">357335551L</v>
@@ -329,7 +329,7 @@
                         </o>
                         <o>
                           <v n="Id">1649127785L</v>
-                          <v n="Value">330</v>
+                          <v n="Value">240</v>
                         </o>
                         <o>
                           <v n="Id">357335551L</v>
@@ -713,7 +713,7 @@
                         </o>
                         <o>
                           <v n="Id">1649127785L</v>
-                          <v n="Value">250</v>
+                          <v n="Value">160</v>
                         </o>
                         <o>
                           <v n="Id">357335551L</v>
@@ -842,7 +842,7 @@
                         </o>
                         <o>
                           <v n="Id">1649127785L</v>
-                          <v n="Value">320</v>
+                          <v n="Value">230</v>
                         </o>
                         <o>
                           <v n="Id">357335551L</v>
@@ -939,7 +939,7 @@
                         </o>
                         <o>
                           <v n="Id">1649127785L</v>
-                          <v n="Value">580</v>
+                          <v n="Value">330</v>
                         </o>
                         <o>
                           <v n="Id">357335551L</v>
@@ -1065,7 +1065,7 @@
                         </o>
                         <o>
                           <v n="Id">1649127785L</v>
-                          <v n="Value">570</v>
+                          <v n="Value">320</v>
                         </o>
                         <o>
                           <v n="Id">357335551L</v>
@@ -1142,7 +1142,7 @@
                     <v n="VisualElementId">27</v>
                     <l n="UserManagementAccessRights" t="ArrayList" />
                   </o>
-                  </l>
+                </l>
                 <n n="VisualElementDescription" />
                 <o n="VisualElemMemberList" t="VisualElemMemberList">
                   <l n="VisualElemMemberList" t="VisualElemMemberCollection" cet="VisualElemMember">
@@ -1230,7 +1230,7 @@
                     </o>
                     <o>
                       <v n="Id">2422045748L</v>
-                      <v n="Value">651</v>
+                      <v n="Value">401</v>
                     </o>
                     <o>
                       <v n="Id">2134141914L</v>
@@ -1277,7 +1277,7 @@
                     </o>
                     <o>
                       <v n="Id">550940142L</v>
-                      <v n="Value">335</v>
+                      <v n="Value">210</v>
                     </o>
                     <o>
                       <v n="Id">1473355128L</v>
@@ -1319,7 +1319,7 @@
                 <v n="VisualElementId">11</v>
                 <l n="UserManagementAccessRights" t="ArrayList" />
               </o>
-              </l>
+            </l>
             <v n="BackgroundBitmapId">""</v>
             <v n="BackgroundColor">16777215</v>
             <o n="Background" t="BackgroundSettings">
@@ -1505,13 +1505,13 @@
             <d2 n="Size" ckt="Int32" cvt="VisualObjectSize">
               <v>0</v>
               <o>
-                <v n="Width">661</v>
-                <v n="Height">351</v>
+                <v n="Width">411</v>
+                <v n="Height">131</v>
               </o>
               <v>1</v>
               <o>
-                <v n="Width">662</v>
-                <v n="Height">352</v>
+                <v n="Width">412</v>
+                <v n="Height">132</v>
               </o>
             </d2>
             <v n="Version">1</v>
