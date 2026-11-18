@@ -31,8 +31,8 @@ VAR
 	bState24VFuse AT %I*: BOOL; 
 	
 	bOErrorLED	AT %Q* : BOOL;
-	bOWarnLamp	AT %Q* : BOOL;	// Reset 24V (EL2004) channel 3: warning lamp, telescope in use during the day
-	bOWarnSiren	AT %Q* : BOOL;	// Reset 24V (EL2004) channel 4: warning sound while the telescope slews
+	bOWarnLamp	AT %Q* : BOOL;	// Reset 24V (EL2004) channel 4: warning lamp, telescope in use during the day
+	bOWarnSiren	AT %Q* : BOOL;	// Reset 24V (EL2004) channel 3: warning sound while the telescope slews
 	bDay		: BOOL;
 	tofLamp		: TOF;
 	bIReset     AT %I* : BOOL;
