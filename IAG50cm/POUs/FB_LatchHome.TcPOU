@@ -90,7 +90,6 @@ VAR
 	iCommandAborted				: BOOL;
 	
 	nState						: INT;
-	nAbortFrom					: INT;									(* #113: state in which the sequence was aborted *)
 	bRearm						: BOOL;									(* #155: re-arm the start once the abort has settled *)
 	fbRearmDelay				: TON;
 	bTakeStart					: BOOL;
@@ -129,14 +128,10 @@ IF nState = 0 AND NOT Execute THEN
 END_IF
 bTravelExceeded := TravelLimit > 0 AND nState >= 1 AND nState <= 3 AND ABS(Axis.NcToPlc.ActPos - fStartPos) > TravelLimit;
 IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive OR bTravelExceeded) THEN
-	nAbortFrom := nState;
-	// #113 mode 2: the running reference step keeps its Execute until the abort is over
-	IF GVL_Homing.nAbortMode <> 2 THEN
-		StepReferencePulseDetection(
-			Execute					:= FALSE,
-			Parameter				:= Parameter,
-			Axis					:= Axis);
-	END_IF
+	StepReferencePulseDetection(
+		Execute					:= FALSE,
+		Parameter				:= Parameter,
+		Axis					:= Axis);
 	MoveAxis(
 		Axis					:= Axis,
 		JogForward				:= FALSE,
@@ -192,13 +187,6 @@ CASE nState OF
 				Execute					:= FALSE,
 				Axis					:= Axis);
 			StepFinishHoming(
-				Execute					:= FALSE,
-				Parameter				:= Parameter,
-				Axis					:= Axis);
-		END_IF
-		// #113 mode 2: release the reference step that was kept running during the abort
-		IF GVL_Homing.nAbortMode = 2 THEN
-			StepReferencePulseDetection(
 				Execute					:= FALSE,
 				Parameter				:= Parameter,
 				Axis					:= Axis);
@@ -487,18 +475,12 @@ CASE nState OF
 		// #113: MC_Stop locks the axis for motion commands until it is done (StateDWord bit 29); MC_AbortHoming sent into the
 		// lock is rejected (17135) and the error disables both axes. Wait for the lock to clear, 5 s at most.
 		IF NOT StopActive OR fbLockWait.Q OR StepAbortHoming.Busy THEN
-			IF GVL_Homing.nAbortMode = 1 AND bStepBusy AND NOT StepAbortHoming.Busy THEN
-				// #113 mode 1: MC_AbortHoming into a running step never completes (HomingBusy stays TRUE, 4F000001 after
+			IF bStepBusy AND NOT StepAbortHoming.Busy THEN
+				// #113: MC_AbortHoming into a running step never completes (HomingBusy stays TRUE, 4F000001 after
 				// 10 s), but a reset of the axis does end it. Ask for one; the Reset input then leaves this state.
 				ResetRequest := TRUE;
 			ELSE
-			StepAbortHoming.Options.DisableDriveAccess := Options.DisableDriveAccess AND (GVL_Homing.nAbortMode <> 3);
-			IF GVL_Homing.nAbortMode = 2 AND (nAbortFrom = 1 OR nAbortFrom = 3) THEN
-				StepReferencePulseDetection(
-					Execute					:= TRUE,
-					Parameter				:= Parameter,
-					Axis					:= Axis);
-			END_IF
+			StepAbortHoming.Options.DisableDriveAccess := Options.DisableDriveAccess;
 
 			StepAbortHoming(
 				Axis				:= Axis, 
