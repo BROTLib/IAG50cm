@@ -39,6 +39,9 @@ FOR i:=0 TO 7 BY 1 DO
 		HourAngle_correction => d_ha_new,
 		Declination_correction => d_dec_new
 	);
+	IF NOT fbpointing.bValid THEN
+		EXIT;	// below 1 deg altitude the forward model gives 0 (#134), that is not a converged result
+	END_IF
 	IF ABS(d_ha - d_ha_new) <= epsilon/3600.0 AND ABS(d_dec - d_dec_new) <= epsilon/3600.0 THEN
 		bValid := TRUE;
 		EXIT;

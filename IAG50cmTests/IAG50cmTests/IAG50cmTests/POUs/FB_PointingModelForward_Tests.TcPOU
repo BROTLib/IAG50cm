@@ -11,6 +11,8 @@ END_VAR
 Zenith_Velocity_Is_Sidereal();
 Near_Zenith_Is_Continuous();
 Reference_Points_Unchanged();
+Horizon_Is_Finite();
+Horizon_Valid_Flag();
 ]]></ST>
     </Implementation>
     <Method Name="Zenith_Is_Finite" Id="{8f719b3b-2e7e-46c0-961a-87bf874a4574}">
@@ -100,6 +102,68 @@ AssertEquals_LREAL(Expected := 0.3090530046351645, Actual := fbModel.HourAngle_c
 AssertEquals_LREAL(Expected := -0.19901388936334252, Actual := fbModel.Declination_correction, Delta := 1.0E-9, Message := 'Dec correction 2');
 AssertEquals_LREAL(Expected := 0.00406630604072863, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity 2');
 AssertEquals_LREAL(Expected := -0.0001359293011053651, Actual := fbModel.Declination_velocity, Delta := 1.0E-9, Message := 'Dec velocity 2');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Horizon_Is_Finite" Id="{5b0c6a1e-2f0d-4c53-9d1a-7e3b84f2a6c1}">
+      <Declaration><![CDATA[METHOD PRIVATE Horizon_Is_Finite
+VAR
+	fbModel	: FB_PointingModelForward;
+	i		: INT;
+	j		: INT;
+	fHa		: LREAL;
+	fDec	: LREAL;
+	bOk		: BOOL := TRUE;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Horizon_Is_Finite');
+// Dec 0 and HA 90 is altitude 0 at the site latitude (sin_alt = 0 up to rounding); sweep HA, Dec, including targets below the horizon
+// ST has no ISNAN: ABS(x) < 1E3 is FALSE for NaN and Inf
+FOR i := -90 TO 90 DO
+	fHa := 90.0 + INT_TO_LREAL(i) * 0.5;
+	FOR j := -2 TO 2 DO
+		fDec := INT_TO_LREAL(j) * 10.0;
+		fbModel(HourAngle := fHa, Declination := fDec, Latitude := 51.5592378);
+		bOk := bOk AND (ABS(fbModel.HourAngle_correction) < 1.0E3) AND (ABS(fbModel.Declination_correction) < 1.0E3)
+			AND (ABS(fbModel.HourAngle_velocity) < 1.0E3) AND (ABS(fbModel.Declination_velocity) < 1.0E3);
+	END_FOR
+END_FOR
+// exactly on the horizon
+fbModel(HourAngle := 90.0, Declination := 0.0, Latitude := 51.5592378);
+bOk := bOk AND (ABS(fbModel.HourAngle_correction) < 1.0E3) AND (ABS(fbModel.Declination_correction) < 1.0E3)
+	AND (ABS(fbModel.HourAngle_velocity) < 1.0E3) AND (ABS(fbModel.Declination_velocity) < 1.0E3);
+AssertTrue(Condition := bOk, Message := 'all outputs finite around and on the horizon');
+AssertFalse(Condition := fbModel.bValid, Message := 'on the horizon: not valid');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Horizon_Valid_Flag" Id="{c93e17d4-8a52-4b7e-b1f6-0d4a5e29c8b3}">
+      <Declaration><![CDATA[METHOD PRIVATE Horizon_Valid_Flag
+VAR
+	fbModel	: FB_PointingModelForward;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Horizon_Valid_Flag');
+// Dec 0: sin(alt) = cos(lat) * cos(HA), so at the site latitude HA 89.2 is altitude 0.5 deg and HA 86.8 is altitude 2 deg
+// altitude about 0.5 deg: not valid, no correction, sidereal HA velocity
+fbModel(HourAngle := 90.0 - 0.8, Declination := 0.0, Latitude := 51.5592378);
+AssertFalse(Condition := fbModel.bValid, Message := 'altitude 0.5 deg: not valid');
+AssertEquals_LREAL(Expected := 0.0, Actual := fbModel.HourAngle_correction, Delta := 1.0E-12, Message := 'HA correction 0');
+AssertEquals_LREAL(Expected := 0.0, Actual := fbModel.Declination_correction, Delta := 1.0E-12, Message := 'Dec correction 0');
+AssertEquals_LREAL(Expected := 360.0 / 86164.099, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity sidereal');
+AssertEquals_LREAL(Expected := 0.0, Actual := fbModel.Declination_velocity, Delta := 1.0E-12, Message := 'Dec velocity 0');
+// altitude about 2 deg: valid
+fbModel(HourAngle := 90.0 - 3.2, Declination := 0.0, Latitude := 51.5592378);
+AssertTrue(Condition := fbModel.bValid, Message := 'altitude 2 deg: valid');
+// the reference points are valid
+fbModel(HourAngle := 20.0, Declination := 40.0, Latitude := 51.5592378);
+AssertTrue(Condition := fbModel.bValid, Message := 'reference point 1 valid');
+fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378);
+AssertTrue(Condition := fbModel.bValid, Message := 'zenith valid');
 TEST_FINISHED();
 ]]></ST>
       </Implementation>

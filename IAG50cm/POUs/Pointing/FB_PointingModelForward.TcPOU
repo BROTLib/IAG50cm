@@ -11,7 +11,8 @@ VAR_OUTPUT
 	HourAngle_correction	: LREAL;
 	Declination_correction	: LREAL;
 	HourAngle_velocity		: LREAL;
-	Declination_velocity 	: LREAL; 
+	Declination_velocity 	: LREAL;
+	bValid					: BOOL;	// FALSE if the target is below fMinSinAlt (altitude < 1 deg): the refraction terms divide by sin_alt and are not physical there (#134). Corrections and Dec velocity are 0.0, HA velocity is sidereal when FALSE.
 END_VAR
 VAR
 	// inputs in rad
@@ -41,6 +42,7 @@ END_VAR
 VAR CONSTANT
 	d2r		: LREAL := PI/180.0;
 	omega 	: LREAL := 360.0 / 86164.099 * (PI/180.0); //sidereal velocity
+	fMinSinAlt : LREAL := 0.017452406437283512;	// SIN(1 deg), below this the refraction terms are not evaluated (#134)
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -70,6 +72,18 @@ IF cos_alt > 1.0E-9 THEN
 ELSE
 	alt_diff := 0.0;
 END_IF
+
+// below 1 deg altitude (also below the horizon) the refraction terms divide by sin_alt (Inf at the horizon) and refraction
+// is not physical there: no correction, sidereal HA velocity, and the caller can refuse the target (#134)
+IF sin_alt < fMinSinAlt THEN
+	bValid := FALSE;
+	HourAngle_correction	:= 0.0;
+	Declination_correction	:= 0.0;
+	HourAngle_velocity		:= omega / d2r;
+	Declination_velocity	:= 0.0;
+	RETURN;
+END_IF
+bValid := TRUE;
 
 // ### TAU offset ###
 off_tau_esti := - C_mAl_tau * ((cos_TAU * sin_DEC) / cos_DEC);
