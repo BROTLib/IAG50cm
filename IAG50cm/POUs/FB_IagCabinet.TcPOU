@@ -6,7 +6,7 @@
 // is no setter on I_Cabinet: the mode cannot become a software ownership switch over ADS, MQTT or the HMI.
 FUNCTION_BLOCK FB_IagCabinet IMPLEMENTS I_Cabinet
 VAR_INPUT
-	bLocalKey			: BOOL;		// the Local/Remote key (FB_CabinetControl.LocalMode); TRUE = Local, polarity still to be verified on site (plan O16)
+	bLocalKey			: BOOL;		// the Local/Remote key (FB_CabinetControl.LocalMode); TRUE = Local (polarity verified on site 2026-11-18: Remote reads 0, Local 1)
 	bEstop				: BOOL;		// E-stop pressed or not yet released
 	bSafetyError		: BOOL;		// TwinSAFE group in error
 	bSafetyAckPending	: BOOL;		// E-stop released, acknowledge not run yet
