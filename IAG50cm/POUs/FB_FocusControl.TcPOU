@@ -66,8 +66,8 @@ fbAxis(
 	HomingMode 		:= MC_ForceCalibration,
 	Position 		:= fPosition, 
 	Velocity 		:= fVelocity,
-	Enable_Positive := TRUE,//NOT axisRef.Status.SoftLimitMaxExceeded,
-	Enable_Negative := TRUE,// NOT axisRef.Status.SoftLimitMinExceeded,
+	Enable_Positive := NOT axisRef.Status.SoftLimitMaxExceeded,	// #235: like the HA and Dec axes; the NC soft limits (1 and 17) stop the axis, this blocks the direction
+	Enable_Negative := NOT axisRef.Status.SoftLimitMinExceeded,
 	Jog_Forward 	:= bMovePos,
 	Jog_Backwards 	:= bMoveNeg,
 	Jog_Slow		:= bJogSlow,	// X7: JogSlow property, set by the HMI gateway; FALSE = the fast jog of the pendant and the VISU
