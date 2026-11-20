@@ -9,6 +9,7 @@ VAR_INPUT
 	nMockStopScans	: UINT := 3;	// scans an MC_Stop takes until Done
 	bMockNoStopDone	: BOOL;			// #120: the mock stop never reports Done (SetStopWithoutDone of the rig)
 	nMockStartScans	: UINT;			// scans from the move command until the axis reports InMotion (0 = at once)
+	bMockInjectHoming	: BOOL;		// #236: a rising edge is a homing command that was in flight before a stop (InjectLateDecHoming of the rig)
 END_VAR
 VAR_OUTPUT
 	nStopEdges		: UINT;			// stop requests the telescope made (rising edges of StopAxis)
@@ -28,7 +29,7 @@ END_VAR
 // homes an enabled, uncalibrated axis by itself; the model does the same (bHome := bEnable). The model writes what the
 // telescope reads: the base outputs and, through pointers (FB_Axis outputs are not writable from outside), the nested fbAxis outputs.
 fbCore(bEnable := bEnable, bHome := bEnable, bMove := bMoveAxis, bStop := bStopAxis, fTarget := fPosition,
-	nHomeScans := nMockHomeScans, nMoveScans := nMockMoveScans, nStopScans := nMockStopScans, nStartScans := nMockStartScans, bSuppressStopDone := bMockNoStopDone, bRelease := bReleaseHold);
+	nHomeScans := nMockHomeScans, nMoveScans := nMockMoveScans, nStopScans := nMockStopScans, nStartScans := nMockStartScans, bSuppressStopDone := bMockNoStopDone, bRelease := bReleaseHold, bInjectHoming := bMockInjectHoming);
 bReleaseHold := FALSE;	// #236: consumed by the model (the real body clears it after use)
 
 pBool := ADR(fbAxis.Ready);			pBool^ := fbCore.bReady;

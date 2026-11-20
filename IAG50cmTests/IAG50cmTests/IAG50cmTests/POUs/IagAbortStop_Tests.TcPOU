@@ -527,7 +527,7 @@ CASE nStep OF
 	IF rig.fbDec.fbCore.bStopDone THEN
 		AssertEquals_UINT(Expected := UINT#1, Actual := rig.fbDec.nStopEdges, Message := 'Dec: one stop so far');
 		F_Note(bFailed := (UINT#1) <> (rig.fbDec.nStopEdges), sText := CONCAT(sTest, 'Dec: one stop so far'));
-		rig.fbDec.fbCore.bInjectHoming := TRUE;
+		rig.InjectLateDecHoming(bOn := TRUE);
 		nStep := 30;
 		nCycles := 0;
 	ELSIF nCycles > 300 THEN
@@ -538,7 +538,7 @@ CASE nStep OF
 	END_IF
 30:	// the late homing is stopped again
 	IF rig.fbDec.nStopEdges >= 2 THEN
-		rig.fbDec.fbCore.bInjectHoming := FALSE;
+		rig.InjectLateDecHoming(bOn := FALSE);
 		nStep := 40;
 		nCycles := 0;
 	ELSIF nCycles > 60 THEN
