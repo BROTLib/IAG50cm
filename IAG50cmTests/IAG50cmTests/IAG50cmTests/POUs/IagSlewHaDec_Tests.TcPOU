@@ -15,6 +15,7 @@ END_VAR
 SlewHaDec_Out_Of_Range_Is_Refused();
 SlewHaDec_While_Parked_Is_Rejected();
 Slew_After_SlewHaDec_Uses_Az_Alt();
+Slew_Az_Alt_Target_Is_In_One_Frame();
 ]]></ST>
     </Implementation>
     <Method Name="SlewHaDec_Moves_Both_Axes_Without_Tracking" Id="{a7d14e92-5b3c-4f68-9c20-d8e316b75a04}">
@@ -259,6 +260,72 @@ CASE nStep OF
 		AssertFalse(Condition := F_NoteNear(CONCAT(sTest, 'target declination'), 51.5592378 - 45.0, rig.fbTel.fDeclinationCalc, 0.5), Message := 'slew target declination');
 		AssertTrue(Condition := COS(rig.fbTel.fHourAngleCalc * 0.017453292519943295) > 0.9999, Message := 'slew target hour angle about 0');
 		F_Note(bFailed := NOT (COS(rig.fbTel.fHourAngleCalc * 0.017453292519943295) > 0.9999), sText := CONCAT(sTest, 'slew target hour angle about 0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Slew_Az_Alt_Target_Is_In_One_Frame" Id="{c4a9e2b7-5d31-4f86-a1c0-7e2b9d6f3a58}">
+      <Declaration><![CDATA[// IAG50cm#239: the Az/Alt slew target. FB_HOR2EQ returns the apparent hour angle but the J2000 declination; the motors are driven in
+// apparent HA/Dec, so the declination used for the axes must be the apparent one: the goto coordinates written by the slew (ICRS)
+// converted back to apparent HA/Dec give the target of the axes. Before the fix the two declinations differed by about 0.05 deg
+// (precession and nutation), which showed up as +0.054 deg in the published altitude at Az 180.
+METHOD PRIVATE Slew_Az_Alt_Target_Is_In_One_Frame
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bAccepted	: BOOL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Slew_Az_Alt_Target_Is_In_One_Frame');
+sTest := 'Slew_Az_Alt_Target_Is_In_One_Frame: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then power on
+	IF rig.ClockValid THEN
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// wait until the startup has finished, then slew to azimuth 180, elevation 60
+	IF rig.Online THEN
+		bAccepted := rig.fbTel.Slew(fAzimuth := 180.0, fAltitude := 60.0);
+		AssertTrue(Condition := bAccepted, Message := 'Slew is accepted when the telescope is online');
+		F_Note(bFailed := NOT bAccepted, sText := CONCAT(sTest, 'Slew is accepted when the telescope is online'));
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 1500 THEN
+		AssertTrue(Condition := FALSE, Message := 'the mock telescope did not reach READY_STATE 1.0');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the mock telescope did not reach READY_STATE 1.0'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// an axis is moving: the goto coordinates of the slew are set, so the apparent position derived from them is the axes' target
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		AssertFalse(Condition := F_NoteNear(CONCAT(sTest, 'declination of the axes target is the apparent one'), rig.fbTel.fDeclinationApparent, rig.fbTel.fDeclinationCalc, 0.001), Message := 'the axes declination is the apparent declination of the target');
+		AssertFalse(Condition := F_NoteNear(CONCAT(sTest, 'hour angle of the axes target is the apparent one'), rig.fbTel.fHourAngleApparent, rig.fbTel.fHourAngleCalc, 0.001), Message := 'the axes hour angle is the apparent hour angle of the target');
+		AssertTrue(Condition := ABS(rig.fbTel.fDeclination - rig.fbTel.fDeclinationCalc) > 0.01, Message := 'the goto declination stays the ICRS one (it differs from the apparent one by precession and nutation)');
+		F_Note(bFailed := NOT (ABS(rig.fbTel.fDeclination - rig.fbTel.fDeclinationCalc) > 0.01), sText := CONCAT(sTest, 'the goto declination stays the ICRS one'));
+		nStep := 99;
+		TEST_FINISHED();
+	ELSIF nCycles > 300 THEN
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew did not start an axis move'));
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF

@@ -44,6 +44,7 @@ VAR
 	fbHor2Eq			: FB_HOR2EQ;
 	fbHaDec2RaDec		: FB_HADEC2RADEC;
 	fbRaDec2HaDec		: FB_RADEC2HADEC;
+	fbRaDec2HaDecAltAz	: FB_RADEC2HADEC;	// apparent declination of the Alt/Az slew target (#239)
 	fbPointingForward	: FB_PointingModelForward;
 	fbPointingInversion : FB_PointingModelInversion;
 	
@@ -138,6 +139,7 @@ VAR
 	fSlewHaDecHa		: LREAL;	// deg, apparent hour angle of that slew
 	fSlewHaDecDec		: LREAL;	// deg, apparent declination of that slew
 	fSlewHaDecDecIcrs	: LREAL;	// the same declination in ICRS (for the goto coordinates and the horizon check), set by _ComputeTargets
+	fDeclinationCalcIcrs	: LREAL;	// deg, ICRS declination of the target of a slew (fDeclinationCalc is the apparent one the motors are driven to; #239)
 
 	nStatusWord, nLastStatus:	UDINT;
 	bTestError : BOOL; // Test Error, deactivates under reset command
@@ -306,6 +308,7 @@ IF bHaDecSlew THEN
 		lon := telescopeConfig.longitude,
 		ra_out => fRightAscensionCalc,
 		dec_out => fSlewHaDecDecIcrs);
+		fDeclinationCalcIcrs := fSlewHaDecDecIcrs;
 	fbEq2Hor(
 		ra := fRightAscensionCalc,
 		dec := fSlewHaDecDecIcrs,
@@ -326,8 +329,16 @@ ELSE
 			altitude := telescopeConfig.altitude,
 			alt_is_observed := FALSE,
 			ra => fRightAscensionCalc,
-			dec => fDeclinationCalc,
+			dec => fDeclinationCalcIcrs,
 			ha => fHourAngleCalc);
+	// FB_HOR2EQ returns the apparent hour angle but the J2000 declination: the motors are driven in apparent HA/Dec, so take the
+	// apparent declination of the same point (#239; the target used to mix the two, +0.054 deg in altitude at Az 180)
+	fbRaDec2HaDecAltAz(
+		ra := fRightAscensionCalc,
+		dec := fDeclinationCalcIcrs,
+		lon := telescopeConfig.longitude,
+		JD := fJd + fTimeOffset,
+		dec_out => fDeclinationCalc);
 END_IF
 // caluclate pointing offsets (of the slew target while a SlewHaDec runs: the slew stage adds them to its target)
 fbPointingForward(
@@ -2390,7 +2401,7 @@ CASE nStage OF
 		THIS^.HourAngleOffset := 0.0;
 		THIS^.DeclinationOffset := 0.0;
 		// write the calculated coordinates into the goto coordinates
-		THIS^.fDeclination := SEL(bSlewHaDec, fDeclinationCalc, fSlewHaDecDecIcrs);
+		THIS^.fDeclination := fDeclinationCalcIcrs;
 		THIS^.fRightAscension := fRightAscensionCalc;
 		nStage := 25;
 	25:
@@ -2816,7 +2827,7 @@ END_VAR
 ]]></Declaration>
         <Implementation>
           <ST><![CDATA[RaDec.RightAscension	:= fRightAscensionCalc;
-RaDec.Declination		:= fDeclinationCalc;]]></ST>
+RaDec.Declination		:= fDeclinationCalcIcrs;]]></ST>
         </Implementation>
       </Get>
     </Property>
