@@ -2548,8 +2548,9 @@ ELSE
 	bLate1 := fbHourAngle.bEnable AND aAxis[1].bHoming AND NOT aAxis[1].bStopping AND NOT fbHourAngle.StopAxis;
 	bLate2 := fbDeclination.bEnable AND aAxis[2].bHoming AND NOT aAxis[2].bStopping AND NOT fbDeclination.StopAxis;
 	IF (bLate1 OR bLate2) AND (abStopDoneSeen[1] OR NOT bLate1) AND (abStopDoneSeen[2] OR NOT bLate2)
-		AND NOT ((aAxis[1].bInMotion OR aAxis[1].bInRamp) AND NOT aAxis[1].bStopping)
-		AND NOT ((aAxis[2].bInMotion OR aAxis[2].bInRamp) AND NOT aAxis[2].bStopping) THEN
+		AND NOT (NOT bLate1 AND (aAxis[1].bInMotion OR aAxis[1].bInRamp) AND NOT aAxis[1].bStopping)
+		AND NOT (NOT bLate2 AND (aAxis[2].bInMotion OR aAxis[2].bInRamp) AND NOT aAxis[2].bStopping) THEN
+		// (a late homing step reports InRamp itself, 2026-11-20: only the other axis moving and not stopping holds the restart back)
 		IF bLate1 THEN
 			abStopDoneSeen[1] := FALSE;
 		END_IF
