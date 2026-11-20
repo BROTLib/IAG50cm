@@ -17,6 +17,8 @@ VAR_INPUT
 	nMoveScans		: UINT := 4;
 	nStopScans		: UINT := 3;
 	bSuppressStopDone	: BOOL;	// the stop ends at rest but bStopDone is never reported (a lost Done, #120)
+	bInjectHoming	: BOOL;		// #236: a rising edge is an NC homing command that was in flight before a stop: the axis starts homing although the stop aborted it
+	bRelease		: BOOL;		// a new power-on was accepted (bReleaseHold of the axis block): the homing may start again after a stop
 	nStartScans		: UINT;		// scans between the move command and the axis reporting InMotion (the NC takes a few cycles; 0 = at once). #92
 END_VAR
 VAR_OUTPUT
@@ -40,6 +42,9 @@ VAR
 	bStartPending	: BOOL;
 	rtMove			: R_TRIG;
 	rtStop			: R_TRIG;
+	rtInject		: R_TRIG;
+	bHomeAborted	: BOOL;		// a stop aborted the homing: no new homing from the level of bHome until the axis is disabled (the real hold, #113)
+	bLateHoming		: BOOL;		// an injected late homing command, ended by the next stop or the calibration
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -55,6 +60,19 @@ IF rtStop.Q THEN
 	nStopCount := 0;
 	bInMotion := FALSE;
 	bStartPending := FALSE;
+	// #236: the NC aborts a running homing on a stop, and the home hold of the axis block keeps it from starting again until the
+	// axis is disabled or a new power-on releases it (the model used to go on homing from the level of bHome)
+	IF bHoming OR bLateHoming THEN
+		bHomeAborted := TRUE;
+	END_IF
+	bLateHoming := FALSE;
+END_IF
+IF NOT bEnable OR bRelease THEN
+	bHomeAborted := FALSE;
+END_IF
+rtInject(CLK := bInjectHoming);
+IF rtInject.Q THEN
+	bLateHoming := TRUE;
 END_IF
 IF bStopping THEN
 	nStopCount := nStopCount + 1;
@@ -75,12 +93,13 @@ ELSE
 	bReady := FALSE;
 END_IF
 
-IF bHome AND bReady AND NOT bCalibrated THEN
+IF ((bHome AND NOT bHomeAborted) OR bLateHoming) AND bReady AND NOT bCalibrated THEN
 	bHoming := TRUE;
 	nHomeCount := nHomeCount + 1;
 	IF nHomeCount >= nHomeScans THEN
 		bCalibrated := TRUE;
 		bHoming := FALSE;
+		bLateHoming := FALSE;
 		nHomeCount := 0;
 	END_IF
 ELSE

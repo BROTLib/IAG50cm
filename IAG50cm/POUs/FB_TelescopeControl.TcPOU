@@ -72,6 +72,7 @@ VAR
 	bHomeCancelled		: BOOL;		// a pending home that never started was dropped (one scan): logs the reason (#75)
 	sHomeDropWhy		: STRING(160);	// why the pending home was dropped, for the WARN text (#108)
 	fbStopTx			: BROTLib.FB_StopTransaction;	// #108/#120: one stop per axis and stop transaction
+	abStopDoneSeen		: ARRAY[1..2] OF BOOL;	// #236: the axis reported StopDone in this stop transaction (a later homing of it is a command that was in flight)
 	rtHaMove			: R_TRIG;		// #92: MoveAxis of the axis went TRUE: the move command is out (MoveTo)
 	rtDecMove			: R_TRIG;
 	bHaMovePending		: BOOL;			// #92: a move was commanded and the NC does not report it yet: the axis is not at rest
@@ -726,6 +727,8 @@ METHOD PROTECTED _OnCommandChanged
 // gohome that preempted a track): each axis gets one stop in it
 IF TCS_command = E_TCSCommand.stop THEN
 	fbStopTx.Begin();
+	abStopDoneSeen[1] := FALSE;
+	abStopDoneSeen[2] := FALSE;
 END_IF]]></ST>
       </Implementation>
     </Method>
@@ -2495,8 +2498,8 @@ fbStopTx.abLocked[1] := (fbHourAngle.axisRef.NcToPlc.StateDWord AND 16#20000000)
 fbStopTx.abLocked[2] := (fbDeclination.axisRef.NcToPlc.StateDWord AND 16#20000000) <> 0;
 fbStopTx.abHoming[1] := fbHourAngle.fbLatchHome.Busy;
 fbStopTx.abHoming[2] := fbDeclination.fbLatchHome.Busy;
-fbStopTx.abMoving[1] := aAxis[1].bInMotion OR aAxis[1].bInRamp;	// for Restart
-fbStopTx.abMoving[2] := aAxis[2].bInMotion OR aAxis[2].bInRamp;
+fbStopTx.abMoving[1] := aAxis[1].bInMotion OR aAxis[1].bInRamp OR aAxis[1].bHoming;	// for Restart (#236: a homing step is a move too)
+fbStopTx.abMoving[2] := aAxis[2].bInMotion OR aAxis[2].bInRamp OR aAxis[2].bHoming;
 fbStopTx.abStopping[1] := aAxis[1].bStopping;
 fbStopTx.abStopping[2] := aAxis[2].bStopping;
 fbStopTx.abSweeping[1] := fbHourAngle.bSweepActive;	// #198
@@ -2510,6 +2513,10 @@ fbStopTx.nTimeDivisor := nTimeDivisor;
     <Method Name="_StopTelescope" Id="{cc9583d1-2578-4480-8aee-f6d55f373bf1}" FolderPath="internal methods\">
       <Declaration><![CDATA[METHOD PRIVATE _StopTelescope : BOOL
 VAR_INPUT
+END_VAR
+VAR
+	bLate1	: BOOL;		// #236: axis 1 / 2 started homing after its stop was done
+	bLate2	: BOOL;
 END_VAR
 ]]></Declaration>
       <Implementation>
@@ -2526,6 +2533,31 @@ ELSE
 	// never lined up with the other one, bStopped stayed FALSE and a gohome waiting for it was dropped. FB_AxisControl
 	// clears StopAxis on StopDone.
 	_SetStopTxInputs();
+	// #236: a homing step of the calibration sweep that was issued just before the stop (the ADS command is in flight for about
+	// 350 ms) starts in the NC after the stop and the axis reset, and nothing stopped it: the Dec ran the whole next step (3 to
+	// 5 deg) with READY_STATE -2. An axis that has reported StopDone in this transaction and then starts homing again, not
+	// stopping, gets one more stop. One restart per StopDone, so a command that keeps arriving cannot loop faster than the
+	// stop completes.
+	IF aAxis[1].bStopDone THEN
+		abStopDoneSeen[1] := TRUE;
+	END_IF
+	IF aAxis[2].bStopDone THEN
+		abStopDoneSeen[2] := TRUE;
+	END_IF
+	// Restart() re-sends the stop to every axis that is moving and not stopping, so all of those must have reported StopDone.
+	bLate1 := fbHourAngle.bEnable AND aAxis[1].bHoming AND NOT aAxis[1].bStopping AND NOT fbHourAngle.StopAxis;
+	bLate2 := fbDeclination.bEnable AND aAxis[2].bHoming AND NOT aAxis[2].bStopping AND NOT fbDeclination.StopAxis;
+	IF (bLate1 OR bLate2) AND (abStopDoneSeen[1] OR NOT bLate1) AND (abStopDoneSeen[2] OR NOT bLate2)
+		AND NOT ((aAxis[1].bInMotion OR aAxis[1].bInRamp) AND NOT aAxis[1].bStopping)
+		AND NOT ((aAxis[2].bInMotion OR aAxis[2].bInRamp) AND NOT aAxis[2].bStopping) THEN
+		IF bLate1 THEN
+			abStopDoneSeen[1] := FALSE;
+		END_IF
+		IF bLate2 THEN
+			abStopDoneSeen[2] := FALSE;
+		END_IF
+		fbStopTx.Restart();
+	END_IF
 	fbStopTx();
 	IF fbStopTx.abWriteLow[1] THEN
 		fbHourAngle.StopAxis := FALSE;	// a level left TRUE by an earlier stop: low for one scan, the stop follows

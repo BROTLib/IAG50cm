@@ -28,7 +28,8 @@ END_VAR
 // homes an enabled, uncalibrated axis by itself; the model does the same (bHome := bEnable). The model writes what the
 // telescope reads: the base outputs and, through pointers (FB_Axis outputs are not writable from outside), the nested fbAxis outputs.
 fbCore(bEnable := bEnable, bHome := bEnable, bMove := bMoveAxis, bStop := bStopAxis, fTarget := fPosition,
-	nHomeScans := nMockHomeScans, nMoveScans := nMockMoveScans, nStopScans := nMockStopScans, nStartScans := nMockStartScans, bSuppressStopDone := bMockNoStopDone);
+	nHomeScans := nMockHomeScans, nMoveScans := nMockMoveScans, nStopScans := nMockStopScans, nStartScans := nMockStartScans, bSuppressStopDone := bMockNoStopDone, bRelease := bReleaseHold);
+bReleaseHold := FALSE;	// #236: consumed by the model (the real body clears it after use)
 
 pBool := ADR(fbAxis.Ready);			pBool^ := fbCore.bReady;
 pBool := ADR(fbAxis.Calibrated);	pBool^ := fbCore.bCalibrated;
