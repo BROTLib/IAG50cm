@@ -606,6 +606,13 @@ ELSIF bGoHomeActive AND bLimitHome THEN
 		bParkHomeFirst := TRUE;
 	END_IF
 	_ParkPreStep := TRUE;
+ELSIF bSlewActive OR bGotoActive THEN
+	// #238: a park over a running slew or goto aborts it (abort stop, then the park at standstill), like a track, a second move or a
+	// gohome does. It used to wait for NOT bBusy, i.e. until the slew had arrived. The supersede block drops the move flags and sets
+	// the abort stop next scan; the park is held until then and runs behind the stop (bMoveAbortPending).
+	bSupersedeRequest := TRUE;
+	eSupersedeKeep := E_TCSCommand.park;
+	_ParkPreStep := TRUE;
 ELSIF NOT (bReady AND NOT bBusy) THEN
 	_ParkPreStep := TRUE;
 END_IF]]></ST>
