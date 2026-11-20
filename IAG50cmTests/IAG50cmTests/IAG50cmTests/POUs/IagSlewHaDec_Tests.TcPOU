@@ -278,7 +278,12 @@ VAR_INST
 	rig			: FB_IagRig;
 	nStep		: INT;
 	nCycles		: UINT;
-	bAccepted	: BOOL;
+	fbH2E		: FB_HOR2EQ;
+	fbR2H		: FB_RADEC2HADEC;
+	fRaIcrs		: LREAL;
+	fDecIcrs	: LREAL;
+	fHaApparent	: LREAL;
+	fDecApparent	: LREAL;
 	sTest		: STRING(80);
 END_VAR
 ]]></Declaration>
@@ -313,17 +318,20 @@ CASE nStep OF
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
-20:	// an axis is moving: the goto coordinates of the slew are set, so the apparent position derived from them is the axes' target
-	IF nCycles >= 3 THEN
-		AssertFalse(Condition := F_NoteNear(CONCAT(sTest, 'declination of the axes target is the apparent one'), rig.fbTel.fDeclinationApparent, rig.fbTel.fDeclinationCalc, 0.001), Message := 'the axes declination is the apparent declination of the target');
-		AssertFalse(Condition := F_NoteNear(CONCAT(sTest, 'hour angle of the axes target is the apparent one'), rig.fbTel.fHourAngleApparent, rig.fbTel.fHourAngleCalc, 0.001), Message := 'the axes hour angle is the apparent hour angle of the target');
-		AssertTrue(Condition := ABS(rig.fbTel.fDeclination - rig.fbTel.fDeclinationCalc) > 0.01, Message := 'the goto declination stays the ICRS one (it differs from the apparent one by precession and nutation)');
-		F_Note(bFailed := NOT (ABS(rig.fbTel.fDeclination - rig.fbTel.fDeclinationCalc) > 0.01), sText := CONCAT(sTest, CONCAT('the goto declination stays the ICRS one: goto ', CONCAT(LREAL_TO_STRING(rig.fbTel.fDeclination), CONCAT(', axes ', CONCAT(LREAL_TO_STRING(rig.fbTel.fDeclinationCalc), CONCAT(', apparent from goto ', CONCAT(LREAL_TO_STRING(rig.fbTel.fDeclinationApparent), CONCAT(', slew active ', BOOL_TO_STRING(rig.fbTel.bSlewActive))))))))));
+20:	// an axis is moving: the goto coordinates of the slew are set. The expected apparent declination of az 180 / alt 60 is computed here
+	// with AstroBROT itself (FB_HOR2EQ gives the J2000 declination, FB_RADEC2HADEC the apparent one of the same point)
+	IF rig.fbHa.MoveAxis OR rig.fbDec.MoveAxis THEN
+		fbH2E(alt := 60.0, az := 180.0, jd := rig.fbTel.fJd + rig.fbTel.fTimeOffset, lat := rig.telescopeConfig.latitude, lon := rig.telescopeConfig.longitude,
+			altitude := rig.telescopeConfig.altitude, alt_is_observed := FALSE, ra => fRaIcrs, dec => fDecIcrs, ha => fHaApparent);
+		fbR2H(ra := fRaIcrs, dec := fDecIcrs, lon := rig.telescopeConfig.longitude, JD := rig.fbTel.fJd + rig.fbTel.fTimeOffset, dec_out => fDecApparent);
+		AssertEquals_LREAL(Expected := fDecApparent, Actual := rig.fbTel.fDeclinationCalc, Delta := 0.0001, Message := 'declination of the axes target is the apparent one');
+		AssertEquals_LREAL(Expected := fHaApparent, Actual := rig.fbTel.fHourAngleCalc, Delta := 0.0001, Message := 'hour angle of the axes target is the apparent one');
+		AssertEquals_LREAL(Expected := fDecIcrs, Actual := rig.fbTel.fDeclination, Delta := 0.0001, Message := 'the goto declination is the ICRS one');
+		AssertEquals_LREAL(Expected := fDecApparent, Actual := rig.fbTel.fDeclinationApparent, Delta := 0.0001, Message := 'the apparent declination derived from the goto coordinates');
 		nStep := 99;
 		TEST_FINISHED();
 	ELSIF nCycles > 300 THEN
-		AssertTrue(Condition := FALSE, Message := 'the slew target was not set');
-		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the slew target was not set'));
+		AssertTrue(Condition := FALSE, Message := 'the slew did not start an axis move');
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
