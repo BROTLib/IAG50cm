@@ -3,7 +3,7 @@
   <POU Name="IagRefraction_Tests" Id="{8275b9de-fbfd-4e09-a4dd-dbfbd58f5ae1}" SpecialFunc="None">
     <Declaration><![CDATA[// IAG50cm#7: the refraction switch. OLD is bit-identical to the pointing model before #7 (frozen copy
 // FB_PointingModelForwardLegacy); FB_RefractionShift against values from the Python port of AstroBROT; the NEW chain of
-// FB_TelescopeControl._ComputeTargets inverts. The telescope block itself (flags, publish, MQTT command) is checked on
+// FB_TelescopeControl._ComputeTargets inverts. The telescope block itself (flags, publish) is checked on
 // the telescope (IAG plan 2026-11-24-iag50cm-refraction-switch, step 6).
 FUNCTION_BLOCK IagRefraction_Tests EXTENDS TcUnit.FB_TestSuite
 VAR
