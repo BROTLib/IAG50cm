@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_IagComm" Id="{26a4ba3b-63ad-496c-bef6-0f7852862290}" SpecialFunc="None">
+    <Declaration><![CDATA[// BROTLib's MQTT comm layer with the IAG50cm-only commands (IAG50cm#7). Everything else goes to BROTLib unchanged.
+//   command refraction=old   GVL_Pointing.eRefractionMode := OLD (the fitted pointing model, as before #7)
+//   command refraction=new   GVL_Pointing.eRefractionMode := NEW (AstroBROT refraction, refit model)
+// Only as the single field of a message; the switch takes effect at once (FB_TelescopeControl logs it). Not refused in
+// Local: it is a setting, not a motion verb.
+FUNCTION_BLOCK FB_IagComm EXTENDS BROTLib.FB_Comm_MQTT_Influx
+VAR
+	fbIagMessage	: BROTLib.FB_InfluxMessage;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[SUPER^();]]></ST>
+    </Implementation>
+    <Method Name="_handleMQTTMessage" Id="{fd040a09-4ef3-4c94-9f64-6a621a0acad5}">
+      <Declaration><![CDATA[METHOD _handleMQTTMessage : BOOL
+VAR_INPUT
+	sPayloadRcv		: STRING(255);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbIagMessage(sPayload := sPayloadRcv);
+IF fbIagMessage.measurement = 'command' AND fbIagMessage.parameter = 'refraction' AND fbIagMessage.remaining = ''
+	AND NOT fbIagMessage.trailingIgnored THEN
+	IF fbIagMessage.value = 'old' THEN
+		GVL_Pointing.eRefractionMode := E_RefractionMode.OLD;
+	ELSIF fbIagMessage.value = 'new' THEN
+		GVL_Pointing.eRefractionMode := E_RefractionMode.NEW;
+	ELSE
+		ADSLOGSTR(ADSLOG_MSGTYPE_WARN OR ADSLOG_MSGTYPE_LOG, 'MQTT refraction: old or new expected, ignored: %s', sPayloadRcv);
+	END_IF
+	_handleMQTTMessage := TRUE;
+	RETURN;
+END_IF
+_handleMQTTMessage := SUPER^._handleMQTTMessage(sPayloadRcv := sPayloadRcv);]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

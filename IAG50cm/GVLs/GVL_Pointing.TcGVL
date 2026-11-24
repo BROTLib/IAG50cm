@@ -8,23 +8,52 @@
 	*)
 
 	(*
-	 pointing from: 21.01.2026 136 points (from Lukas Melzig)
+	 OLD (E_RefractionMode.OLD): pointing from 21.01.2026, 136 points (from Lukas Melzig), with the fitted refraction terms.
+	 These are the values that were in this GVL as C_* before IAG50cm#7, unchanged.
 	RMS Ha:  17.69244750276253
 	RMS Dec:  13.468555776826959
 	*)
-	C_mAl_tau	: LREAL := 0.01687078;
-	C_mEl_tau	: LREAL := -0.02608578;
-	C_Coll_tau	: LREAL := 0.29826615;
-	C_Refr_tau	: LREAL := -0.00759962;
-	C_Enc_tau	: LREAL := 0.00108764;
-	C_Flex_tau	: LREAL := -0.02462705;
-	C_NP_tau	: LREAL := 0.02128217;
-	
-	C_mAl_dec	: LREAL := 0.01606325;
-	C_mEl_dec	: LREAL := -0.05749048;
-	C_Coll_dec	: LREAL := -0.17376101;
-	C_Refr_dec	: LREAL := 0.01678090;
-	C_Flex_dec	: LREAL := -0.01915146;
-END_VAR]]></Declaration>
+	stCoeffOld	: ST_PointingCoefficients := (
+		C_mAl_tau	:= 0.01687078,
+		C_mEl_tau	:= -0.02608578,
+		C_Coll_tau	:= 0.29826615,
+		C_Refr_tau	:= -0.00759962,
+		C_Enc_tau	:= 0.00108764,
+		C_Flex_tau	:= -0.02462705,
+		C_NP_tau	:= 0.02128217,
+		C_mAl_dec	:= 0.01606325,
+		C_mEl_dec	:= -0.05749048,
+		C_Coll_dec	:= -0.17376101,
+		C_Refr_dec	:= 0.01678090,
+		C_Flex_dec	:= -0.01915146);
+
+	(*
+	 NEW (E_RefractionMode.NEW): the same 136 points refitted without the refraction terms, after removing the AstroBROT
+	 refraction (site estimate 998.1 hPa / 9.35 C, the weather of that night is not known) and with the model evaluated
+	 at the observed HA/Dec. IAG repo tools/pointing/refit_refraction.py (it also reproduces stCoeffOld to 5E-9).
+	RMS Ha:  18.688
+	RMS Dec:  13.477
+	*)
+	stCoeffNew	: ST_PointingCoefficients := (
+		C_mAl_tau	:= 0.01690121,
+		C_mEl_tau	:= -0.02889108,
+		C_Coll_tau	:= 0.29834839,
+		C_Refr_tau	:= 0.0,
+		C_Enc_tau	:= 0.00103115,
+		C_Flex_tau	:= -0.00894541,
+		C_NP_tau	:= 0.02123962,
+		C_mAl_dec	:= 0.01606778,
+		C_mEl_dec	:= -0.05759730,
+		C_Coll_dec	:= -0.17370353,
+		C_Refr_dec	:= 0.0,
+		C_Flex_dec	:= -0.02055715);
+END_VAR
+VAR_GLOBAL PERSISTENT
+	// The refraction switch (IAG50cm#7): set it with the MQTT command "command refraction=old|new" (FB_IagComm) or online
+	// in XAE. MAIN hands it to the telescope every cycle; it takes effect at once, also while tracking (the target moves
+	// by the difference of the two models). Kept over a restart; a new persistent layout starts with OLD.
+	eRefractionMode	: E_RefractionMode := E_RefractionMode.OLD;
+END_VAR
+]]></Declaration>
   </GVL>
 </TcPlcObject>

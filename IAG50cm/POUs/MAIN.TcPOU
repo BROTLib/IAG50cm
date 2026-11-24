@@ -3,7 +3,7 @@
   <POU Name="MAIN" Id="{d994e49b-b7f8-4497-8346-561ddfb9c2db}" SpecialFunc="None">
     <Declaration><![CDATA[PROGRAM MAIN
 VAR
-	comm			: FB_Comm_MQTT_Influx;
+	comm			: FB_IagComm;	// BROTLib.FB_Comm_MQTT_Influx plus "command refraction=old|new" (IAG50cm#7)
 	coverControl	: FB_CoverControl(comm := comm);
 	focusControl	: FB_FocusControl(comm:=comm);
 	haControl		: FB_HourAngleControl(comm:=comm);
@@ -93,6 +93,8 @@ telescopeControl(
 	// this is the previous cycle's value; the drives are cut by the safety circuit regardless.
 	bEstopTriggered	:= safetyHandling.estop,
 	bSafetyAckPending	:= safetyHandling.ackPending,	// previous cycle, like bEstopTriggered (#59)
+	eRefractionMode	:= GVL_Pointing.eRefractionMode,	// IAG50cm#7: the refraction switch, at once
+	stWeather		:= comm.Weather,	// live pressure and temperature (BROTLib#33), used in NEW only
 );
 
 //Safety

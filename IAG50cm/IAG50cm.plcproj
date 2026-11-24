@@ -21,7 +21,13 @@
     <ProjectVersion>0.10.0</ProjectVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="DUTs\E_RefractionMode.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DUTs\E_MirrorCoverState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_PointingCoefficients.TcDUT">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DUTs\ST_AxisStatus.TcDUT">
@@ -171,6 +177,9 @@
     <Compile Include="POUs\Pointing\FB_PointingModelInversion.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\Pointing\FB_RefractionShift.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\SerialBackground.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -181,6 +190,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_IagCabinet.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_IagComm.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_FocusControl.TcPOU">

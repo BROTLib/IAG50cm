@@ -6,15 +6,17 @@ VAR_INPUT
 	HourAngle		: LREAL;
 	Declination		: LREAL;
 	Latitude		: LREAL;
+	eRefractionMode	: E_RefractionMode := E_RefractionMode.OLD;	// coefficient set (IAG50cm#7): OLD = GVL_Pointing.stCoeffOld, the model as before
 END_VAR
 VAR_OUTPUT
 	HourAngle_correction	: LREAL;
 	Declination_correction	: LREAL;
 	HourAngle_velocity		: LREAL;
 	Declination_velocity 	: LREAL;
-	bValid					: BOOL;	// FALSE if the target is below fMinSinAlt (altitude < 1 deg): the refraction terms divide by sin_alt and are not physical there (#134). Corrections and Dec velocity are 0.0, HA velocity is sidereal when FALSE.
+	bValid					: BOOL;	// FALSE if the target is below fMinSinAlt (altitude < 1 deg): the refraction terms divide by sin_alt and are not physical there (#134; kept in NEW too, where they are 0). Corrections and Dec velocity are 0.0, HA velocity is sidereal when FALSE.
 END_VAR
 VAR
+	stC		: ST_PointingCoefficients;	// the set of this call, copied from GVL_Pointing
 	// inputs in rad
 	tau		: LREAL;
 	dec		: LREAL;
@@ -46,7 +48,14 @@ VAR CONSTANT
 END_VAR
 ]]></Declaration>
     <Implementation>
-      <ST><![CDATA[// degrees to rad
+      <ST><![CDATA[// the coefficient set (IAG50cm#7); OLD is the set that was in GVL_Pointing as C_* before, so OLD is unchanged
+IF eRefractionMode = E_RefractionMode.NEW THEN
+	stC := GVL_Pointing.stCoeffNew;
+ELSE
+	stC := GVL_Pointing.stCoeffOld;
+END_IF
+
+// degrees to rad
 tau := HourAngle * d2r;
 dec	:= Declination * d2r;
 lat := Latitude * d2r;
@@ -86,35 +95,35 @@ END_IF
 bValid := TRUE;
 
 // ### TAU offset ###
-off_tau_esti := - C_mAl_tau * ((cos_TAU * sin_DEC) / cos_DEC);
-off_tau_esti := off_tau_esti + C_mEl_tau * ((sin_TAU * sin_DEC) / cos_DEC);
-off_tau_esti := off_tau_esti + C_Coll_tau;
-off_tau_esti := off_tau_esti + C_Refr_tau * ((sin_TAU * cos_lat) / (sin_alt * cos_DEC)); 
-off_tau_esti := off_tau_esti + C_Flex_tau * ((sin_TAU * cos_lat) / cos_DEC);
-off_tau_esti := off_tau_esti + C_Enc_tau / cos_DEC;
-off_tau_esti := off_tau_esti - C_NP_tau * (sin_DEC / cos_DEC);
+off_tau_esti := - stC.C_mAl_tau * ((cos_TAU * sin_DEC) / cos_DEC);
+off_tau_esti := off_tau_esti + stC.C_mEl_tau * ((sin_TAU * sin_DEC) / cos_DEC);
+off_tau_esti := off_tau_esti + stC.C_Coll_tau;
+off_tau_esti := off_tau_esti + stC.C_Refr_tau * ((sin_TAU * cos_lat) / (sin_alt * cos_DEC)); 
+off_tau_esti := off_tau_esti + stC.C_Flex_tau * ((sin_TAU * cos_lat) / cos_DEC);
+off_tau_esti := off_tau_esti + stC.C_Enc_tau / cos_DEC;
+off_tau_esti := off_tau_esti - stC.C_NP_tau * (sin_DEC / cos_DEC);
 
 
-track_tau_esti := c_mal_tau * omega * ((sin_TAU * sin_DEC) / cos_DEC);
-track_tau_esti := track_tau_esti + c_mel_tau * omega * ((cos_TAU * sin_DEC) / cos_DEC);
-track_tau_esti := track_tau_esti + c_refr_tau * omega * ((cos_TAU * cos_lat) / (sin_alt * cos_DEC)); // 1ST derivative term
-track_tau_esti := track_tau_esti - c_refr_tau * sin_alt_rate * ((sin_TAU * cos_lat) / (sin_alt*sin_alt * cos_DEC)); // 2nd term
-track_tau_esti := track_tau_esti + c_flex_tau * omega * ((cos_TAU * cos_lat) / cos_DEC);
+track_tau_esti := stC.c_mal_tau * omega * ((sin_TAU * sin_DEC) / cos_DEC);
+track_tau_esti := track_tau_esti + stC.c_mel_tau * omega * ((cos_TAU * sin_DEC) / cos_DEC);
+track_tau_esti := track_tau_esti + stC.c_refr_tau * omega * ((cos_TAU * cos_lat) / (sin_alt * cos_DEC)); // 1ST derivative term
+track_tau_esti := track_tau_esti - stC.c_refr_tau * sin_alt_rate * ((sin_TAU * cos_lat) / (sin_alt*sin_alt * cos_DEC)); // 2nd term
+track_tau_esti := track_tau_esti + stC.c_flex_tau * omega * ((cos_TAU * cos_lat) / cos_DEC);
 
 
 // ### DEC offset ###
-off_dec_esti := C_mAl_dec * sin_TAU;
-off_dec_esti := off_dec_esti + C_mEl_dec * cos_TAU;
-off_dec_esti := off_dec_esti + C_Coll_dec;
-off_dec_esti := off_dec_esti + C_Refr_dec * ((sin_lat - sin_alt * sin_DEC) / (cos_DEC * sin_alt));
-off_dec_esti := off_dec_esti - C_Flex_dec * ((sin_lat - sin_alt * sin_DEC) / cos_DEC);
+off_dec_esti := stC.C_mAl_dec * sin_TAU;
+off_dec_esti := off_dec_esti + stC.C_mEl_dec * cos_TAU;
+off_dec_esti := off_dec_esti + stC.C_Coll_dec;
+off_dec_esti := off_dec_esti + stC.C_Refr_dec * ((sin_lat - sin_alt * sin_DEC) / (cos_DEC * sin_alt));
+off_dec_esti := off_dec_esti - stC.C_Flex_dec * ((sin_lat - sin_alt * sin_DEC) / cos_DEC);
 
 
-track_dec_esti := c_mal_dec * omega * cos_TAU;
-track_dec_esti := track_dec_esti - c_mel_dec * omega * sin_TAU;
-track_dec_esti := track_dec_esti - c_refr_dec * sin_alt_rate * (sin_DEC / (cos_DEC * sin_alt));//# 1ST term
-track_dec_esti := track_dec_esti - c_refr_dec * sin_alt_rate * ((sin_lat - sin_alt * sin_DEC) / (cos_DEC * sin_alt*sin_alt)); //# 2nd derivative term
-track_dec_esti := track_dec_esti + c_flex_dec * sin_alt_rate * (sin_DEC / cos_DEC);
+track_dec_esti := stC.c_mal_dec * omega * cos_TAU;
+track_dec_esti := track_dec_esti - stC.c_mel_dec * omega * sin_TAU;
+track_dec_esti := track_dec_esti - stC.c_refr_dec * sin_alt_rate * (sin_DEC / (cos_DEC * sin_alt));//# 1ST term
+track_dec_esti := track_dec_esti - stC.c_refr_dec * sin_alt_rate * ((sin_lat - sin_alt * sin_DEC) / (cos_DEC * sin_alt*sin_alt)); //# 2nd derivative term
+track_dec_esti := track_dec_esti + stC.c_flex_dec * sin_alt_rate * (sin_DEC / cos_DEC);
 
 HourAngle_correction	:= off_tau_esti;
 Declination_correction	:= off_dec_esti;

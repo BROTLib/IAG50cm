@@ -28,6 +28,7 @@ VAR
 	fbTelemetryTests		: IagTelemetry_Tests;
 	fbCoordinatesTests		: IagCoordinates_Tests;
 	fbSlewHaDecTests		: IagSlewHaDec_Tests;
+	fbRefractionTests		: IagRefraction_Tests;	// IAG50cm#7
 END_VAR
 ]]></Declaration>
     <Implementation>

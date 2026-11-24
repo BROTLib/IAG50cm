@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <DUT Name="E_RefractionMode" Id="{9fae02fd-7790-4219-9abe-50b3cb6e1d13}">
+    <Declaration><![CDATA[// Which refraction the pointing path uses (IAG50cm#7, #3; IAG plan 2026-11-24-iag50cm-refraction-switch).
+// OLD: the 21.01.2026 pointing model with its fitted refraction terms and the AstroBROT flags as before, bit-identical.
+// NEW: AstroBROT refraction (live weather or the site estimate) and the refit model without refraction terms.
+{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE E_RefractionMode :
+(
+	OLD := 0,
+	NEW := 1
+) INT;
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>
