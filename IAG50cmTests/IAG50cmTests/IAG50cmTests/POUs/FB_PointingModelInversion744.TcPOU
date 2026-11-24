@@ -1,14 +1,16 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
-  <POU Name="FB_PointingModelInversion" Id="{12b898bd-db5a-496e-8f1c-7de4951e9b09}" SpecialFunc="None">
-    <Declaration><![CDATA[FUNCTION_BLOCK FB_PointingModelInversion
+  <POU Name="FB_PointingModelInversion744" Id="{6c0bf817-169f-465b-8447-88c59d8d1690}" SpecialFunc="None">
+    <Declaration><![CDATA[// Frozen copy of IAG50cm develop 744020b (before IAG50cm#17), the oracle of IagLibraryMatchesLegacy_Tests. Only the names
+// and the two types that moved to BROTLib are changed. Do not change it.
+FUNCTION_BLOCK FB_PointingModelInversion744
 VAR_INPUT
 	HourAngle		: LREAL;
 	Declination		: LREAL;
 	Altitude		: LREAL;
 	Latitude		: LREAL;
 	epsilon			: LREAL := 0.25; //iteration accuracy in arcsec
-	eRefractionMode	: E_RefractionMode := E_RefractionMode.OLD;	// coefficient set of the forward model (IAG50cm#7)
+	eRefractionMode	: BROTLib.E_RefractionMode := BROTLib.E_RefractionMode.OLD;	// coefficient set of the forward model (IAG50cm#7)
 END_VAR
 VAR_OUTPUT
 	HourAngle_correction	: LREAL;
@@ -16,7 +18,7 @@ VAR_OUTPUT
 	bValid					: BOOL;	// FALSE if the iteration did not converge within epsilon (e.g. altitude too close to the horizon, where the model is chaotic -- see testing/check_pointing_inversion.py). HourAngle_correction/Declination_correction are 0.0 when FALSE.
 END_VAR
 VAR
-	fbpointing : FB_PointingModelForward;
+	fbpointing : FB_PointingModelForward744;
 	d_ha		: LREAL := 0.0;
 	d_dec		: LREAL := 0.0;
 	d_ha_new	: LREAL := 0.0;
@@ -59,16 +61,5 @@ ELSE
 	Declination_correction := 0.0;
 END_IF]]></ST>
     </Implementation>
-    <LineIds Name="FB_PointingModelInversion">
-      <LineId Id="97" Count="0" />
-      <LineId Id="47" Count="0" />
-      <LineId Id="91" Count="1" />
-      <LineId Id="53" Count="2" />
-      <LineId Id="57" Count="2" />
-      <LineId Id="50" Count="0" />
-      <LineId Id="94" Count="2" />
-      <LineId Id="65" Count="0" />
-      <LineId Id="69" Count="1" />
-    </LineIds>
   </POU>
 </TcPlcObject>

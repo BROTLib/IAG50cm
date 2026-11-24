@@ -1,7 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="IagRefraction_Tests" Id="{8275b9de-fbfd-4e09-a4dd-dbfbd58f5ae1}" SpecialFunc="None">
-    <Declaration><![CDATA[// IAG50cm#7: the refraction switch. OLD is bit-identical to the pointing model before #7 (frozen copy
+    <Declaration><![CDATA[// IAG50cm#7: the refraction switch, on BROTLib's blocks since #17 with IAG50cm's coefficients (GVL_Pointing). OLD is
+// bit-identical to the pointing model before #7 (frozen copy
 // FB_PointingModelForwardLegacy); FB_RefractionShift against values from the Python port of AstroBROT; the NEW chain of
 // FB_TelescopeControl._ComputeTargets inverts. The telescope block itself (flags, publish) is checked on
 // the telescope (IAG plan 2026-11-24-iag50cm-refraction-switch, step 6).
@@ -11,7 +12,6 @@ END_VAR
 ]]></Declaration>
     <Implementation>
       <ST><![CDATA[Old_Model_Is_Bit_Identical();
-Default_Mode_Is_Old();
 New_Model_Has_No_Refraction_Terms();
 Refraction_Shift_Values();
 Refraction_Round_Trip();
@@ -24,7 +24,7 @@ Refraction_Rate_Sign();
     <Method Name="Old_Model_Is_Bit_Identical" Id="{ce9e1ed9-301c-4ced-ba01-82760ea10673}">
       <Declaration><![CDATA[METHOD PRIVATE Old_Model_Is_Bit_Identical
 VAR
-	fbNew	: FB_PointingModelForward;
+	fbNew	: BROTLib.FB_EqPointingModelForward;
 	fbOld	: FB_PointingModelForwardLegacy;
 	i, j	: INT;
 	fHa, fDec	: LREAL;
@@ -33,13 +33,13 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[TEST('Old_Model_Is_Bit_Identical');
-// E_RefractionMode.OLD (the default) against the frozen copy of the model before #7: the same numbers, not just close.
+// BROTLib.FB_EqPointingModelForward with GVL_Pointing.stCoeffOld against the frozen copy of the model before #7: the same numbers, not just close.
 // Grid: HA -170..180 in 10 deg, Dec -30..85 in 5 deg (below the 1 deg altitude gate both give 0 / sidereal).
 FOR i := -17 TO 18 DO
 	FOR j := -6 TO 17 DO
 		fHa := INT_TO_LREAL(i) * 10.0;
 		fDec := INT_TO_LREAL(j) * 5.0;
-		fbNew(HourAngle := fHa, Declination := fDec, Latitude := 51.5592378, eRefractionMode := E_RefractionMode.OLD);
+		fbNew(HourAngle := fHa, Declination := fDec, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 		fbOld(HourAngle := fHa, Declination := fDec, Latitude := 51.5592378);
 		IF fbNew.HourAngle_correction <> fbOld.HourAngle_correction OR fbNew.Declination_correction <> fbOld.Declination_correction
 			OR fbNew.HourAngle_velocity <> fbOld.HourAngle_velocity OR fbNew.Declination_velocity <> fbOld.Declination_velocity
@@ -53,28 +53,10 @@ TEST_FINISHED();
 ]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Default_Mode_Is_Old" Id="{758d0d1f-645e-4e72-a4f0-d0598d59fc41}">
-      <Declaration><![CDATA[METHOD PRIVATE Default_Mode_Is_Old
-VAR
-	fbDefault	: FB_PointingModelForward;
-	fbOld		: FB_PointingModelForwardLegacy;
-END_VAR
-]]></Declaration>
-      <Implementation>
-        <ST><![CDATA[TEST('Default_Mode_Is_Old');
-// a caller that does not set eRefractionMode gets the old model
-fbDefault(HourAngle := 30.0, Declination := 20.0, Latitude := 51.5592378);
-fbOld(HourAngle := 30.0, Declination := 20.0, Latitude := 51.5592378);
-AssertEquals_LREAL(Expected := fbOld.HourAngle_correction, Actual := fbDefault.HourAngle_correction, Delta := 0.0, Message := 'HA');
-AssertEquals_LREAL(Expected := fbOld.Declination_correction, Actual := fbDefault.Declination_correction, Delta := 0.0, Message := 'Dec');
-TEST_FINISHED();
-]]></ST>
-      </Implementation>
-    </Method>
     <Method Name="New_Model_Has_No_Refraction_Terms" Id="{c36ee8e5-6053-405c-aa8d-7ee3cbf49e24}">
       <Declaration><![CDATA[METHOD PRIVATE New_Model_Has_No_Refraction_Terms
 VAR
-	fbNew	: FB_PointingModelForward;
+	fbNew	: BROTLib.FB_EqPointingModelForward;
 END_VAR
 ]]></Declaration>
       <Implementation>
@@ -82,7 +64,7 @@ END_VAR
 // NEW uses GVL_Pointing.stCoeffNew, whose C_Refr_* are 0, and differs from OLD
 AssertEquals_LREAL(Expected := 0.0, Actual := GVL_Pointing.stCoeffNew.C_Refr_tau, Delta := 0.0, Message := 'C_Refr_tau');
 AssertEquals_LREAL(Expected := 0.0, Actual := GVL_Pointing.stCoeffNew.C_Refr_dec, Delta := 0.0, Message := 'C_Refr_dec');
-fbNew(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378, eRefractionMode := E_RefractionMode.NEW);
+fbNew(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffNew);
 // at the zenith only the constant and the Dec-dependent terms are left: Coll_tau + Enc_tau/cos - NP_tau*tan, ...
 AssertEquals_LREAL(Expected := 0.29834839 + 0.00103115 / COS(51.5592378 * PI / 180.0) - 0.02123962 * TAN(51.5592378 * PI / 180.0)
 	- 0.01690121 * TAN(51.5592378 * PI / 180.0),
@@ -94,7 +76,7 @@ TEST_FINISHED();
     <Method Name="Refraction_Shift_Values" Id="{6498f461-c921-4092-b85a-3493fea72d31}">
       <Declaration><![CDATA[METHOD PRIVATE Refraction_Shift_Values
 VAR
-	fbShift	: FB_RefractionShift;
+	fbShift	: BROTLib.FB_RefractionShift;
 END_VAR
 ]]></Declaration>
       <Implementation>
@@ -123,8 +105,8 @@ TEST_FINISHED();
     <Method Name="Refraction_Round_Trip" Id="{7e9f7658-3308-45ff-b06e-2a6e955e3387}">
       <Declaration><![CDATA[METHOD PRIVATE Refraction_Round_Trip
 VAR
-	fbTo	: FB_RefractionShift;
-	fbFrom	: FB_RefractionShift;
+	fbTo	: BROTLib.FB_RefractionShift;
+	fbFrom	: BROTLib.FB_RefractionShift;
 	i, j	: INT;
 	fHa, fDec	: LREAL;
 	fErr, fMax	: LREAL;
@@ -156,7 +138,7 @@ TEST_FINISHED();
     <Method Name="Refraction_Zero_At_The_Zenith" Id="{016fa20c-9519-4ba7-a155-a757c213d71a}">
       <Declaration><![CDATA[METHOD PRIVATE Refraction_Zero_At_The_Zenith
 VAR
-	fbShift	: FB_RefractionShift;
+	fbShift	: BROTLib.FB_RefractionShift;
 END_VAR
 ]]></Declaration>
       <Implementation>
@@ -171,8 +153,8 @@ TEST_FINISHED();
     <Method Name="Refraction_Uses_The_Weather" Id="{08a46e20-d538-45ac-a86c-31ac52e0b87b}">
       <Declaration><![CDATA[METHOD PRIVATE Refraction_Uses_The_Weather
 VAR
-	fbEstimate	: FB_RefractionShift;
-	fbHigh		: FB_RefractionShift;
+	fbEstimate	: BROTLib.FB_RefractionShift;
+	fbHigh		: BROTLib.FB_RefractionShift;
 END_VAR
 ]]></Declaration>
       <Implementation>
@@ -190,10 +172,10 @@ TEST_FINISHED();
     <Method Name="New_Chain_Round_Trip" Id="{5381c1df-8716-485f-bef3-c39322682146}">
       <Declaration><![CDATA[METHOD PRIVATE New_Chain_Round_Trip
 VAR
-	fbTo		: FB_RefractionShift;
-	fbModel		: FB_PointingModelForward;
-	fbInv		: FB_PointingModelInversion;
-	fbFrom		: FB_RefractionShift;
+	fbTo		: BROTLib.FB_RefractionShift;
+	fbModel		: BROTLib.FB_EqPointingModelForward;
+	fbInv		: BROTLib.FB_EqPointingModelInversion;
+	fbFrom		: BROTLib.FB_RefractionShift;
 	fHa, fDec	: LREAL;
 	fAxisHa, fAxisDec	: LREAL;
 	fGeoHa, fGeoDec		: LREAL;
@@ -213,10 +195,10 @@ FOR i := 0 TO 2 DO
 	END_CASE
 	fbTo(HourAngle := fHa, Declination := fDec, Latitude := 51.5592378, SiteAltitude := 100.0, ToObserved := TRUE);
 	fbModel(HourAngle := fHa + fbTo.HourAngleShift, Declination := fDec + fbTo.DeclinationShift, Latitude := 51.5592378,
-		eRefractionMode := E_RefractionMode.NEW);
+		stCoefficients := GVL_Pointing.stCoeffNew);
 	fAxisHa := fHa + fbTo.HourAngleShift + fbModel.HourAngle_correction;
 	fAxisDec := fDec + fbTo.DeclinationShift + fbModel.Declination_correction;
-	fbInv(HourAngle := fAxisHa, Declination := fAxisDec, Latitude := 51.5592378, eRefractionMode := E_RefractionMode.NEW);
+	fbInv(HourAngle := fAxisHa, Declination := fAxisDec, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffNew);
 	fbFrom(HourAngle := fAxisHa - fbInv.HourAngle_correction, Declination := fAxisDec - fbInv.Declination_correction,
 		Latitude := 51.5592378, SiteAltitude := 100.0, ToObserved := FALSE);
 	fGeoHa := fAxisHa - (fbInv.HourAngle_correction - fbFrom.HourAngleShift);
@@ -232,8 +214,8 @@ TEST_FINISHED();
     <Method Name="Refraction_Rate_Sign" Id="{71aaaafa-25a6-4460-8510-5503dea42c06}">
       <Declaration><![CDATA[METHOD PRIVATE Refraction_Rate_Sign
 VAR
-	fbNow	: FB_RefractionShift;
-	fbLater	: FB_RefractionShift;
+	fbNow	: BROTLib.FB_RefractionShift;
+	fbLater	: BROTLib.FB_RefractionShift;
 	fRate	: LREAL;
 END_VAR
 ]]></Declaration>

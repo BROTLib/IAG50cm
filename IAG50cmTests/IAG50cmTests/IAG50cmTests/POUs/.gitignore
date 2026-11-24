@@ -4,7 +4,6 @@ FB_HomeDropReason.TcPOU
 FB_HomeHold.TcPOU
 FB_StartRequest.TcPOU
 FB_SweepStop.TcPOU
-FB_PointingModelForward.TcPOU
 GVL_Pointing.TcGVL
 FB_TelescopeControl.TcPOU
 FB_HourAngleControl.TcPOU
@@ -12,13 +11,9 @@ FB_DeclinationControl.TcPOU
 FB_AxisControl.TcPOU
 FB_LatchHome.TcPOU
 FB_CabinetControl.TcPOU
-FB_PointingModelInversion.TcPOU
 F_HourAngleOffsetOnAxis.TcPOU
 F_RoundLREAL.TcPOU
 NCError_TO_STRING.TcPOU
 F_SunElevation.TcPOU
 FB_StepDrain.TcPOU
 ST_AxisStatus.TcDUT
-E_RefractionMode.TcDUT
-ST_PointingCoefficients.TcDUT
-FB_RefractionShift.TcPOU

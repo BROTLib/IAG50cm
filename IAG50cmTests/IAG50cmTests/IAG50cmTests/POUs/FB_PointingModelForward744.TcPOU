@@ -1,12 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
-  <POU Name="FB_PointingModelForward" Id="{ebb46eb4-547b-401e-8748-73f4ab83529c}" SpecialFunc="None">
-    <Declaration><![CDATA[FUNCTION_BLOCK FB_PointingModelForward
+  <POU Name="FB_PointingModelForward744" Id="{a967089f-b25e-4bfb-9ef3-9a9eabebe515}" SpecialFunc="None">
+    <Declaration><![CDATA[// Frozen copy of IAG50cm develop 744020b (before IAG50cm#17), the oracle of IagLibraryMatchesLegacy_Tests. Only the names
+// and the two types that moved to BROTLib are changed. Do not change it.
+FUNCTION_BLOCK FB_PointingModelForward744
 VAR_INPUT
 	HourAngle		: LREAL;
 	Declination		: LREAL;
 	Latitude		: LREAL;
-	eRefractionMode	: E_RefractionMode := E_RefractionMode.OLD;	// coefficient set (IAG50cm#7): OLD = GVL_Pointing.stCoeffOld, the model as before
+	eRefractionMode	: BROTLib.E_RefractionMode := BROTLib.E_RefractionMode.OLD;	// coefficient set (IAG50cm#7): OLD = GVL_Pointing.stCoeffOld, the model as before
 END_VAR
 VAR_OUTPUT
 	HourAngle_correction	: LREAL;
@@ -16,7 +18,7 @@ VAR_OUTPUT
 	bValid					: BOOL;	// FALSE if the target is below fMinSinAlt (altitude < 1 deg): the refraction terms divide by sin_alt and are not physical there (#134; kept in NEW too, where they are 0). Corrections and Dec velocity are 0.0, HA velocity is sidereal when FALSE.
 END_VAR
 VAR
-	stC		: ST_PointingCoefficients;	// the set of this call, copied from GVL_Pointing
+	stC		: BROTLib.ST_EqPointingCoefficients;	// the set of this call, copied from GVL_Pointing
 	// inputs in rad
 	tau		: LREAL;
 	dec		: LREAL;
@@ -49,7 +51,7 @@ END_VAR
 ]]></Declaration>
     <Implementation>
       <ST><![CDATA[// the coefficient set (IAG50cm#7); OLD is the set that was in GVL_Pointing as C_* before, so OLD is unchanged
-IF eRefractionMode = E_RefractionMode.NEW THEN
+IF eRefractionMode = BROTLib.E_RefractionMode.NEW THEN
 	stC := GVL_Pointing.stCoeffNew;
 ELSE
 	stC := GVL_Pointing.stCoeffOld;
@@ -132,36 +134,5 @@ Declination_velocity 	:= track_dec_esti/d2r;
 
             ]]></ST>
     </Implementation>
-    <LineIds Name="FB_PointingModelForward">
-      <LineId Id="171" Count="0" />
-      <LineId Id="17" Count="0" />
-      <LineId Id="121" Count="0" />
-      <LineId Id="123" Count="1" />
-      <LineId Id="18" Count="5" />
-      <LineId Id="26" Count="1" />
-      <LineId Id="165" Count="0" />
-      <LineId Id="164" Count="0" />
-      <LineId Id="166" Count="0" />
-      <LineId Id="222" Count="1" />
-      <LineId Id="58" Count="3" />
-      <LineId Id="138" Count="1" />
-      <LineId Id="142" Count="3" />
-      <LineId Id="161" Count="0" />
-      <LineId Id="155" Count="1" />
-      <LineId Id="154" Count="0" />
-      <LineId Id="157" Count="2" />
-      <LineId Id="162" Count="1" />
-      <LineId Id="140" Count="0" />
-      <LineId Id="148" Count="1" />
-      <LineId Id="147" Count="0" />
-      <LineId Id="151" Count="2" />
-      <LineId Id="72" Count="2" />
-      <LineId Id="95" Count="2" />
-      <LineId Id="217" Count="0" />
-      <LineId Id="219" Count="2" />
-      <LineId Id="218" Count="0" />
-      <LineId Id="103" Count="0" />
-      <LineId Id="9" Count="0" />
-    </LineIds>
   </POU>
 </TcPlcObject>

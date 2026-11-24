@@ -14,21 +14,15 @@ foreach ($n in 'FB_HomeDropReason', 'FB_HomeHold', 'FB_StartRequest', 'FB_StepDr
   Copy-Item (Join-Path $repo "IAG50cm\POUs\$n.TcPOU") $dest -Force
   Write-Host "Copied $n.TcPOU"
 }
-# FB_PointingModelForward reads the fitted coefficients from GVL_Pointing
-Copy-Item (Join-Path $repo 'IAG50cm\POUs\Pointing\FB_PointingModelForward.TcPOU') $dest -Force
-Write-Host 'Copied FB_PointingModelForward.TcPOU'
+# the pointing coefficients and the refraction switch (the model, its inversion and the refraction step are BROTLib's
+# since IAG50cm#17: FB_EqPointing*, FB_RefractionShift)
 Copy-Item (Join-Path $repo 'IAG50cm\GVLs\GVL_Pointing.TcGVL') $dest -Force
 Write-Host 'Copied GVL_Pointing.TcGVL'
-# IAG50cm#7: the refraction switch (the coefficient struct, the mode enum and the refraction step)
-foreach ($f in 'DUTs\E_RefractionMode.TcDUT', 'DUTs\ST_PointingCoefficients.TcDUT', 'POUs\Pointing\FB_RefractionShift.TcPOU') {
-  Copy-Item (Join-Path $repo "IAG50cm\$f") $dest -Force
-  Write-Host "Copied $f"
-}
 # The telescope state machine and what it compiles against (mock rig, spike S0 of the unification plan): the closure of
 # FB_TelescopeControl in IAG50cm/POUs, found with a comment-blind reference search. The dome, focus and cover blocks are
 # not copied, they are mocks (FB_DomeMock, FB_FocusMock, FB_CoversMock).
 foreach ($f in 'FB_TelescopeControl.TcPOU', 'FB_HourAngleControl.TcPOU', 'FB_DeclinationControl.TcPOU', 'FB_AxisControl.TcPOU',
-              'FB_LatchHome.TcPOU', 'FB_CabinetControl.TcPOU', 'Pointing\FB_PointingModelInversion.TcPOU',
+              'FB_LatchHome.TcPOU', 'FB_CabinetControl.TcPOU',
               'Functions\F_HourAngleOffsetOnAxis.TcPOU', 'Functions\F_RoundLREAL.TcPOU', 'Functions\NCError_TO_STRING.TcPOU',
               'Functions\F_SunElevation.TcPOU') {
   Copy-Item (Join-Path $repo "IAG50cm\POUs\$f") $dest -Force
