@@ -11,6 +11,7 @@ VAR
 	mqttTimer 			: TON := (PT:=T#5S);
 	fbFollower			: BROTLib.FB_MoveFollower;	// starts, re-targets and holds the move to fPosition (MONETcommon#122)
 	bHoldOnStop			: BOOL;		// Stop() was called: the target becomes the position reached at StopDone
+	bJogging			: BOOL;		// a jog (Visu, pendant, ADS) runs from bMovePos/bMoveNeg until standstill: the follower is off and the target follows the focus (as HalfBROT FB_FocusJogLatch)
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -22,13 +23,17 @@ IF bEnable AND NOT fbAxis.Calibrated THEN
 	THIS^.HomeAxis := TRUE;		// starts _StartHoming on FALSE -> TRUE
 END_IF
 
+// a jog runs until the axis is at standstill again (the ramp down after the button is released is part of it); the inputs
+// are what fbAxis reported in its last call. Without this the follower drove the focus back to fPosition and aborted the jog.
+bJogging := bMovePos OR bMoveNeg OR (bJogging AND NOT fbAxis.StandStill);
+
 // a new target during a move restarts it, MoveDone, abort, error and stop end it (MONETcommon#122); the inputs are
 // what fbAxis reported in its last call. The enable comes from the telescope, so bNeedEnable is not used.
 fbFollower(
 	fTarget		:= fPosition,
 	fActual		:= fActualPosition,
 	fTolerance	:= fTolerance,
-	bActive		:= fbAxis.Calibrated,
+	bActive		:= fbAxis.Calibrated AND NOT bJogging,
 	bReady		:= fbAxis.Ready AND NOT fbAxis.MoveDone,
 	bMoveDone	:= fbAxis.MoveDone,
 	bAborted	:= fbAxis.CommandAborted,
@@ -45,6 +50,11 @@ END_IF
 
 // after an error a reset must not resume the old move by itself
 IF bError AND fbAxis.Calibrated THEN
+	fPosition := fActualPosition;
+END_IF
+
+// while jogging the focus is moved by hand: the target follows it, so the follower holds the new position afterwards
+IF bJogging AND fbAxis.Calibrated THEN
 	fPosition := fActualPosition;
 END_IF
 
