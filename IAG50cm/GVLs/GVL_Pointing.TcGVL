@@ -13,7 +13,7 @@
 	RMS Ha:  17.69244750276253
 	RMS Dec:  13.468555776826959
 	*)
-	stCoeffOld	: ST_PointingCoefficients := (
+	stCoeffOld	: BROTLib.ST_EqPointingCoefficients := (
 		C_mAl_tau	:= 0.01687078,
 		C_mEl_tau	:= -0.02608578,
 		C_Coll_tau	:= 0.29826615,
@@ -34,7 +34,7 @@
 	RMS Ha:  18.688
 	RMS Dec:  13.477
 	*)
-	stCoeffNew	: ST_PointingCoefficients := (
+	stCoeffNew	: BROTLib.ST_EqPointingCoefficients := (
 		C_mAl_tau	:= 0.01690121,
 		C_mEl_tau	:= -0.02889108,
 		C_Coll_tau	:= 0.29834839,
@@ -51,7 +51,7 @@ END_VAR
 VAR_GLOBAL PERSISTENT
 	// The refraction switch (IAG50cm#7): set it online in XAE (write value). MAIN hands it to the telescope every cycle; it takes effect at once, also while tracking (the target moves
 	// by the difference of the two models). Kept over a restart; a new persistent layout starts with OLD.
-	eRefractionMode	: E_RefractionMode := E_RefractionMode.OLD;
+	eRefractionMode	: BROTLib.E_RefractionMode := BROTLib.E_RefractionMode.OLD;
 END_VAR
 ]]></Declaration>
   </GVL>

@@ -57,9 +57,6 @@
     <Compile Include="POUs\FB_CabinetControl.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_PointingModelInversion.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\F_HourAngleOffsetOnAxis.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -165,13 +162,22 @@
     <Compile Include="POUs\IagCoordinates_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\E_RefractionMode.TcDUT">
+    <Compile Include="POUs\FB_IagChain744.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\ST_PointingCoefficients.TcDUT">
+    <Compile Include="POUs\FB_IagChainLibrary.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_RefractionShift.TcPOU">
+    <Compile Include="POUs\FB_PointingModelForward744.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_PointingModelInversion744.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FB_RefractionShift744.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\IagLibraryMatchesLegacy_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FB_PointingModelForwardLegacy.TcPOU">
@@ -210,9 +216,6 @@
     <Compile Include="POUs\FB_SweepStop.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="POUs\FB_PointingModelForward.TcPOU">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="POUs\GVL_Pointing.TcGVL">
       <SubType>Code</SubType>
     </Compile>
@@ -226,7 +229,7 @@
       <Namespace>AstroBROT</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="BROTLib">
-      <DefaultResolution>BROTLib, 0.27.0 (BROT)</DefaultResolution>
+      <DefaultResolution>BROTLib, 0.29.0 (BROT)</DefaultResolution>
       <Namespace>BROTLib</Namespace>
     </PlaceholderReference>
     <PlaceholderReference Include="Tc2_Math">

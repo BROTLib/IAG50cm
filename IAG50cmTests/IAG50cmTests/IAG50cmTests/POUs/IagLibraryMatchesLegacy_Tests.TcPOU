@@ -1,0 +1,290 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="IagLibraryMatchesLegacy_Tests" Id="{3d5584a5-d052-4fef-bd8e-c72482c887d0}" SpecialFunc="None">
+    <Declaration><![CDATA[// IAG50cm#17: FB_TelescopeControl._ComputeTargets on BROTLib (FB_RaDecCoordinates + FB_EqPointing, FB_IagChainLibrary)
+// gives exactly the numbers of the same method before the move (develop 744020b, FB_IagChain744): every output, `<>`,
+// in OLD and NEW, with and without live weather, while tracking, during an Alt/Az slew and during a SlewHaDec, over
+// three cycles per case with the axes following the target (the inversion and FB_EQ2HOR keep state between cycles).
+// One intended difference: bRefractionLiveWeather is FALSE in OLD now (the weather is not used there), it was the
+// F_RefractionWeather result before. Site IAG50cm.
+FUNCTION_BLOCK IagLibraryMatchesLegacy_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+VAR CONSTANT
+	fLat	: LREAL := 51.5592378;
+	fLon	: LREAL := 9.9452433;
+	fAlt	: LREAL := 100.0;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Tracking_Matches();
+AltAz_Slew_Matches();
+SlewHaDec_Matches();
+Old_Live_Weather_Flag();
+]]></ST>
+    </Implementation>
+    <Method Name="Run" Id="{38efbc01-f2ba-453a-a7d3-855875ceb04b}">
+      <Declaration><![CDATA[// one case: nScenario 0 = tracking fRa/fDec, 1 = Alt/Az slew to fA (elevation) / fB (azimuth), 2 = SlewHaDec to fA (HA) /
+// fB (Dec); three cycles, the axes at target + offset of the previous cycle (first cycle: at HA 0 / Dec 0). Returns the
+// number of outputs that differ, summed over the cycles.
+METHOD PRIVATE Run : INT
+VAR_INPUT
+	eMode		: BROTLib.E_RefractionMode;
+	bWeather	: BOOL;
+	nScenario	: INT;
+	fRa, fDec	: LREAL;
+	fA, fB		: LREAL;
+END_VAR
+VAR
+	fbOld		: FB_IagChain744;
+	fbNew		: FB_IagChainLibrary;
+	stW			: BROTLib.ST_Weather;
+	nCycle		: INT;
+	fAxHa, fAxDec	: LREAL;
+	n			: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bWeather THEN
+	stW.fPressure := 1003.0;
+	stW.bPressureValid := TRUE;
+	stW.fTemperature := 2.5;
+	stW.bTemperatureValid := TRUE;
+END_IF
+FOR nCycle := 0 TO 2 DO
+	fbOld.fJd := 2461000.5 + INT_TO_LREAL(nCycle) * 0.1 / 86400.0;
+	fbOld.fTimeOffset := 0.0;
+	fbOld.fLongitude := fLon;
+	fbOld.fLatitude := fLat;
+	fbOld.fAltitude := fAlt;
+	fbOld.fRightAscension := fRa;
+	fbOld.fDeclination := fDec;
+	fbOld.bSlewActive := nScenario > 0;
+	fbOld.bSlewHaDec := nScenario = 2;
+	IF nScenario = 1 THEN
+		fbOld.fElevation := fA;
+		fbOld.fAzimuth := fB;
+	END_IF
+	fbOld.fSlewHaDecHa := fA;
+	fbOld.fSlewHaDecDec := fB;
+	fbOld.eRefractionMode := eMode;
+	fbOld.stWeather := stW;
+	fbOld.fHourAngleOffset := 0.002;
+	fbOld.fDeclinationOffset := -0.001;
+	IF nCycle > 0 THEN
+		fbOld.fHourAngleAxis := fAxHa;
+		fbOld.fDeclinationAxis := fAxDec;
+	END_IF
+	// the library side gets exactly the same inputs, including the slew Alt/Az a SlewHaDec wrote in the last cycle
+	fbNew.fJd := fbOld.fJd;
+	fbNew.fTimeOffset := fbOld.fTimeOffset;
+	fbNew.fLongitude := fLon;
+	fbNew.fLatitude := fLat;
+	fbNew.fAltitude := fAlt;
+	fbNew.fRightAscension := fRa;
+	fbNew.fDeclination := fDec;
+	fbNew.bSlewActive := fbOld.bSlewActive;
+	fbNew.bSlewHaDec := fbOld.bSlewHaDec;
+	IF nScenario = 1 THEN
+		fbNew.fElevation := fA;
+		fbNew.fAzimuth := fB;
+	END_IF
+	fbNew.fSlewHaDecHa := fA;
+	fbNew.fSlewHaDecDec := fB;
+	fbNew.eRefractionMode := eMode;
+	fbNew.stWeather := stW;
+	fbNew.fHourAngleOffset := fbOld.fHourAngleOffset;
+	fbNew.fDeclinationOffset := fbOld.fDeclinationOffset;
+	fbNew.fHourAngleAxis := fbOld.fHourAngleAxis;
+	fbNew.fDeclinationAxis := fbOld.fDeclinationAxis;
+	fbOld();
+	fbNew();
+	n := n + Compare(fbOld := fbOld, fbNew := fbNew, bOldMode := eMode = BROTLib.E_RefractionMode.OLD);
+	// the axes follow: target (slew target while a slew runs) + pointing offset
+	IF nScenario = 0 THEN
+		fAxHa := fbOld.fHourAngleApparent + fbOld.fHourAnglePointingOffset;
+		fAxDec := fbOld.fDeclinationApparent + fbOld.fDeclinationPointingOffset;
+	ELSE
+		fAxHa := fbOld.fHourAngleCalc + fbOld.fHourAnglePointingOffset;
+		fAxDec := fbOld.fDeclinationCalc + fbOld.fDeclinationPointingOffset;
+	END_IF
+END_FOR
+Run := n;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Compare" Id="{25e0b94e-7cf1-49c0-9460-03a7a134bc31}">
+      <Declaration><![CDATA[// number of outputs that are not bit-identical (and the slew Alt/Az a SlewHaDec writes)
+METHOD PRIVATE Compare : INT
+VAR_IN_OUT
+	fbOld	: FB_IagChain744;
+	fbNew	: FB_IagChainLibrary;
+END_VAR
+VAR_INPUT
+	bOldMode	: BOOL;
+END_VAR
+VAR
+	n	: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF fbOld.bRefractionNew <> fbNew.bRefractionNew THEN n := n + 1; END_IF
+IF NOT bOldMode AND fbOld.bRefractionLiveWeather <> fbNew.bRefractionLiveWeather THEN n := n + 1; END_IF
+IF fbOld.bRefractionTemperatureSet <> fbNew.bRefractionTemperatureSet THEN n := n + 1; END_IF
+IF fbOld.fRefractionPressure <> fbNew.fRefractionPressure THEN n := n + 1; END_IF
+IF fbOld.fRefractionTemperature <> fbNew.fRefractionTemperature THEN n := n + 1; END_IF
+IF fbOld.fHourAngleApparent <> fbNew.fHourAngleApparent THEN n := n + 1; END_IF
+IF fbOld.fDeclinationApparent <> fbNew.fDeclinationApparent THEN n := n + 1; END_IF
+IF fbOld.fElevationCalc <> fbNew.fElevationCalc THEN n := n + 1; END_IF
+IF fbOld.fAzimuthCalc <> fbNew.fAzimuthCalc THEN n := n + 1; END_IF
+IF fbOld.fRightAscensionCalc <> fbNew.fRightAscensionCalc THEN n := n + 1; END_IF
+IF fbOld.fDeclinationCalc <> fbNew.fDeclinationCalc THEN n := n + 1; END_IF
+IF fbOld.fHourAngleCalc <> fbNew.fHourAngleCalc THEN n := n + 1; END_IF
+IF fbOld.fDeclinationCalcIcrs <> fbNew.fDeclinationCalcIcrs THEN n := n + 1; END_IF
+IF fbOld.fSlewHaDecDecIcrs <> fbNew.fSlewHaDecDecIcrs THEN n := n + 1; END_IF
+IF fbOld.fElevation <> fbNew.fElevation THEN n := n + 1; END_IF
+IF fbOld.fAzimuth <> fbNew.fAzimuth THEN n := n + 1; END_IF
+IF fbOld.fHourAnglePointingOffset <> fbNew.fHourAnglePointingOffset THEN n := n + 1; END_IF
+IF fbOld.fDeclinationPointingOffset <> fbNew.fDeclinationPointingOffset THEN n := n + 1; END_IF
+IF fbOld.fHourAngleVelocity <> fbNew.fHourAngleVelocity THEN n := n + 1; END_IF
+IF fbOld.fDeclinationVelocity <> fbNew.fDeclinationVelocity THEN n := n + 1; END_IF
+IF fbOld.fHourAngleRefraction <> fbNew.fHourAngleRefraction THEN n := n + 1; END_IF
+IF fbOld.fDeclinationRefraction <> fbNew.fDeclinationRefraction THEN n := n + 1; END_IF
+IF fbOld.fHourAngleModelIn <> fbNew.fHourAngleModelIn THEN n := n + 1; END_IF
+IF fbOld.fDeclinationModelIn <> fbNew.fDeclinationModelIn THEN n := n + 1; END_IF
+IF fbOld.fHourAngleCurrent <> fbNew.fHourAngleCurrent THEN n := n + 1; END_IF
+IF fbOld.fDeclinationCurrent <> fbNew.fDeclinationCurrent THEN n := n + 1; END_IF
+IF fbOld.fHourAngleInversionOffsetCalc <> fbNew.fHourAngleInversionOffsetCalc THEN n := n + 1; END_IF
+IF fbOld.fDeclinationInversionOffsetCalc <> fbNew.fDeclinationInversionOffsetCalc THEN n := n + 1; END_IF
+IF fbOld.fHourAngleInversionOffset <> fbNew.fHourAngleInversionOffset THEN n := n + 1; END_IF
+IF fbOld.fDeclinationInversionOffset <> fbNew.fDeclinationInversionOffset THEN n := n + 1; END_IF
+IF fbOld.bPointingInversionValid <> fbNew.bPointingInversionValid THEN n := n + 1; END_IF
+IF fbOld.fRightAscensionCurrentICRS <> fbNew.fRightAscensionCurrentICRS THEN n := n + 1; END_IF
+IF fbOld.fDeclinationCurrentICRS <> fbNew.fDeclinationCurrentICRS THEN n := n + 1; END_IF
+IF fbOld.fRightAscensionCurrentICRScorr <> fbNew.fRightAscensionCurrentICRScorr THEN n := n + 1; END_IF
+IF fbOld.fDeclinationCurrentICRScorr <> fbNew.fDeclinationCurrentICRScorr THEN n := n + 1; END_IF
+IF fbOld.fElevationCurrent <> fbNew.fElevationCurrent THEN n := n + 1; END_IF
+IF fbOld.fAzimuthCurrent <> fbNew.fAzimuthCurrent THEN n := n + 1; END_IF
+IF fbOld.fElevationCurrentSky <> fbNew.fElevationCurrentSky THEN n := n + 1; END_IF
+IF fbOld.fAzimuthCurrentSky <> fbNew.fAzimuthCurrentSky THEN n := n + 1; END_IF
+Compare := n;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Tracking_Matches" Id="{2c8b78cc-17b6-4d32-b9b8-4cbbfec8572e}">
+      <Declaration><![CDATA[// tracking six targets over the sky (altitudes from below the horizon to near the zenith), both modes, with and without weather
+METHOD PRIVATE Tracking_Matches
+VAR
+	m, w, i	: INT;
+	fRa, fDec	: LREAL;
+	n		: INT;
+	eMode	: BROTLib.E_RefractionMode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Tracking_Matches');
+FOR m := 0 TO 1 DO
+	IF m = 0 THEN eMode := BROTLib.E_RefractionMode.OLD; ELSE eMode := BROTLib.E_RefractionMode.NEW; END_IF
+	FOR w := 0 TO 1 DO
+		FOR i := 0 TO 5 DO
+			fRa := INT_TO_LREAL(i) * 60.0 + 7.0;
+			fDec := -10.0 + INT_TO_LREAL(i) * 17.0;
+			n := n + Run(eMode := eMode, bWeather := w = 1, nScenario := 0, fRa := fRa, fDec := fDec, fA := 0.0, fB := 0.0);
+		END_FOR
+	END_FOR
+END_FOR
+AssertEquals_INT(Expected := 0, Actual := n, Message := 'outputs that differ from 744020b while tracking');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AltAz_Slew_Matches" Id="{9f07f247-ea10-4427-b719-55ee11beb0fc}">
+      <Declaration><![CDATA[// an Alt/Az slew (the no-sky check of 2026-11-24: El 60 / Az 180, and three more), both modes, with and without weather
+METHOD PRIVATE AltAz_Slew_Matches
+VAR
+	m, w, i	: INT;
+	fEl, fAz	: LREAL;
+	n		: INT;
+	eMode	: BROTLib.E_RefractionMode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('AltAz_Slew_Matches');
+FOR m := 0 TO 1 DO
+	IF m = 0 THEN eMode := BROTLib.E_RefractionMode.OLD; ELSE eMode := BROTLib.E_RefractionMode.NEW; END_IF
+	FOR w := 0 TO 1 DO
+		FOR i := 0 TO 3 DO
+			CASE i OF
+				0: fEl := 60.0; fAz := 180.0;
+				1: fEl := 20.0; fAz := 250.0;
+				2: fEl := 45.0; fAz := 90.0;
+				3: fEl := 85.0; fAz := 10.0;
+			END_CASE
+			n := n + Run(eMode := eMode, bWeather := w = 1, nScenario := 1, fRa := 100.0, fDec := 20.0, fA := fEl, fB := fAz);
+		END_FOR
+	END_FOR
+END_FOR
+AssertEquals_INT(Expected := 0, Actual := n, Message := 'outputs that differ from 744020b during an Alt/Az slew');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SlewHaDec_Matches" Id="{7fcc97a3-e665-454b-ba2d-b6f78bfd7756}">
+      <Declaration><![CDATA[// a SlewHaDec (the park position HA 0 / Dec 52 and three more), both modes, with and without weather
+METHOD PRIVATE SlewHaDec_Matches
+VAR
+	m, w, i	: INT;
+	fHa, fDec	: LREAL;
+	n		: INT;
+	eMode	: BROTLib.E_RefractionMode;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('SlewHaDec_Matches');
+FOR m := 0 TO 1 DO
+	IF m = 0 THEN eMode := BROTLib.E_RefractionMode.OLD; ELSE eMode := BROTLib.E_RefractionMode.NEW; END_IF
+	FOR w := 0 TO 1 DO
+		FOR i := 0 TO 3 DO
+			CASE i OF
+				0: fHa := 0.0; fDec := 52.015;
+				1: fHa := -45.0; fDec := 10.0;
+				2: fHa := 30.0; fDec := 70.0;
+				3: fHa := 80.0; fDec := -15.0;
+			END_CASE
+			n := n + Run(eMode := eMode, bWeather := w = 1, nScenario := 2, fRa := 100.0, fDec := 20.0, fA := fHa, fB := fDec);
+		END_FOR
+	END_FOR
+END_FOR
+AssertEquals_INT(Expected := 0, Actual := n, Message := 'outputs that differ from 744020b during a SlewHaDec');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Old_Live_Weather_Flag" Id="{358fb9fa-b0ea-451b-9a60-0999d643ed9b}">
+      <Declaration><![CDATA[// the one intended difference: with live weather in OLD, POINTING.REFRACTION.LIVE_WEATHER is FALSE now (not used in OLD)
+METHOD PRIVATE Old_Live_Weather_Flag
+VAR
+	fbNew	: FB_IagChainLibrary;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Old_Live_Weather_Flag');
+fbNew.fJd := 2461000.5;
+fbNew.fLongitude := fLon;
+fbNew.fLatitude := fLat;
+fbNew.fAltitude := fAlt;
+fbNew.fRightAscension := 100.0;
+fbNew.fDeclination := 20.0;
+fbNew.stWeather.fPressure := 1003.0;
+fbNew.stWeather.bPressureValid := TRUE;
+fbNew();
+AssertFalse(Condition := fbNew.bRefractionLiveWeather, Message := 'OLD: no live weather flag');
+fbNew.eRefractionMode := BROTLib.E_RefractionMode.NEW;
+fbNew();
+AssertTrue(Condition := fbNew.bRefractionLiveWeather, Message := 'NEW: live weather flag');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

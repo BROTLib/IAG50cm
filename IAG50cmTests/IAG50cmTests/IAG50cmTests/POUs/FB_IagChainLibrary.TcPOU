@@ -1,0 +1,150 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_IagChainLibrary" Id="{a46e18f9-660c-42aa-b1e6-b37406913b48}" SpecialFunc="None">
+    <Declaration><![CDATA[// FB_TelescopeControl._ComputeTargets as it is now (IAG50cm#17: BROTLib.FB_RaDecCoordinates and BROTLib.FB_EqPointing),
+// with the same changes as FB_IagChain744: the site and the axis positions are inputs, the switch log line is left out.
+// Generated from the source (tools/Sync-Sources.ps1 does not make it; regenerate it when _ComputeTargets changes).
+FUNCTION_BLOCK FB_IagChainLibrary
+VAR_INPUT
+	fJd					: LREAL;
+	fTimeOffset			: LREAL;
+	fLongitude			: LREAL;	// telescopeConfig
+	fLatitude			: LREAL;
+	fAltitude			: LREAL;
+	fRightAscension		: LREAL;	// target, ICRS
+	fDeclination		: LREAL;
+	fElevation			: LREAL;	// Alt/Az slew target; written by a SlewHaDec, as in the telescope
+	fAzimuth			: LREAL;
+	bSlewHaDec			: BOOL;
+	bSlewActive			: BOOL;
+	fSlewHaDecHa		: LREAL;
+	fSlewHaDecDec		: LREAL;
+	eRefractionMode		: BROTLib.E_RefractionMode := BROTLib.E_RefractionMode.OLD;
+	stWeather			: BROTLib.ST_Weather;
+	fHourAngleAxis		: LREAL;	// fbHourAngle.ActualPosition
+	fDeclinationAxis	: LREAL;	// fbDeclination.ActualPosition
+	fHourAngleOffset	: LREAL;
+	fDeclinationOffset	: LREAL;
+END_VAR
+VAR_OUTPUT
+	bRefractionNew, bRefractionLiveWeather, bRefractionTemperatureSet	: BOOL;
+	fRefractionPressure, fRefractionTemperature	: LREAL;
+	fHourAngleApparent, fDeclinationApparent, fElevationCalc, fAzimuthCalc	: LREAL;
+	fRightAscensionCalc, fDeclinationCalc, fHourAngleCalc, fDeclinationCalcIcrs, fSlewHaDecDecIcrs	: LREAL;
+	fHourAnglePointingOffset, fDeclinationPointingOffset, fHourAngleVelocity, fDeclinationVelocity	: LREAL;
+	fHourAngleRefraction, fDeclinationRefraction, fHourAngleModelIn, fDeclinationModelIn	: LREAL;
+	fHourAngleCurrent, fDeclinationCurrent	: LREAL;
+	fHourAngleInversionOffsetCalc, fDeclinationInversionOffsetCalc, fHourAngleInversionOffset, fDeclinationInversionOffset	: LREAL;
+	bPointingInversionValid	: BOOL;
+	fRightAscensionCurrentICRS, fDeclinationCurrentICRS, fRightAscensionCurrentICRScorr, fDeclinationCurrentICRScorr	: LREAL;
+	fElevationCurrent, fAzimuthCurrent, fElevationCurrentSky, fAzimuthCurrentSky	: LREAL;
+END_VAR
+VAR
+	bHaDecSlew			: BOOL;
+	fbCoordinates		: BROTLib.FB_RaDecCoordinates;
+	fbPointing			: BROTLib.FB_EqPointing;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// IAG50cm#7: the refraction mode of this cycle. It takes effect at once, also while tracking (the target moves by the
+// difference of the two models). The weather only enters in NEW; in OLD every AstroBROT call gets its defaults as before.
+bRefractionNew := eRefractionMode = BROTLib.E_RefractionMode.NEW;
+// IAG50cm#17: the coordinate chain is BROTLib.FB_RaDecCoordinates (the same AstroBROT calls in the same order as the code
+// that was here): the weather (NEW only), the apparent HA/Dec and Alt/Az of the target, and the slew target. A SlewHaDec
+// (X5) drives to its apparent HA/Dec; its ICRS position and Alt/Az are derived from it, so that the horizon and pole
+// guards, the dome azimuth and the goto coordinates follow the same target. An Alt/Az slew gets the apparent declination
+// of its target (#239).
+bHaDecSlew := bSlewHaDec AND bSlewActive;
+fbCoordinates.fJd := fJd;
+fbCoordinates.fTimeOffset := fTimeOffset;
+fbCoordinates.fLongitude := fLongitude;
+fbCoordinates.fLatitude := fLatitude;
+fbCoordinates.fAltitude := fAltitude;
+fbCoordinates.fRightAscension := fRightAscension;
+fbCoordinates.fDeclination := fDeclination;
+fbCoordinates.fElevation := fElevation;
+fbCoordinates.fAzimuth := fAzimuth;
+fbCoordinates.bSlewAltIsObserved := FALSE;	// OLD: a theoretical slew altitude, as before (#3); NEW takes it as observed
+fbCoordinates.eRefractionMode := eRefractionMode;
+fbCoordinates.stWeather := stWeather;
+fbCoordinates.bSlewHaDec := bHaDecSlew;
+fbCoordinates.fSlewHaDecHa := fSlewHaDecHa;
+fbCoordinates.fSlewHaDecDec := fSlewHaDecDec;
+fbCoordinates.Target();
+bRefractionLiveWeather := fbCoordinates.bRefractionLiveWeather;	// FALSE in OLD, where the weather is not used
+fRefractionPressure := fbCoordinates.fRefractionPressure;	// 0.0 / 0.0 / FALSE in OLD: the AstroBROT defaults
+fRefractionTemperature := fbCoordinates.fRefractionTemperature;
+bRefractionTemperatureSet := fbCoordinates.bRefractionTemperatureSet;
+fHourAngleApparent := fbCoordinates.fHourAngleApparent;
+fDeclinationApparent := fbCoordinates.fDeclinationApparent;
+fElevationCalc := fbCoordinates.fElevationCalc;
+fAzimuthCalc := fbCoordinates.fAzimuthCalc;
+fRightAscensionCalc := fbCoordinates.fRightAscensionCalc;
+fDeclinationCalc := fbCoordinates.fDeclinationCalc;
+fHourAngleCalc := fbCoordinates.fHourAngleCalc;
+fDeclinationCalcIcrs := fbCoordinates.fDeclinationCalcIcrs;
+IF bHaDecSlew THEN
+	fSlewHaDecDecIcrs := fbCoordinates.fDeclinationCalcIcrs;
+	fElevation := fbCoordinates.fElevationSlew;
+	fAzimuth := fbCoordinates.fAzimuthSlew;
+END_IF
+// caluclate pointing offsets (of the slew target while a SlewHaDec runs: the slew stage adds them to its target)
+// get current coordinates (of motors); read before the pointing path, which does the forward model and the inversion
+fDeclinationCurrent := fDeclinationAxis ;
+fHourAngleCurrent := fHourAngleAxis ;
+// IAG50cm#7 / #17: BROTLib.FB_EqPointing, the same calls in the same order as the code that was here. OLD: the model with
+// stCoeffOld. NEW: the axes point at the observed HA/Dec, the refraction shift of the target is part of the offset and
+// its change over 10 s of the velocity, the model (stCoeffNew) is evaluated at the observed position, and the inversion
+// removes the refraction again (axis - geometric).
+fbPointing(
+	eRefractionMode		:= eRefractionMode,
+	stCoeffOld			:= GVL_Pointing.stCoeffOld,
+	stCoeffNew			:= GVL_Pointing.stCoeffNew,
+	fLatitude			:= fLatitude,
+	fSiteAltitude		:= fAltitude,
+	fPressure			:= fRefractionPressure,
+	fTemperature		:= fRefractionTemperature,
+	bTemperatureSet		:= bRefractionTemperatureSet,
+	fHourAngleTarget	:= SEL(bHaDecSlew, fHourAngleApparent, fSlewHaDecHa),
+	fDeclinationTarget	:= SEL(bHaDecSlew, fDeclinationApparent, fSlewHaDecDec),
+	fHourAngleAxis		:= fHourAngleCurrent,
+	fDeclinationAxis	:= fDeclinationCurrent,
+	fHourAnglePointingOffset	=> fHourAnglePointingOffset,
+	fDeclinationPointingOffset	=> fDeclinationPointingOffset,
+	fHourAngleVelocity			=> fHourAngleVelocity,
+	fDeclinationVelocity		=> fDeclinationVelocity,
+	fHourAngleRefraction		=> fHourAngleRefraction,
+	fDeclinationRefraction		=> fDeclinationRefraction,
+	fHourAngleModelIn			=> fHourAngleModelIn,
+	fDeclinationModelIn			=> fDeclinationModelIn,
+	fHourAngleInversionOffset	=> fHourAngleInversionOffsetCalc,
+	fDeclinationInversionOffset	=> fDeclinationInversionOffsetCalc,
+	bInversionValid				=> bPointingInversionValid);
+// near the horizon the inversion is chaotic and does not converge (see BROTLib.FB_EqPointingModelInversion);
+// keep reporting the last trustworthy correction rather than whatever garbage it would return
+IF bPointingInversionValid THEN
+	fHourAngleInversionOffset := fHourAngleInversionOffsetCalc;
+	fDeclinationInversionOffset := fDeclinationInversionOffsetCalc;
+END_IF
+// ICRS and Alt/Az of the axes and of the sky (BROTLib.FB_RaDecCoordinates.Current, IAG50cm#17). It holds the last valid
+// inversion itself, by the same rule as above. fElevationCurrent (the horizon guards) is the raw one in both modes; the
+// sky altitude is the observed one in NEW (#3, #7).
+fbCoordinates.fHourAngleCurrent := fHourAngleCurrent;
+fbCoordinates.fDeclinationCurrent := fDeclinationCurrent;
+fbCoordinates.fHourAngleOffset := fHourAngleOffset;
+fbCoordinates.fDeclinationOffset := fDeclinationOffset;
+fbCoordinates.fHourAngleInversion := fHourAngleInversionOffsetCalc;
+fbCoordinates.fDeclinationInversion := fDeclinationInversionOffsetCalc;
+fbCoordinates.bInversionValid := bPointingInversionValid;
+fbCoordinates.Current();
+fRightAscensionCurrentICRS := fbCoordinates.fRightAscensionCurrentICRS;
+fDeclinationCurrentICRS := fbCoordinates.fDeclinationCurrentICRS;
+fRightAscensionCurrentICRScorr := fbCoordinates.fRightAscensionCurrentICRScorr;
+fDeclinationCurrentICRScorr := fbCoordinates.fDeclinationCurrentICRScorr;
+fElevationCurrent := fbCoordinates.fElevationCurrent;
+fAzimuthCurrent := fbCoordinates.fAzimuthCurrent;
+fElevationCurrentSky := fbCoordinates.fElevationCurrentSky;
+fAzimuthCurrentSky := fbCoordinates.fAzimuthCurrentSky;]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

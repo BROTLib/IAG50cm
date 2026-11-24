@@ -1,0 +1,292 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_IagChain744" Id="{0ec3bde0-2a2b-4e6a-9951-3f4d18572aa3}" SpecialFunc="None">
+    <Declaration><![CDATA[// The coordinate chain and the pointing path of IAG50cm's FB_TelescopeControl._ComputeTargets at IAG50cm develop 744020b
+// (BROTLib/IAG50cm#243, the refraction switch), the last version before IAG50cm#17 moved them into BROTLib, frozen into a
+// block of its own: the method body unchanged except that the site and the axis positions are inputs, the switch log
+// line is left out and E_RefractionMode is BROTLib's. The oracle of IagLibraryMatchesLegacy_Tests. Do not change it.
+FUNCTION_BLOCK FB_IagChain744
+VAR_INPUT
+	fJd					: LREAL;
+	fTimeOffset			: LREAL;
+	fLongitude			: LREAL;	// telescopeConfig
+	fLatitude			: LREAL;
+	fAltitude			: LREAL;
+	fRightAscension		: LREAL;	// target, ICRS
+	fDeclination		: LREAL;
+	fElevation			: LREAL;	// Alt/Az slew target; written by a SlewHaDec, as in the telescope
+	fAzimuth			: LREAL;
+	bSlewHaDec			: BOOL;
+	bSlewActive			: BOOL;
+	fSlewHaDecHa		: LREAL;
+	fSlewHaDecDec		: LREAL;
+	eRefractionMode		: BROTLib.E_RefractionMode := BROTLib.E_RefractionMode.OLD;
+	stWeather			: BROTLib.ST_Weather;
+	fHourAngleAxis		: LREAL;	// fbHourAngle.ActualPosition
+	fDeclinationAxis	: LREAL;	// fbDeclination.ActualPosition
+	fHourAngleOffset	: LREAL;
+	fDeclinationOffset	: LREAL;
+END_VAR
+VAR_OUTPUT
+	bRefractionNew, bRefractionLiveWeather, bRefractionTemperatureSet	: BOOL;
+	fRefractionPressure, fRefractionTemperature	: LREAL;
+	fHourAngleApparent, fDeclinationApparent, fElevationCalc, fAzimuthCalc	: LREAL;
+	fRightAscensionCalc, fDeclinationCalc, fHourAngleCalc, fDeclinationCalcIcrs, fSlewHaDecDecIcrs	: LREAL;
+	fHourAnglePointingOffset, fDeclinationPointingOffset, fHourAngleVelocity, fDeclinationVelocity	: LREAL;
+	fHourAngleRefraction, fDeclinationRefraction, fHourAngleModelIn, fDeclinationModelIn	: LREAL;
+	fHourAngleCurrent, fDeclinationCurrent	: LREAL;
+	fHourAngleInversionOffsetCalc, fDeclinationInversionOffsetCalc, fHourAngleInversionOffset, fDeclinationInversionOffset	: LREAL;
+	bPointingInversionValid	: BOOL;
+	fRightAscensionCurrentICRS, fDeclinationCurrentICRS, fRightAscensionCurrentICRScorr, fDeclinationCurrentICRScorr	: LREAL;
+	fElevationCurrent, fAzimuthCurrent, fElevationCurrentSky, fAzimuthCurrentSky	: LREAL;
+END_VAR
+VAR
+	bHaDecSlew			: BOOL;
+	fbEq2Hor			: FB_EQ2HOR;
+	fbHor2Eq			: FB_HOR2EQ;
+	fbHaDec2RaDec		: FB_HADEC2RADEC;
+	fbRaDec2HaDec		: FB_RADEC2HADEC;
+	fbRaDec2HaDecAltAz	: FB_RADEC2HADEC;
+	fbPointingForward	: FB_PointingModelForward744;
+	fbPointingInversion	: FB_PointingModelInversion744;
+	fbRefractionTarget		: FB_RefractionShift744;
+	fbRefractionTargetLater	: FB_RefractionShift744;
+	fbRefractionCurrent		: FB_RefractionShift744;
+END_VAR
+VAR CONSTANT
+	fRefractionRateStep	: LREAL := 10.0;
+	fSiderealRate		: LREAL := 360.0 / 86164.0905;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[// IAG50cm#7: the refraction mode of this cycle. It takes effect at once, also while tracking (the target moves by the
+// difference of the two models). The weather only enters in NEW; in OLD every AstroBROT call gets its defaults as before.
+bRefractionNew := eRefractionMode = BROTLib.E_RefractionMode.NEW;
+bRefractionLiveWeather := BROTLib.F_RefractionWeather(
+	stWeather		:= stWeather,
+	fSiteAltitude	:= fAltitude,
+	fPressure		=> fRefractionPressure,
+	fTemperature	=> fRefractionTemperature,
+	bTemperatureSet	=> bRefractionTemperatureSet);
+IF NOT bRefractionNew THEN
+	fRefractionPressure := 0.0;	// the AstroBROT defaults: OLD stays as it was
+	fRefractionTemperature := 0.0;
+	bRefractionTemperatureSet := FALSE;
+END_IF
+
+// calculate fHourAngleApparent, fDeclinationApparent 
+
+fbRaDec2HaDec(
+	ra := fRightAscension,
+	dec := fDeclination,
+	lon := fLongitude,
+	JD := fJd + fTimeOffset,
+	ha_out => fHourAngleApparent,
+	dec_out => fDeclinationApparent);
+// (and also horizontal coord. -> used for checking if target is on sky or in ground)
+fbEq2Hor(
+	ra := fRightAscension,
+	dec := fDeclination,
+	lon := fLongitude,
+	lat := fLatitude,
+	altitude := fAltitude,
+	JD := fJd + fTimeOffset,
+	refract_to_observed := TRUE,
+	pressure := fRefractionPressure,
+	temperature := fRefractionTemperature,
+	temperature_set := bRefractionTemperatureSet,
+	alt => fElevationCalc,
+	az => fAzimuthCalc);
+	
+bHaDecSlew := bSlewHaDec AND bSlewActive;
+IF bHaDecSlew THEN
+	// SlewHaDec (X5): the target is the apparent HA/Dec itself. Its ICRS position and horizontal coordinates are derived
+	// from it, so that the horizon and pole guards, the dome azimuth and the goto coordinates follow the same target.
+	fHourAngleCalc := fSlewHaDecHa;
+	fDeclinationCalc := fSlewHaDecDec;
+	fbHaDec2RaDec(
+		ha := fSlewHaDecHa,
+		dec := fSlewHaDecDec,
+		jd := fJd + fTimeOffset,
+		lon := fLongitude,
+		ra_out => fRightAscensionCalc,
+		dec_out => fSlewHaDecDecIcrs);
+		fDeclinationCalcIcrs := fSlewHaDecDecIcrs;
+	fbEq2Hor(
+		ra := fRightAscensionCalc,
+		dec := fSlewHaDecDecIcrs,
+		lon := fLongitude,
+		lat := fLatitude,
+		altitude := fAltitude,
+		refract_to_observed := bRefractionNew,	// OLD: FALSE as before; NEW: the observed altitude, as the published one (#7)
+		pressure := fRefractionPressure,
+		temperature := fRefractionTemperature,
+		temperature_set := bRefractionTemperatureSet,
+		JD := fJd + fTimeOffset,
+		alt => fElevation,
+		az => fAzimuth);
+ELSE
+	// calculate equatorial coordinates (used by Slew command, takes Alt/Az -> moves telescope)
+	fbHor2Eq(alt := fElevation,
+			az := fAzimuth,
+			jd := fJd+fTimeOffset,
+			lat := fLatitude,
+			lon := fLongitude,
+			altitude := fAltitude,
+			// OLD: FALSE as before. NEW (#3): the commanded altitude is an observed one, the refraction is removed here and
+			// added again with the pointing offset (fbRefractionTarget), so the axes point at the commanded Alt/Az
+			alt_is_observed := bRefractionNew,
+			pressure := fRefractionPressure,
+			temperature := fRefractionTemperature,
+			temperature_set := bRefractionTemperatureSet,
+			ra => fRightAscensionCalc,
+			dec => fDeclinationCalcIcrs,
+			ha => fHourAngleCalc);
+	// FB_HOR2EQ returns the apparent hour angle but the J2000 declination: the motors are driven in apparent HA/Dec, so take the
+	// apparent declination of the same point (#239; the target used to mix the two, +0.054 deg in altitude at Az 180)
+	fbRaDec2HaDecAltAz(
+		ra := fRightAscensionCalc,
+		dec := fDeclinationCalcIcrs,
+		lon := fLongitude,
+		JD := fJd + fTimeOffset,
+		dec_out => fDeclinationCalc);
+END_IF
+// caluclate pointing offsets (of the slew target while a SlewHaDec runs: the slew stage adds them to its target)
+fHourAngleModelIn := SEL(bHaDecSlew, fHourAngleApparent, fSlewHaDecHa);
+fDeclinationModelIn := SEL(bHaDecSlew, fDeclinationApparent, fSlewHaDecDec);
+IF bRefractionNew THEN
+	// IAG50cm#7 NEW: the axes point at the observed HA/Dec. The refraction shift of the target is added to the pointing
+	// offset (every user of fHourAnglePointingOffset adds it to the geometric target), the model is evaluated at the
+	// observed position, and the change of the shift over fRefractionRateStep is added to the tracking rate.
+	fbRefractionTarget(
+		HourAngle		:= fHourAngleModelIn,
+		Declination		:= fDeclinationModelIn,
+		Latitude		:= fLatitude,
+		SiteAltitude	:= fAltitude,
+		Pressure		:= fRefractionPressure,
+		Temperature		:= fRefractionTemperature,
+		TemperatureSet	:= bRefractionTemperatureSet,
+		ToObserved		:= TRUE);
+	fbRefractionTargetLater(
+		HourAngle		:= fHourAngleModelIn + fRefractionRateStep * fSiderealRate,
+		Declination		:= fDeclinationModelIn,
+		Latitude		:= fLatitude,
+		SiteAltitude	:= fAltitude,
+		Pressure		:= fRefractionPressure,
+		Temperature		:= fRefractionTemperature,
+		TemperatureSet	:= bRefractionTemperatureSet,
+		ToObserved		:= TRUE);
+	fHourAngleRefraction := fbRefractionTarget.HourAngleShift;
+	fDeclinationRefraction := fbRefractionTarget.DeclinationShift;
+	fHourAngleModelIn := fHourAngleModelIn + fHourAngleRefraction;
+	fDeclinationModelIn := fDeclinationModelIn + fDeclinationRefraction;
+ELSE
+	fHourAngleRefraction := 0.0;
+	fDeclinationRefraction := 0.0;
+END_IF
+fbPointingForward(
+	HourAngle	:= fHourAngleModelIn,
+	Declination	:= fDeclinationModelIn,
+	Latitude	:= fLatitude,
+	eRefractionMode := eRefractionMode,
+	HourAngle_correction => fHourAnglePointingOffset,
+	Declination_correction => fDeclinationPointingOffset,
+	HourAngle_velocity => fHourAngleVelocity,
+	Declination_velocity => fDeclinationVelocity,
+);
+IF bRefractionNew THEN
+	fHourAnglePointingOffset := fHourAnglePointingOffset + fHourAngleRefraction;
+	fDeclinationPointingOffset := fDeclinationPointingOffset + fDeclinationRefraction;
+	fHourAngleVelocity := fHourAngleVelocity
+		+ (fbRefractionTargetLater.HourAngleShift - fbRefractionTarget.HourAngleShift) / fRefractionRateStep;
+	fDeclinationVelocity := fDeclinationVelocity
+		+ (fbRefractionTargetLater.DeclinationShift - fbRefractionTarget.DeclinationShift) / fRefractionRateStep;
+END_IF
+(*--------------------------------------------------------------*)
+// get current coordinates (of motors)
+fDeclinationCurrent := fDeclinationAxis ;
+fHourAngleCurrent := fHourAngleAxis ;
+// calculte pointing inversion
+fbPointingInversion(
+	HourAngle:= fHourAngleCurrent,
+	Declination:= fDeclinationCurrent,
+	Latitude:=fLatitude,
+	eRefractionMode := eRefractionMode,
+	HourAngle_correction => fHourAngleInversionOffsetCalc,
+	Declination_correction => fDeclinationInversionOffsetCalc,
+	bValid => bPointingInversionValid
+);
+IF bRefractionNew THEN
+	// IAG50cm#7 NEW: axis - model = the observed HA/Dec; remove the refraction from it, so that the inversion offset is
+	// axis - geometric, the inverse of the forward path above
+	fbRefractionCurrent(
+		HourAngle		:= fHourAngleCurrent - fHourAngleInversionOffsetCalc,
+		Declination		:= fDeclinationCurrent - fDeclinationInversionOffsetCalc,
+		Latitude		:= fLatitude,
+		SiteAltitude	:= fAltitude,
+		Pressure		:= fRefractionPressure,
+		Temperature		:= fRefractionTemperature,
+		TemperatureSet	:= bRefractionTemperatureSet,
+		ToObserved		:= FALSE);
+	fHourAngleInversionOffsetCalc := fHourAngleInversionOffsetCalc - fbRefractionCurrent.HourAngleShift;
+	fDeclinationInversionOffsetCalc := fDeclinationInversionOffsetCalc - fbRefractionCurrent.DeclinationShift;
+END_IF
+// near the horizon the inversion is chaotic and does not converge (see FB_PointingModelInversion);
+// keep reporting the last trustworthy correction rather than whatever garbage it would return
+IF bPointingInversionValid THEN
+	fHourAngleInversionOffset := fHourAngleInversionOffsetCalc;
+	fDeclinationInversionOffset := fDeclinationInversionOffsetCalc;
+END_IF
+(*--------------------------------------------------------------*)
+// transform from apparent to icrs
+
+//current
+fbHaDec2RaDec(
+	ha := fHourAngleCurrent,
+	dec := fDeclinationCurrent,
+	jd := fJd+fTimeOffset,
+	lon := fLongitude,
+	ra_out => fRightAscensionCurrentICRS,
+	dec_out => fDeclinationCurrentICRS);
+//current corrected
+fbHaDec2RaDec(
+	ha := fHourAngleCurrent - fHourAngleInversionOffset - F_HourAngleOffsetOnAxis(fHourAngleOffset, fDeclinationApparent),
+	dec := fDeclinationCurrent - fDeclinationInversionOffset- fDeclinationOffset,
+	jd := fJd+fTimeOffset,
+	lon := fLongitude,
+	ra_out => fRightAscensionCurrentICRScorr,
+	dec_out => fDeclinationCurrentICRScorr);
+(*--------------------------------------------------------------*)
+// to ALT AZ
+fbEq2Hor(
+	ra := fRightAscensionCurrentICRS,
+	dec := fDeclinationCurrentICRS,
+	lon := fLongitude,
+	lat := fLatitude,
+	altitude := fAltitude,
+	refract_to_observed := FALSE,	// both modes: the horizon guards on fElevationCurrent keep their physical position (#7)
+	pressure := 0.0,
+	temperature := 0.0,
+	temperature_set := FALSE,
+	JD := fJd + fTimeOffset,
+	alt => fElevationCurrent,
+	az => fAzimuthCurrent);
+	
+fbEq2Hor(
+	ra := fRightAscensionCurrentICRScorr,
+	dec := fDeclinationCurrentICRScorr,
+	lon := fLongitude,
+	lat := fLatitude,
+	altitude := fAltitude,
+	// OLD: FALSE as before (the geometric altitude minus the refraction). NEW: the corrected position is geometric, the
+	// published altitude is the observed one, as the commanded altitude of an Alt/Az slew (#3, #7)
+	refract_to_observed := bRefractionNew,
+	pressure := fRefractionPressure,
+	temperature := fRefractionTemperature,
+	temperature_set := bRefractionTemperatureSet,
+	JD := fJd + fTimeOffset,
+	alt => fElevationCurrentSky,
+	az => fAzimuthCurrentSky);]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

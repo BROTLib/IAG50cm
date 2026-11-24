@@ -29,6 +29,7 @@ VAR
 	fbCoordinatesTests		: IagCoordinates_Tests;
 	fbSlewHaDecTests		: IagSlewHaDec_Tests;
 	fbRefractionTests		: IagRefraction_Tests;	// IAG50cm#7
+	fbLibraryMatchesTests	: IagLibraryMatchesLegacy_Tests;	// IAG50cm#17
 END_VAR
 ]]></Declaration>
     <Implementation>

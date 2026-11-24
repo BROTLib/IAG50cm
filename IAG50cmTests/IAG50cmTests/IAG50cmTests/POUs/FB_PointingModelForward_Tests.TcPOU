@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="FB_PointingModelForward_Tests" Id="{88bf79e3-f7f3-454d-be5e-7c7cc042f0fe}" SpecialFunc="None">
-    <Declaration><![CDATA[// Tests for FB_PointingModelForward at the zenith (#4): finite outputs, continuity, unchanged values elsewhere.
+    <Declaration><![CDATA[// Tests for the pointing model (BROTLib.FB_EqPointingModelForward with GVL_Pointing.stCoeffOld since #17) at the zenith (#4): finite outputs, continuity, unchanged values elsewhere.
 FUNCTION_BLOCK FB_PointingModelForward_Tests EXTENDS TcUnit.FB_TestSuite
 VAR
 END_VAR
@@ -18,7 +18,7 @@ Horizon_Valid_Flag();
     <Method Name="Zenith_Is_Finite" Id="{8f719b3b-2e7e-46c0-961a-87bf874a4574}">
       <Declaration><![CDATA[METHOD PRIVATE Zenith_Is_Finite
 VAR
-	fbModel	: FB_PointingModelForward;
+	fbModel	: BROTLib.FB_EqPointingModelForward;
 	i		: INT;
 	j		: INT;
 	fLat	: LREAL;
@@ -34,7 +34,7 @@ FOR i := -179 TO 179 DO
 	fLat := INT_TO_LREAL(i) * 0.5;
 	FOR j := -1 TO 1 DO
 		fHa := INT_TO_LREAL(j) * 1.0E-6;
-		fbModel(HourAngle := fHa, Declination := fLat, Latitude := fLat);
+		fbModel(HourAngle := fHa, Declination := fLat, Latitude := fLat, stCoefficients := GVL_Pointing.stCoeffOld);
 		bOk := bOk AND (ABS(fbModel.HourAngle_correction) < 1.0E3) AND (ABS(fbModel.Declination_correction) < 1.0E3)
 			AND (ABS(fbModel.HourAngle_velocity) < 1.0E3) AND (ABS(fbModel.Declination_velocity) < 1.0E3);
 	END_FOR
@@ -47,13 +47,13 @@ TEST_FINISHED();
     <Method Name="Zenith_Velocity_Is_Sidereal" Id="{e45ac4fb-e136-436a-9636-a34ee20b895a}">
       <Declaration><![CDATA[METHOD PRIVATE Zenith_Velocity_Is_Sidereal
 VAR
-	fbModel	: FB_PointingModelForward;
+	fbModel	: BROTLib.FB_EqPointingModelForward;
 END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[TEST('Zenith_Velocity_Is_Sidereal');
 // at the site zenith the HA velocity is close to sidereal (0.0039 deg/s) and the Dec velocity is small, no jump (#4)
-fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378);
+fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertEquals_LREAL(Expected := 0.003906120536459564, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity');
 AssertEquals_LREAL(Expected := 0.0000671134505799, Actual := fbModel.Declination_velocity, Delta := 1.0E-9, Message := 'Dec velocity');
 TEST_FINISHED();
@@ -63,20 +63,20 @@ TEST_FINISHED();
     <Method Name="Near_Zenith_Is_Continuous" Id="{e2032857-e82c-4c61-a470-643cdd298aa4}">
       <Declaration><![CDATA[METHOD PRIVATE Near_Zenith_Is_Continuous
 VAR
-	fbModel	: FB_PointingModelForward;
+	fbModel	: BROTLib.FB_EqPointingModelForward;
 	fHaVelZenith	: LREAL;
 	fDecVelZenith	: LREAL;
 END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[TEST('Near_Zenith_Is_Continuous');
-fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378);
+fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 fHaVelZenith := fbModel.HourAngle_velocity;
 fDecVelZenith := fbModel.Declination_velocity;
-fbModel(HourAngle := 1.0E-3, Declination := 51.5592378, Latitude := 51.5592378);
+fbModel(HourAngle := 1.0E-3, Declination := 51.5592378, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertEquals_LREAL(Expected := fHaVelZenith, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-6, Message := 'HA velocity, HA offset');
 AssertEquals_LREAL(Expected := fDecVelZenith, Actual := fbModel.Declination_velocity, Delta := 1.0E-6, Message := 'Dec velocity, HA offset');
-fbModel(HourAngle := 0.0, Declination := 51.5592378 - 1.0E-3, Latitude := 51.5592378);
+fbModel(HourAngle := 0.0, Declination := 51.5592378 - 1.0E-3, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertEquals_LREAL(Expected := fHaVelZenith, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-6, Message := 'HA velocity, Dec offset');
 AssertEquals_LREAL(Expected := fDecVelZenith, Actual := fbModel.Declination_velocity, Delta := 1.0E-6, Message := 'Dec velocity, Dec offset');
 TEST_FINISHED();
@@ -86,18 +86,18 @@ TEST_FINISHED();
     <Method Name="Reference_Points_Unchanged" Id="{db1a8278-856e-4db0-91d0-3c2e27da78f1}">
       <Declaration><![CDATA[METHOD PRIVATE Reference_Points_Unchanged
 VAR
-	fbModel	: FB_PointingModelForward;
+	fbModel	: BROTLib.FB_EqPointingModelForward;
 END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[TEST('Reference_Points_Unchanged');
 // reference values from testing/check_pointing_zenith.py, site latitude
-fbModel(HourAngle := 20.0, Declination := 40.0, Latitude := 51.5592378);
+fbModel(HourAngle := 20.0, Declination := 40.0, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertEquals_LREAL(Expected := 0.2519851785590655, Actual := fbModel.HourAngle_correction, Delta := 1.0E-9, Message := 'HA correction 1');
 AssertEquals_LREAL(Expected := -0.21403018480072264, Actual := fbModel.Declination_correction, Delta := 1.0E-9, Message := 'Dec correction 1');
 AssertEquals_LREAL(Expected := 0.004006846115724003, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity 1');
 AssertEquals_LREAL(Expected := 0.00016906699168115099, Actual := fbModel.Declination_velocity, Delta := 1.0E-9, Message := 'Dec velocity 1');
-fbModel(HourAngle := -35.0, Declination := 10.0, Latitude := 51.5592378);
+fbModel(HourAngle := -35.0, Declination := 10.0, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertEquals_LREAL(Expected := 0.3090530046351645, Actual := fbModel.HourAngle_correction, Delta := 1.0E-9, Message := 'HA correction 2');
 AssertEquals_LREAL(Expected := -0.19901388936334252, Actual := fbModel.Declination_correction, Delta := 1.0E-9, Message := 'Dec correction 2');
 AssertEquals_LREAL(Expected := 0.00406630604072863, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity 2');
@@ -109,7 +109,7 @@ TEST_FINISHED();
     <Method Name="Horizon_Is_Finite" Id="{5b0c6a1e-2f0d-4c53-9d1a-7e3b84f2a6c1}">
       <Declaration><![CDATA[METHOD PRIVATE Horizon_Is_Finite
 VAR
-	fbModel	: FB_PointingModelForward;
+	fbModel	: BROTLib.FB_EqPointingModelForward;
 	i		: INT;
 	j		: INT;
 	fHa		: LREAL;
@@ -125,13 +125,13 @@ FOR i := -90 TO 90 DO
 	fHa := 90.0 + INT_TO_LREAL(i) * 0.5;
 	FOR j := -2 TO 2 DO
 		fDec := INT_TO_LREAL(j) * 10.0;
-		fbModel(HourAngle := fHa, Declination := fDec, Latitude := 51.5592378);
+		fbModel(HourAngle := fHa, Declination := fDec, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 		bOk := bOk AND (ABS(fbModel.HourAngle_correction) < 1.0E3) AND (ABS(fbModel.Declination_correction) < 1.0E3)
 			AND (ABS(fbModel.HourAngle_velocity) < 1.0E3) AND (ABS(fbModel.Declination_velocity) < 1.0E3);
 	END_FOR
 END_FOR
 // exactly on the horizon
-fbModel(HourAngle := 90.0, Declination := 0.0, Latitude := 51.5592378);
+fbModel(HourAngle := 90.0, Declination := 0.0, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 bOk := bOk AND (ABS(fbModel.HourAngle_correction) < 1.0E3) AND (ABS(fbModel.Declination_correction) < 1.0E3)
 	AND (ABS(fbModel.HourAngle_velocity) < 1.0E3) AND (ABS(fbModel.Declination_velocity) < 1.0E3);
 AssertTrue(Condition := bOk, Message := 'all outputs finite around and on the horizon');
@@ -143,26 +143,26 @@ TEST_FINISHED();
     <Method Name="Horizon_Valid_Flag" Id="{c93e17d4-8a52-4b7e-b1f6-0d4a5e29c8b3}">
       <Declaration><![CDATA[METHOD PRIVATE Horizon_Valid_Flag
 VAR
-	fbModel	: FB_PointingModelForward;
+	fbModel	: BROTLib.FB_EqPointingModelForward;
 END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[TEST('Horizon_Valid_Flag');
 // Dec 0: sin(alt) = cos(lat) * cos(HA), so at the site latitude HA 89.2 is altitude 0.5 deg and HA 86.8 is altitude 2 deg
 // altitude about 0.5 deg: not valid, no correction, sidereal HA velocity
-fbModel(HourAngle := 90.0 - 0.8, Declination := 0.0, Latitude := 51.5592378);
+fbModel(HourAngle := 90.0 - 0.8, Declination := 0.0, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertFalse(Condition := fbModel.bValid, Message := 'altitude 0.5 deg: not valid');
 AssertEquals_LREAL(Expected := 0.0, Actual := fbModel.HourAngle_correction, Delta := 1.0E-12, Message := 'HA correction 0');
 AssertEquals_LREAL(Expected := 0.0, Actual := fbModel.Declination_correction, Delta := 1.0E-12, Message := 'Dec correction 0');
 AssertEquals_LREAL(Expected := 360.0 / 86164.099, Actual := fbModel.HourAngle_velocity, Delta := 1.0E-9, Message := 'HA velocity sidereal');
 AssertEquals_LREAL(Expected := 0.0, Actual := fbModel.Declination_velocity, Delta := 1.0E-12, Message := 'Dec velocity 0');
 // altitude about 2 deg: valid
-fbModel(HourAngle := 90.0 - 3.2, Declination := 0.0, Latitude := 51.5592378);
+fbModel(HourAngle := 90.0 - 3.2, Declination := 0.0, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertTrue(Condition := fbModel.bValid, Message := 'altitude 2 deg: valid');
 // the reference points are valid
-fbModel(HourAngle := 20.0, Declination := 40.0, Latitude := 51.5592378);
+fbModel(HourAngle := 20.0, Declination := 40.0, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertTrue(Condition := fbModel.bValid, Message := 'reference point 1 valid');
-fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378);
+fbModel(HourAngle := 0.0, Declination := 51.5592378, Latitude := 51.5592378, stCoefficients := GVL_Pointing.stCoeffOld);
 AssertTrue(Condition := fbModel.bValid, Message := 'zenith valid');
 TEST_FINISHED();
 ]]></ST>
