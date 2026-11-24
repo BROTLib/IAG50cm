@@ -3,7 +3,7 @@
   <POU Name="MAIN" Id="{d994e49b-b7f8-4497-8346-561ddfb9c2db}" SpecialFunc="None">
     <Declaration><![CDATA[PROGRAM MAIN
 VAR
-	comm			: FB_IagComm;	// BROTLib.FB_Comm_MQTT_Influx plus "command refraction=old|new" (IAG50cm#7)
+	comm			: FB_Comm_MQTT_Influx;
 	coverControl	: FB_CoverControl(comm := comm);
 	focusControl	: FB_FocusControl(comm:=comm);
 	haControl		: FB_HourAngleControl(comm:=comm);

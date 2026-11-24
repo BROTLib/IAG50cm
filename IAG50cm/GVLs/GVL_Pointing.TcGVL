@@ -49,8 +49,7 @@
 		C_Flex_dec	:= -0.02055715);
 END_VAR
 VAR_GLOBAL PERSISTENT
-	// The refraction switch (IAG50cm#7): set it with the MQTT command "command refraction=old|new" (FB_IagComm) or online
-	// in XAE. MAIN hands it to the telescope every cycle; it takes effect at once, also while tracking (the target moves
+	// The refraction switch (IAG50cm#7): set it online in XAE (write value). MAIN hands it to the telescope every cycle; it takes effect at once, also while tracking (the target moves
 	// by the difference of the two models). Kept over a restart; a new persistent layout starts with OLD.
 	eRefractionMode	: E_RefractionMode := E_RefractionMode.OLD;
 END_VAR
