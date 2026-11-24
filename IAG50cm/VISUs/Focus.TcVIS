@@ -2612,7 +2612,7 @@
                         </o>
                         <o>
                           <v n="Id">743958181L</v>
-                          <v n="Value">"MAIN.focusControl.MovePos"</v>
+                          <v n="Value">"MAIN.focusControl.bMovePos"</v>
                         </o>
                       </l>
                     </o>
