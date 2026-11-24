@@ -210,6 +210,18 @@ END_VAR
 ]]></ST>
       </Implementation>
     </Method>
+    <Method Name="SetSafetyAckPending" Id="{9e3b7c41-2d6a-4f58-a0c3-71b5e4d2f806}">
+      <Declaration><![CDATA[// the input bSafetyAckPending of the telescope under test, as MAIN sets it from FB_SafetyHandling.ackPending (#199)
+METHOD SetSafetyAckPending
+VAR_INPUT
+	bValue	: BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[fbTel.bSafetyAckPending := bValue;
+]]></ST>
+      </Implementation>
+    </Method>
     <Method Name="SetSlewInput" Id="{56f9b5ac-d946-4b7f-bf1f-220a8f105ee7}">
       <Declaration><![CDATA[// the command input bSlew of the telescope under test, as an ADS writer sets it (not the method)
 METHOD SetSlewInput

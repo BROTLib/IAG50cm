@@ -681,7 +681,7 @@ nCycles := nCycles + 1;
 CASE nStep OF
 0:	// wait for the clock, then a power-on while the acknowledge after an E-stop is pending: refused
 	IF rig.ClockValid THEN
-		rig.fbTel.bSafetyAckPending := TRUE;
+		rig.SetSafetyAckPending(TRUE);
 		rig.fbTel.Init();
 		nStep := 10;
 		nCycles := 0;
@@ -703,7 +703,7 @@ CASE nStep OF
 	END_IF
 20:	// the acknowledge is done (as after the first reset on the telescope), then a reset with no error and nothing pending
 	IF nCycles > 5 THEN
-		rig.fbTel.bSafetyAckPending := FALSE;
+		rig.SetSafetyAckPending(FALSE);
 		rig.fbTel.Reset();
 		nStep := 30;
 		nCycles := 0;
