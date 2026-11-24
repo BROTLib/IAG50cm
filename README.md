@@ -282,6 +282,10 @@ A single TwinCAT visualization, `Safety` (`VISUs/Safety.TcVIS`), provides the
 safety operator page: ErrAck / Restart toggle switches bound to `GVL_Safety`
 and labels for E-stop / STO / EL1904 / EL2904 diagnostics (the diagnostic
 function blocks feeding it are currently commented out in `FB_SafetyHandling`).
+Like the MONET Safety visu it shows one red STO lamp per drive (Dec, HA, Focus):
+`FB_SafetyHandling.bStoDec/bStoHa/bStoFocus`, read from the `STO_active_ChA/ChB`
+bits of the drives' FSoE messages to the EL1918 (the drives' own `STO_STATE`).
+A drive whose FSoE connection is not in ProcessData is shown torque-free.
 
 ---
 

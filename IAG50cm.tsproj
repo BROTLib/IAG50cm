@@ -2425,6 +2425,31 @@ External Setpoint Generation:
 							<Name>MAIN.safetyHandling.stInfoSafetyOut</Name>
 							<Type GUID="{09C911EB-69BC-418A-FB6C-0128FB138416}" Namespace="BROTLib">ST_InfoDataConnection</Type>
 						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.nFsoeCmdHaDec</Name>
+							<Comment><![CDATA[ HA DEC (ELM7212): FSoE command of the send message]]></Comment>
+							<Type>USINT</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.bStoActiveChADec</Name>
+							<Comment><![CDATA[ HA DEC (ELM7212) STO_active_ChA: channel 1, Dec drive]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.bStoActiveChBHa</Name>
+							<Comment><![CDATA[ HA DEC (ELM7212) STO_active_ChB: channel 2, HA drive]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.nFsoeCmdFocus</Name>
+							<Comment><![CDATA[ FOCUS (ELM7221): FSoE command of the send message]]></Comment>
+							<Type>USINT</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.safetyHandling.bStoActiveChAFocus</Name>
+							<Comment><![CDATA[ FOCUS (ELM7221) STO_active_ChA]]></Comment>
+							<Type>BOOL</Type>
+						</Var>
 					</Vars>
 					<Vars VarGrpType="2" ContextId="1" AreaNo="17">
 						<Name>PlcTask Outputs</Name>
@@ -8241,10 +8266,15 @@ Bit 8 - 15 : reserved]]></Comment>
 				<Link VarA="PlcTask_Fast Outputs^SerialBackground.fbPendantSerial.stOut_EL6001^D" VarB="COM RxPDO-Map Outputs Channel 1^Data Out 9" Size="8" OffsA="72"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^FOCUS (ELM7221-9016)">
+				<Link VarA="PlcTask Inputs^MAIN.safetyHandling.bStoActiveChAFocus" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1^STO_active_ChA"/>
+				<Link VarA="PlcTask Inputs^MAIN.safetyHandling.nFsoeCmdFocus" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1^FSoE Cmd"/>
 				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 3"/>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 2"/>
 			</OwnerB>
 			<OwnerB Name="TIID^Device 1 (EtherCAT)^Term 1 (EK1200)^HA DEC (ELM7212-9016)">
+				<Link VarA="PlcTask Inputs^MAIN.safetyHandling.bStoActiveChADec" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1^STO_active_ChA"/>
+				<Link VarA="PlcTask Inputs^MAIN.safetyHandling.bStoActiveChBHa" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1^STO_active_ChB"/>
+				<Link VarA="PlcTask Inputs^MAIN.safetyHandling.nFsoeCmdHaDec" VarB="Module 1 (SAFETY)^SAFETY FSoE Connection 1 Send Message^Message_1^FSoE Cmd"/>
 				<Link VarA="PlcTask Outputs^GVL_Safety.ErrAck" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 3"/>
 				<Link VarA="PlcTask Outputs^GVL_Safety.Run" VarB="Module 1 (SAFETY)^SAFETY Standard Outputdata^Standard In Var 2"/>
 			</OwnerB>

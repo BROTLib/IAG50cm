@@ -36,6 +36,11 @@
               <l n="LanguageTexts" t="ArrayList" />
             </o>
             <o>
+              <v n="TextID">"901"</v>
+              <v n="TextDefault">"Dec:"</v>
+              <l n="LanguageTexts" t="ArrayList" />
+            </o>
+            <o>
               <v n="TextID">"815"</v>
               <v n="TextDefault">"Derotator:"</v>
               <l n="LanguageTexts" t="ArrayList" />
@@ -78,6 +83,16 @@
             <o>
               <v n="TextID">"225"</v>
               <v n="TextDefault">"Estop: %s"</v>
+              <l n="LanguageTexts" t="ArrayList" />
+            </o>
+            <o>
+              <v n="TextID">"903"</v>
+              <v n="TextDefault">"Focus:"</v>
+              <l n="LanguageTexts" t="ArrayList" />
+            </o>
+            <o>
+              <v n="TextID">"902"</v>
+              <v n="TextDefault">"HA:"</v>
               <l n="LanguageTexts" t="ArrayList" />
             </o>
             <o>

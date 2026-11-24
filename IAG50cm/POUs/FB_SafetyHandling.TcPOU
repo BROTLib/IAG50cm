@@ -42,6 +42,16 @@ VAR
 	bSafetyOutCh3			: BOOL;
 	bSafetyOutCh4			: BOOL;
 	
+	// STO state of the drives for the Safety visu (display only, like the IbSTO lamps of MONET). Read from the FSoE
+	// messages the drives send to the EL1918: the safety logic of each drive puts its STO_STATE (TRUE = torque-free)
+	// into STO_active_ChX. The bits are data only while the connection runs (FSoE command ProcessData, 16#36): in any
+	// other state (start-up, fail-safe data, unlinked) the drive is shown torque-free.
+	nFsoeCmdHaDec		AT%I*	: USINT;	// HA DEC (ELM7212): FSoE command of the send message
+	bStoActiveChADec	AT%I*	: BOOL;		// HA DEC (ELM7212) STO_active_ChA: channel 1, Dec drive
+	bStoActiveChBHa		AT%I*	: BOOL;		// HA DEC (ELM7212) STO_active_ChB: channel 2, HA drive
+	nFsoeCmdFocus		AT%I*	: USINT;	// FOCUS (ELM7221): FSoE command of the send message
+	bStoActiveChAFocus	AT%I*	: BOOL;		// FOCUS (ELM7221) STO_active_ChA
+
 	initialStartUpStep		: INT := 0;
 	startDelay 				: TON := (PT := T#2S);
 	stateDelay 				: TON := (PT := T#1S);
@@ -72,6 +82,12 @@ VAR_OUTPUT
 	estop					: BOOL;		// Emergency_stop engaged
 	ackPending				: BOOL;		// E-stop seen, no clean acknowledge since (#59)
 	bStartUpDone			: BOOL;		// the start-up ErrAck/Restart sequence is finished (#103)
+	bStoDec					: BOOL;		// Dec drive torque-free (STO), display only
+	bStoHa					: BOOL;		// HA drive torque-free (STO), display only
+	bStoFocus				: BOOL;		// focus drive torque-free (STO), display only
+END_VAR
+VAR CONSTANT
+	FSOE_CMD_PROCESSDATA	: USINT := 16#36;	// FSoE command of a running connection
 END_VAR
 VAR_INPUT
 	// issue a remote restart
@@ -122,7 +138,12 @@ fbInfoSafetyOut(
 	bChannel3		=>bSafetyOutCh3, 
 	bChannel4		=>bSafetyOutCh4);
 
-// initial startup	
+// STO state of the drives (display only)
+bStoDec		:= bStoActiveChADec OR nFsoeCmdHaDec <> FSOE_CMD_PROCESSDATA;
+bStoHa		:= bStoActiveChBHa OR nFsoeCmdHaDec <> FSOE_CMD_PROCESSDATA;
+bStoFocus	:= bStoActiveChAFocus OR nFsoeCmdFocus <> FSOE_CMD_PROCESSDATA;
+
+// initial startup
 CASE initialStartUpStep OF
 	0:
 		// begin start up procedure, do ErrAck
