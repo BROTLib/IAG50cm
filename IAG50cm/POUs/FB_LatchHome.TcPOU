@@ -32,7 +32,10 @@ VAR_INPUT
 	(* #165: maximum distance of the axis from where the sequence started, over all segments and restarts (0 = off). The
 	   limit per step does not bound the sequence: 3 steps out, a jog and 3 back, and an abort restarts it. *)
 	TravelLimit				: LREAL;
-	
+	(* #237: NC encoder ID of the axis (as in the System Manager), for the abort of the touch probe after a reset-ended
+	   abort (0 = no abort of the touch probe) *)
+	EncoderID					: UDINT;
+
 	(* Set bipolar torque limit to this value to avoid mechanical damadges [%] *)
 	TorqueLimit					: LREAL;								(* E *)
 
@@ -104,6 +107,13 @@ VAR
 	fbTimeOut					: TON;
 	fbLockWait					: TON;									(* #113: longest wait for the MC_Stop lock before MC_AbortHoming *)
 	fbAbortTimeout				: TON;									(* #155: longest time in the abort state, it has no other exit *)
+
+	(* #237: clean-up after an abort that the axis reset ended (state 21) *)
+	stProbeRef					: TRIGGER_REF;							(* the touch probe the reference step armed *)
+	fbAbortProbe				: MC_AbortTrigger;
+	nCleanup					: INT;
+	fbCleanupTimeout			: TON;									(* longest time of the clean-up, it then ends anyway *)
+	nCleanupErrorID				: UDINT;								(* diagnostics: last error of the clean-up (not reported) *)
 END_VAR
 VAR CONSTANT
 	ERR_ABORT_TIMEOUT			: UDINT := 16#4F000001;					(* #155: the abort did not finish in time *)
@@ -151,6 +161,7 @@ IF nState >= 1 AND nState <= 6 AND (NOT Execute OR StopActive OR bTravelExceeded
 END_IF
 fbLockWait(IN := nState = 20 AND StopActive AND NOT StepAbortHoming.Busy, PT := T#5S);
 fbAbortTimeout(IN := nState = 20, PT := T#10S);
+fbCleanupTimeout(IN := nState = 21, PT := T#5S);	// #237
 // #155: not in the scan in which the abort ended: the NC has to settle, a start at once overlapped it (4B66)
 fbRearmDelay(IN := bRearm AND nState = 0 AND Execute, PT := T#300MS);
 IF fbRearmDelay.Q THEN
@@ -463,20 +474,20 @@ CASE nState OF
 				Parameter			:= Parameter,
 				Execute				:= FALSE,
 				Options				:= );
-			Busy := FALSE;
-			IF Reset AND iErrorId <> 0 THEN
-				// #237: the abort was the travel limit (the marks were not found) and a step was still busy, so the end of
-				// the abort came through the reset this block asked for. That reset only set CommandAborted: the error was
-				// lost, Execute stayed TRUE without a re-arm and the power-on hung until its 3 min timeout (2026-11-24).
-				Error := TRUE;
-				ErrorID := iErrorId;
-			ELSIF Reset THEN
-				CommandAborted := TRUE;
+			IF Reset THEN
+				// #237: the reset ended the running step, but MC_AbortHoming never ran: the touch probe of the step
+				// stayed armed (MC_TouchProbe Busy) and the homing parameters stayed stored (Parameter.Stored TRUE, the
+				// NC monitoring still as set for the homing). Every later sweep then found no marker (19210) until a PLC
+				// restart. Clean up first (state 21), then report as before.
+				nCleanup := 0;
+				nCleanupErrorID := 0;
+				nState := 21;
 			ELSE
+				Busy := FALSE;
 				Error := TRUE;
 				ErrorID := ERR_ABORT_TIMEOUT;
+				nState := 0;
 			END_IF
-			nState := 0;
 		ELSE
 		// #113: MC_Stop locks the axis for motion commands until it is done (StateDWord bit 29); MC_AbortHoming sent into the
 		// lock is rejected (17135) and the error disables both axes. Wait for the lock to clear, 5 s at most.
@@ -528,6 +539,83 @@ CASE nState OF
 			END_IF
 			END_IF
 		END_IF
+		END_IF
+
+	21:	(* #237: clean-up after an abort that the axis reset ended *)
+		// the step blocks get Execute FALSE, so the step sees the abort of its touch probe
+		StepReferencePulseDetection(
+			Execute					:= FALSE,
+			Parameter				:= Parameter,
+			Axis					:= Axis);
+		CASE nCleanup OF
+			0:	// MC_AbortHoming into the MC_Stop lock is rejected (17135, #113): wait for the lock, at most 2 s
+				IF NOT StopActive OR fbCleanupTimeout.ET >= T#2S THEN
+					IF EncoderID <> 0 THEN
+						nCleanup := 1;
+					ELSE
+						nCleanup := 2;
+					END_IF
+				END_IF
+			1:	// disarm the touch probe the reference step left armed
+				stProbeRef.EncoderID := EncoderID;
+				stProbeRef.TouchProbe := RefSignal.TouchProbe;
+				fbAbortProbe(
+					Execute				:= TRUE,
+					Axis				:= Axis,
+					TriggerInput		:= stProbeRef);
+				IF NOT fbAbortProbe.Busy AND (fbAbortProbe.Done OR fbAbortProbe.Error) THEN
+					IF fbAbortProbe.Error THEN
+						nCleanupErrorID := fbAbortProbe.ErrorID;	// e.g. the probe was not armed: go on
+					END_IF
+					fbAbortProbe(
+						Execute				:= FALSE,
+						Axis				:= Axis,
+						TriggerInput		:= stProbeRef);
+					nCleanup := 2;
+				END_IF
+			2:	// restore the homing parameters (the NC monitoring) and clear Parameter.Stored; no step runs any more
+				StepAbortHoming.Options.DisableDriveAccess := Options.DisableDriveAccess;
+				StepAbortHoming(
+					Axis				:= Axis,
+					Parameter			:= Parameter,
+					Execute				:= TRUE,
+					Options				:= );
+				IF NOT StepAbortHoming.Busy AND (StepAbortHoming.Done OR StepAbortHoming.Error) THEN
+					IF StepAbortHoming.Error THEN
+						nCleanupErrorID := StepAbortHoming.ErrorID;
+					END_IF
+					StepAbortHoming(
+						Axis				:= Axis,
+						Parameter			:= Parameter,
+						Execute				:= FALSE,
+						Options				:= );
+					nCleanup := 3;
+				END_IF
+		END_CASE
+		IF nCleanup = 3 OR fbCleanupTimeout.Q THEN
+			IF fbCleanupTimeout.Q THEN
+				nCleanupErrorID := ERR_ABORT_TIMEOUT;
+			END_IF
+			fbAbortProbe(
+				Execute				:= FALSE,
+				Axis				:= Axis,
+				TriggerInput		:= stProbeRef);
+			StepAbortHoming(
+				Axis				:= Axis,
+				Parameter			:= Parameter,
+				Execute				:= FALSE,
+				Options				:= );
+			Busy := FALSE;
+			IF iErrorId <> 0 THEN
+				// #237: the abort was the travel limit (the marks were not found) and a step was still busy, so the end of
+				// the abort came through the reset this block asked for. That reset only set CommandAborted: the error was
+				// lost, Execute stayed TRUE without a re-arm and the power-on hung until its 3 min timeout (2026-11-24).
+				Error := TRUE;
+				ErrorID := iErrorId;
+			ELSE
+				CommandAborted := TRUE;
+			END_IF
+			nState := 0;
 		END_IF
 
 END_CASE]]></ST>

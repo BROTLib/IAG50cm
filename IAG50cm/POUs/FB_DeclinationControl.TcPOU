@@ -99,6 +99,7 @@ fbLatchHome(
 	TimeLimit 			:= T#1M,
 	DistanceLimit 		:= 6,
 	TravelLimit			:= 21,	// #165: 3 steps of 6 deg and the 2 deg jog, plus a margin
+	EncoderID			:= 1,	// #237: NC encoder ID of the Dec (TriggerRef.EncoderID of the step, 2026-11-24)
 	Error 				=> bLatchHomeError,
 	ErrorID 			=> nLatchHomeErrorID);
 	
