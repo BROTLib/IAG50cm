@@ -2324,7 +2324,7 @@ External Setpoint Generation:
 		</Motion>
 		<Plc>
 			<Project GUID="{30056B24-4448-422C-A198-D2875E035098}" Name="IAG50cm" PrjFilePath="IAG50cm\IAG50cm.plcproj" TmcFilePath="IAG50cm\IAG50cm.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{3FFB9824-4F6C-5E16-2789-16243AB2D80A}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IAG50cm\IAG50cm.tmc" TmcHash="{6F8E44C2-5686-3237-7C7A-BE3EFB9EE446}">
 					<Name>IAG50cm Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1">
@@ -2469,11 +2469,6 @@ External Setpoint Generation:
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
-							<Name>MAIN.coverControl.bMotor1RelaisA</Name>
-							<Comment><![CDATA[ Motor relais]]></Comment>
-							<Type>BOOL</Type>
-						</Var>
-						<Var>
 							<Name>MAIN.coverControl.bMotor1RelaisB</Name>
 							<Type>BOOL</Type>
 						</Var>
@@ -2483,6 +2478,11 @@ External Setpoint Generation:
 						</Var>
 						<Var>
 							<Name>MAIN.coverControl.bMotor2RelaisB</Name>
+							<Type>BOOL</Type>
+						</Var>
+						<Var>
+							<Name>MAIN.coverControl.bMotor1RelaisA</Name>
+							<Comment><![CDATA[ Motor relais]]></Comment>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
@@ -2503,12 +2503,12 @@ External Setpoint Generation:
 						</Var>
 						<Var>
 							<Name>MAIN.telescopeControl.fbCabinet.bOWarnLamp</Name>
-							<Comment><![CDATA[ Reset 24V (EL2004) channel 3: warning lamp, telescope in use during the day]]></Comment>
+							<Comment><![CDATA[ Reset 24V (EL2004) channel 4: warning lamp, telescope in use during the day]]></Comment>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
 							<Name>MAIN.telescopeControl.fbCabinet.bOWarnSiren</Name>
-							<Comment><![CDATA[ Reset 24V (EL2004) channel 4: warning sound while the telescope slews]]></Comment>
+							<Comment><![CDATA[ Reset 24V (EL2004) channel 3: warning sound while the telescope slews]]></Comment>
 							<Type>BOOL</Type>
 						</Var>
 						<Var>
