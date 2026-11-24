@@ -30,6 +30,7 @@ VAR
 	fbSlewHaDecTests		: IagSlewHaDec_Tests;
 	fbRefractionTests		: IagRefraction_Tests;	// IAG50cm#7
 	fbLibraryMatchesTests	: IagLibraryMatchesLegacy_Tests;	// IAG50cm#17
+	fbFocusTargetWhileOffTests	: F_FocusTargetWhileOff_Tests;	// IAG50cm#242
 END_VAR
 ]]></Declaration>
     <Implementation>

@@ -13,6 +13,7 @@ FB_LatchHome.TcPOU
 FB_CabinetControl.TcPOU
 F_HourAngleOffsetOnAxis.TcPOU
 F_RoundLREAL.TcPOU
+F_FocusTargetWhileOff.TcPOU
 NCError_TO_STRING.TcPOU
 F_SunElevation.TcPOU
 FB_StepDrain.TcPOU

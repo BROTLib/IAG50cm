@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="F_FocusTargetWhileOff" Id="{3fa9a7e7-fefc-4bd5-8dd6-ea21b3eba719}" SpecialFunc="None">
+    <Declaration><![CDATA[// IAG50cm#242: the focus target while the focus axis is switched off. A switched-off, calibrated focus holds its target at
+// the actual position, so nothing written while it is off (pendant key while parked, VISU, ADS) is queued and driven to at
+// the next enable. Keyed on the enable and not on Ready: the power-on writes its target (focusPark) in the same scan as the
+// enable, before the axis is ready, and that target must be kept.
+FUNCTION F_FocusTargetWhileOff : LREAL
+VAR_INPUT
+	bEnable		: BOOL;		// the focus enable (FB_FocusControl.bEnable)
+	bCalibrated	: BOOL;		// fbAxis.Calibrated: the actual position is valid
+	fTarget		: LREAL;	// the target as written (fPosition)
+	fActual		: LREAL;	// the actual position
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF NOT bEnable AND bCalibrated THEN
+	F_FocusTargetWhileOff := fActual;
+ELSE
+	F_FocusTargetWhileOff := fTarget;
+END_IF
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

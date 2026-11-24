@@ -33,6 +33,9 @@
     <Compile Include="POUs\FB_HomeHold_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\F_FocusTargetWhileOff_Tests.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\FB_SweepStop_Tests.TcPOU">
       <SubType>Code</SubType>
     </Compile>
@@ -61,6 +64,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\F_RoundLREAL.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\F_FocusTargetWhileOff.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\NCError_TO_STRING.TcPOU">

@@ -53,6 +53,10 @@ IF bError AND fbAxis.Calibrated THEN
 	fPosition := fActualPosition;
 END_IF
 
+// #242: a switched-off focus holds its target at the actual position, so a pendant key, the VISU or ADS while parked
+// queues nothing that runs at the next enable (the power-on target is written with the enable and is kept)
+fPosition := F_FocusTargetWhileOff(bEnable := bEnable, bCalibrated := fbAxis.Calibrated, fTarget := fPosition, fActual := fActualPosition);
+
 // while jogging the focus is moved by hand: the target follows it, so the follower holds the new position afterwards
 IF bJogging AND fbAxis.Calibrated THEN
 	fPosition := fActualPosition;

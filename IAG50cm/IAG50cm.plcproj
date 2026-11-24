@@ -117,6 +117,9 @@
     <Compile Include="POUs\Functions\F_RoundLREAL.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\Functions\F_FocusTargetWhileOff.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\FB_HomeDropReason.TcPOU">
       <SubType>Code</SubType>
     </Compile>

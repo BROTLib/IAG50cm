@@ -1,0 +1,80 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="F_FocusTargetWhileOff_Tests" Id="{bd6844e8-b6f0-4b4c-802b-1c484f5b1651}" SpecialFunc="None">
+    <Declaration><![CDATA[// Tests for F_FocusTargetWhileOff, the focus target hold while the focus is switched off (IAG50cm#242).
+FUNCTION_BLOCK F_FocusTargetWhileOff_Tests EXTENDS TcUnit.FB_TestSuite
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[Off_And_Calibrated_Holds_The_Actual_Position();
+Repeated_Keys_While_Off_Do_Not_Add_Up();
+Enabled_Keeps_The_Target();
+PowerOn_Target_Written_With_The_Enable_Is_Kept();
+Off_And_Not_Calibrated_Keeps_The_Target();
+]]></ST>
+    </Implementation>
+    <Method Name="Off_And_Calibrated_Holds_The_Actual_Position" Id="{bb83b1d0-26e8-4de2-8612-9be5caf4137b}">
+      <Declaration><![CDATA[METHOD PRIVATE Off_And_Calibrated_Holds_The_Actual_Position
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Off_And_Calibrated_Holds_The_Actual_Position');
+// the #242 case: parked, the pendant raised the target to 16.4, the focus stands at 16.3002
+AssertEquals_LREAL(Expected := 16.3002, Actual := F_FocusTargetWhileOff(bEnable := FALSE, bCalibrated := TRUE, fTarget := 16.4, fActual := 16.3002), Delta := 0.0, Message := 'held at the actual position');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Repeated_Keys_While_Off_Do_Not_Add_Up" Id="{9b7585f7-a05d-4fd1-aa0d-01f84dd0bd6e}">
+      <Declaration><![CDATA[METHOD PRIVATE Repeated_Keys_While_Off_Do_Not_Add_Up
+VAR
+	fTarget	: LREAL;
+	i		: INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Repeated_Keys_While_Off_Do_Not_Add_Up');
+// the pendant steps from the target (ipFocus.Position): with the hold every key starts again from the actual position
+fTarget := 16.3;
+FOR i := 1 TO 5 DO
+	fTarget := F_FocusTargetWhileOff(bEnable := FALSE, bCalibrated := TRUE, fTarget := fTarget + 1.0, fActual := 16.3);
+END_FOR
+AssertEquals_LREAL(Expected := 16.3, Actual := fTarget, Delta := 0.0, Message := 'no queued steps');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Enabled_Keeps_The_Target" Id="{234bddbd-1cf6-463f-a1d3-a2f72d2e6255}">
+      <Declaration><![CDATA[METHOD PRIVATE Enabled_Keeps_The_Target
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Enabled_Keeps_The_Target');
+AssertEquals_LREAL(Expected := 16.4, Actual := F_FocusTargetWhileOff(bEnable := TRUE, bCalibrated := TRUE, fTarget := 16.4, fActual := 16.3), Delta := 0.0, Message := 'a running focus moves to its target');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="PowerOn_Target_Written_With_The_Enable_Is_Kept" Id="{a307f6d4-7c30-4f4f-927c-800e649c081b}">
+      <Declaration><![CDATA[METHOD PRIVATE PowerOn_Target_Written_With_The_Enable_Is_Kept
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('PowerOn_Target_Written_With_The_Enable_Is_Kept');
+// power-on stage 70: Enable := TRUE and Position := focusPark in the same scan, the axis is not ready yet
+AssertEquals_LREAL(Expected := 16.3, Actual := F_FocusTargetWhileOff(bEnable := TRUE, bCalibrated := TRUE, fTarget := 16.3, fActual := 15.0), Delta := 0.0, Message := 'power-on target kept');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Off_And_Not_Calibrated_Keeps_The_Target" Id="{a778f286-3a44-48d3-aeeb-18d5ab0311fc}">
+      <Declaration><![CDATA[METHOD PRIVATE Off_And_Not_Calibrated_Keeps_The_Target
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Off_And_Not_Calibrated_Keeps_The_Target');
+// without calibration the actual position is not trusted, as for the error, stop and jog holds
+AssertEquals_LREAL(Expected := 16.4, Actual := F_FocusTargetWhileOff(bEnable := FALSE, bCalibrated := FALSE, fTarget := 16.4, fActual := 0.0), Delta := 0.0, Message := 'uncalibrated: unchanged');
+TEST_FINISHED();
+]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>
