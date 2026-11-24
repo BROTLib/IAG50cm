@@ -30,6 +30,7 @@ CASE ErrorID OF
 	16#ED43:	NCError_TO_STRING := 'Under-voltage - DC link.';				
 	16#F324:	NCError_TO_STRING := 'Excessive position command value deviation';				
 	16#F601:	NCError_TO_STRING := 'Calibrate commutation offset error.';				
+	16#4F000003:	NCError_TO_STRING := 'Calibration: travel limit reached, no reference mark found (#237)';
 
 ELSE
 	NCError_TO_STRING := DWORD_TO_HEXSTR(ErrorID, 4, FALSE);

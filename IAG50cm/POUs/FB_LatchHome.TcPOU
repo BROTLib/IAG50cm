@@ -464,7 +464,13 @@ CASE nState OF
 				Execute				:= FALSE,
 				Options				:= );
 			Busy := FALSE;
-			IF Reset THEN
+			IF Reset AND iErrorId <> 0 THEN
+				// #237: the abort was the travel limit (the marks were not found) and a step was still busy, so the end of
+				// the abort came through the reset this block asked for. That reset only set CommandAborted: the error was
+				// lost, Execute stayed TRUE without a re-arm and the power-on hung until its 3 min timeout (2026-11-24).
+				Error := TRUE;
+				ErrorID := iErrorId;
+			ELSIF Reset THEN
 				CommandAborted := TRUE;
 			ELSE
 				Error := TRUE;
