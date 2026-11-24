@@ -19,3 +19,6 @@ NCError_TO_STRING.TcPOU
 F_SunElevation.TcPOU
 FB_StepDrain.TcPOU
 ST_AxisStatus.TcDUT
+E_RefractionMode.TcDUT
+ST_PointingCoefficients.TcDUT
+FB_RefractionShift.TcPOU

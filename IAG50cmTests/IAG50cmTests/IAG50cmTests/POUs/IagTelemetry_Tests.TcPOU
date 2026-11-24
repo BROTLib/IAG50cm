@@ -6,11 +6,11 @@
 // depend on (pyBROT, BROTgui). The migration onto FB_RaDecTelescopeControl must not change them. FB_RecordingComm records
 // the calls; the method is called once, directly, so the record holds exactly one telemetry run. The expected list was
 // written from the code at IAG50cm develop 0df040e; where the code has an IF/ELSE with the same field in both branches the
-// field is listed once.
+// field is listed once. IAG50cm#7 added the four POINTING.REFRACTION.* fields after POINTING.OFFSETS.DEC (73 fields).
 FUNCTION_BLOCK IagTelemetry_Tests EXTENDS TcUnit.FB_TestSuite
 VAR CONSTANT
 	// kinds: 1 LREAL, 2 INT, 4 STRING (FB_RecordingComm)
-	aExpectedNames : ARRAY[1..69] OF STRING(80) := [
+	aExpectedNames : ARRAY[1..73] OF STRING(80) := [
 		'TELESCOPE.READY_STATE',
 		'TELESCOPE.MOTION_STATE',
 		'TELESCOPE.INFO.NAME',
@@ -39,6 +39,10 @@ VAR CONSTANT
 		'POINTING.SLEWTIME',
 		'POINTING.OFFSETS.HA',
 		'POINTING.OFFSETS.DEC',
+		'POINTING.REFRACTION.MODE',
+		'POINTING.REFRACTION.HA',
+		'POINTING.REFRACTION.DEC',
+		'POINTING.REFRACTION.LIVE_WEATHER',
 		'POSITION.LOCAL.SIDEREAL_TIME',
 		'POSITION.LOCAL.JD',
 		'POSITION.LOCAL.LATITUDE',
@@ -80,7 +84,7 @@ VAR CONSTANT
 		'POSITION.EQUATORIAL.DEC_ICRS',
 		'POSITION.EQUATORIAL.HA_APPARENT',
 		'POSITION.EQUATORIAL.DEC_APPARENT'];
-	aExpectedKinds : ARRAY[1..69] OF INT := [1, 1, 4, 1, 4, 4, 2, 4, 4, 2, 2, 1, 1, 1, 1, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+	aExpectedKinds : ARRAY[1..73] OF INT := [1, 1, 4, 1, 4, 4, 2, 4, 4, 2, 2, 1, 1, 1, 1, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
 END_VAR
 ]]></Declaration>
     <Implementation>
@@ -117,14 +121,14 @@ CASE nStep OF
 		rig.fbTel._SendTelemetryEquitorial();
 		rig.fbComm.Stop();
 		nFirstBad := 0;
-		FOR i := 1 TO 69 DO
+		FOR i := 1 TO 73 DO
 			IF rig.fbComm.aNames[i] <> aExpectedNames[i] OR rig.fbComm.aKinds[i] <> aExpectedKinds[i] THEN
 				nFirstBad := i;
 				EXIT;
 			END_IF
 		END_FOR
-		AssertEquals_INT(Expected := 69, Actual := rig.fbComm.nCount, Message := 'number of published fields');
-		F_Note(bFailed := rig.fbComm.nCount <> 69, sText := CONCAT(sTest, CONCAT('number of published fields: ', INT_TO_STRING(rig.fbComm.nCount))));
+		AssertEquals_INT(Expected := 73, Actual := rig.fbComm.nCount, Message := 'number of published fields');
+		F_Note(bFailed := rig.fbComm.nCount <> 73, sText := CONCAT(sTest, CONCAT('number of published fields: ', INT_TO_STRING(rig.fbComm.nCount))));
 		AssertEquals_INT(Expected := 0, Actual := nFirstBad, Message := 'first field that differs in name or type (index)');
 		IF nFirstBad > 0 THEN
 			F_Note(bFailed := TRUE, sText := CONCAT(CONCAT(CONCAT(sTest, CONCAT('field ', INT_TO_STRING(nFirstBad))), CONCAT(' is ', rig.fbComm.aNames[nFirstBad])), CONCAT(', expected ', aExpectedNames[nFirstBad])));
