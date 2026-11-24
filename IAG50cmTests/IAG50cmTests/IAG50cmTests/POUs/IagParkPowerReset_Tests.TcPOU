@@ -17,6 +17,7 @@ Init_Drops_A_Stale_Home();
 Reset_At_Rest_Drops_A_Pending_Move();
 Reset_During_Park_Keeps_The_Park();
 Reset_Recovers_A_Stuck_Stop();
+Reset_Clears_A_Refused_PowerOn();
 ]]></ST>
     </Implementation>
     <Method Name="Park_During_Stop_Runs_After_Settle" Id="{6b0f034f-eecc-426f-8e38-cf376fe6fb5c}">
@@ -649,6 +650,71 @@ CASE nStep OF
 	ELSIF nCycles > 100 THEN
 		AssertTrue(Condition := FALSE, Message := 'the reset did not recover the stuck stop');
 		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the reset did not recover the stuck stop'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+END_CASE
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset_Clears_A_Refused_PowerOn" Id="{4c23e64a-7c9a-40e8-a410-089ecaf91da9}">
+      <Declaration><![CDATA[// #199: a power-on refused while the safety acknowledge is pending latched bPowerFailure, and READY_STATE stayed -1 after
+// the acknowledge and any number of resets, stops or parks (only a later accepted power-on cleared it). A reset ends it.
+METHOD PRIVATE Reset_Clears_A_Refused_PowerOn
+VAR_INST
+	rig			: FB_IagRig;
+	nStep		: INT;
+	nCycles		: UINT;
+	bSeen		: BOOL;
+	sTest		: STRING(80);
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TEST('Reset_Clears_A_Refused_PowerOn');
+sTest := 'Reset_Clears_A_Refused_PowerOn: ';
+IF nStep >= 90 THEN
+	RETURN;
+END_IF
+rig.Scan();
+nCycles := nCycles + 1;
+CASE nStep OF
+0:	// wait for the clock, then a power-on while the acknowledge after an E-stop is pending: refused
+	IF rig.ClockValid THEN
+		rig.fbTel.bSafetyAckPending := TRUE;
+		rig.fbTel.Init();
+		nStep := 10;
+		nCycles := 0;
+	ELSIF nCycles > 2000 THEN
+		AssertTrue(Condition := FALSE, Message := 'the astronomical clock never became valid');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the astronomical clock never became valid'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+10:	// the refusal gives READY_STATE -1
+	IF rig.fbTel.ReadyState = -1.0 THEN
+		nStep := 20;
+		nCycles := 0;
+	ELSIF nCycles > 50 THEN
+		AssertTrue(Condition := FALSE, Message := 'the refused power-on did not give READY_STATE -1');
+		F_Note(bFailed := TRUE, sText := CONCAT(sTest, 'the refused power-on did not give READY_STATE -1'));
+		nStep := 99;
+		TEST_FINISHED();
+	END_IF
+20:	// the acknowledge is done (as after the first reset on the telescope), then a reset with no error and nothing pending
+	IF nCycles > 5 THEN
+		rig.fbTel.bSafetyAckPending := FALSE;
+		rig.fbTel.Reset();
+		nStep := 30;
+		nCycles := 0;
+	END_IF
+30:
+	IF nCycles > 20 THEN
+		AssertTrue(Condition := rig.fbTel.ReadyState <> -1.0,
+			Message := CONCAT('READY_STATE is not -1 after the reset, it is ', LREAL_TO_STRING(rig.fbTel.ReadyState)));
+		F_Note(bFailed := NOT (rig.fbTel.ReadyState <> -1.0),
+			sText := CONCAT(sTest, CONCAT('READY_STATE after the reset ', LREAL_TO_STRING(rig.fbTel.ReadyState))));
+		AssertFalse(Condition := rig.fbTel.bError, Message := 'no error');
 		nStep := 99;
 		TEST_FINISHED();
 	END_IF
